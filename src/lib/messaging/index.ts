@@ -1,8 +1,17 @@
 // 类型安全的消息通道：业务代码只和 ProtocolMap 打交道，
 // 不直接碰 browser.runtime.sendMessage。
 
+import type {
+  TranslateRequest,
+  TranslateResponse,
+} from "@/engines/types";
+
 export interface ProtocolMap {
   ping: { input: { text: string }; output: { echo: string; at: number } };
+  translate: {
+    input: TranslateRequest & { engine?: string };
+    output: TranslateResponse;
+  };
 }
 
 type Envelope<K extends keyof ProtocolMap = keyof ProtocolMap> = {
