@@ -33,6 +33,7 @@ interface WordHit {
 
 interface State {
   target: string;
+  engine: string;
   dwellTimer: number | null;
   lastWord: string | null;
   pendingX: number;
@@ -45,6 +46,7 @@ interface State {
 export function initHover(): void {
   const state: State = {
     target: "zh",
+    engine: "google",
     dwellTimer: null,
     lastWord: null,
     pendingX: 0,
@@ -54,8 +56,14 @@ export function initHover(): void {
     segmenter: new Intl.Segmenter(undefined, { granularity: "word" }),
   };
 
-  void getSettings().then((s) => (state.target = s.targetLang));
-  watchSettings((s) => (state.target = s.targetLang));
+  void getSettings().then((s) => {
+    state.target = s.targetLang;
+    state.engine = s.engines.hover;
+  });
+  watchSettings((s) => {
+    state.target = s.targetLang;
+    state.engine = s.engines.hover;
+  });
 
   document.addEventListener("mousemove", (e) => onMove(e, state), {
     passive: true,
@@ -65,7 +73,7 @@ export function initHover(): void {
 }
 
 function onMove(e: MouseEvent, s: State): void {
-  if (isEditable(e.target)) {
+  if (isEditable(e.target) || isOurUi(e.target)) {
     dismiss(s);
     return;
   }
@@ -90,7 +98,7 @@ function fire(s: State): void {
   setHighlight(hit.range);
   const anchor = hit.rect;
 
-  sendMessage("translate", { text: hit.text, target: s.target })
+  sendMessage("translate", { text: hit.text, target: s.target, engine: s.engine })
     .then((res) => {
       if (mySeq !== s.seq) return;
       show(s, res.text, anchor);
@@ -213,6 +221,14 @@ function isEditable(t: EventTarget | null): boolean {
   const tag = t.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return true;
   return (t as HTMLElement).isContentEditable;
+}
+
+// 鼠标进入我们自己注入的 UI（划词 logo / 卡片等）时不触发 hover，
+// 避免两条交互路径打架。
+function isOurUi(t: EventTarget | null): boolean {
+  if (!(t instanceof Element)) return false;
+  // selection UI 都在 closed shadow root 里，事件 retarget 后 target 就是 host
+  return !!t.closest("[data-onelingo-tooltip],[data-onelingo-host]");
 }
 
 // ---------- CSS Custom Highlight ----------

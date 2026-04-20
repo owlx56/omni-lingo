@@ -1,5 +1,6 @@
 import { sendMessage } from "@/lib/messaging";
 import { initHover } from "@/features/hover";
+import { initSelection } from "@/features/selection";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -12,5 +13,6 @@ export default defineContentScript({
       console.warn("[OneLingo] ping failed:", e);
     }
     initHover();
+    initSelection();
   },
 });
