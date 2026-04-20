@@ -9,14 +9,18 @@ export interface EngineMap {
   fullPage: string;
 }
 
+export type HoverGranularity = "word" | "sentence" | "paragraph";
+
 export interface Settings {
   targetLang: "zh" | "en";
   engines: EngineMap;
+  hoverGranularity: HoverGranularity;
 }
 
 const DEFAULTS: Settings = {
   targetLang: "zh",
   engines: { hover: "google", selection: "google", fullPage: "google" },
+  hoverGranularity: "sentence",
 };
 
 const KEY = "sync:settings" as const;

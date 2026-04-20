@@ -32,12 +32,27 @@ function isEnvelope(raw: unknown): raw is Envelope {
   );
 }
 
-export function sendMessage<K extends keyof ProtocolMap>(
+export async function sendMessage<K extends keyof ProtocolMap>(
   type: K,
   input: ProtocolMap[K]["input"],
 ): Promise<ProtocolMap[K]["output"]> {
   const env: Envelope<K> = { __onelingo: true, type, input };
-  return browser.runtime.sendMessage(env) as Promise<ProtocolMap[K]["output"]>;
+  const send = () =>
+    browser.runtime.sendMessage(env) as Promise<ProtocolMap[K]["output"]>;
+  try {
+    return await send();
+  } catch (err) {
+    // MV3 Service Worker 被 Chrome 杀掉时抛此错；
+    // 再次 sendMessage 会自动唤醒 SW，等 150ms 让它重启后重试一次。
+    if (
+      err instanceof Error &&
+      err.message.includes("message channel closed")
+    ) {
+      await new Promise<void>((r) => setTimeout(r, 150));
+      return await send();
+    }
+    throw err;
+  }
 }
 
 export function onMessage<K extends keyof ProtocolMap>(

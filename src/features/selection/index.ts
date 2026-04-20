@@ -17,8 +17,6 @@ import {
   setSelText,
   setSelTarget,
   setSelResult,
-  setSelEngine,
-  type SelEngine,
 } from "./card-store";
 
 const LOGO_ATTR = "data-onelingo-logo";
@@ -66,13 +64,11 @@ export function initSelection(): void {
     s.target = cfg.targetLang;
     s.engine = cfg.engines.selection;
     setSelTarget(cfg.targetLang);
-    setSelEngine(cfg.engines.selection as SelEngine);
   });
   watchSettings((cfg) => {
     s.target = cfg.targetLang;
     s.engine = cfg.engines.selection;
     setSelTarget(cfg.targetLang);
-    setSelEngine(cfg.engines.selection as SelEngine);
   });
 
   // ★ 关键修复：shadow DOM 内的 mouseup retarget 到 host，
@@ -115,7 +111,6 @@ function onMouseUp(e: MouseEvent, s: State): void {
 
   setSelText(text);
   setSelResult(null);
-  setSelEngine(s.engine as SelEngine);
   setSelTarget(s.target);
 
   const mySeq = s.seq;

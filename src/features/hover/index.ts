@@ -1,11 +1,14 @@
 // 悬停翻译最小闭环。热路径，保持 vanilla、零框架。
 //
-// 策略：mousemove 只重置 dwell timer（不做昂贵计算）；timer 触发时
-// 用最后的坐标取词、发 RPC、显译文。换词即重启；离开或进入可编辑
-// 区则 dismiss。暂无 Shadow DOM。
+// 粒度（hoverGranularity）：
+//   word      — word 几何校验 → 直接返回命中词
+//   sentence  — word 几何校验 → sentence segmenter 取句（文本节点内）
+//   paragraph — word 几何校验 → 找最近 block 祖先 → innerText 整段
+//
+// 缓存共用：key = engine|src|tgt|text，全文翻译按相同粒度拆句即可命中。
 
 import { sendMessage } from "@/lib/messaging";
-import { getSettings, watchSettings } from "@/lib/storage/settings";
+import { getSettings, watchSettings, type HoverGranularity } from "@/lib/storage/settings";
 
 const DWELL_MS = 1;
 const TOOLTIP_ATTR = "data-onelingo-tooltip";
@@ -19,55 +22,57 @@ type CaretDoc = Document & {
   caretRangeFromPoint?(x: number, y: number): Range | null;
 };
 
-// CSS Custom Highlight API 的最小类型占位。TS lib 里还没完全稳定，
-// 用窄声明避免 any，Firefox 无此 API 时优雅降级。
 type HighlightCtor = new (range: Range) => unknown;
 type HighlightRegistry = { set(name: string, h: unknown): void; delete(name: string): void };
 type CSSWithHighlights = typeof CSS & { highlights?: HighlightRegistry };
 
-interface WordHit {
-  text: string;
-  rect: DOMRect;
-  range: Range;
+interface TextHit {
+  text: string;   // 翻译单元（句子 or 段落）
+  rect: DOMRect;  // 词位置（tooltip 锚点）
+  range: Range;   // 高亮范围
 }
 
 interface State {
   target: string;
   engine: string;
+  granularity: HoverGranularity;
   dwellTimer: number | null;
-  lastWord: string | null;
+  lastText: string | null;  // 上次翻译的文本（去重）
   pendingX: number;
   pendingY: number;
   tooltip: HTMLDivElement | null;
   seq: number;
-  segmenter: Intl.Segmenter;
+  wordSegmenter: Intl.Segmenter;
+  sentenceSegmenter: Intl.Segmenter;
 }
 
 export function initHover(): void {
   const state: State = {
     target: "zh",
     engine: "google",
+    granularity: "sentence",
     dwellTimer: null,
-    lastWord: null,
+    lastText: null,
     pendingX: 0,
     pendingY: 0,
     tooltip: null,
     seq: 0,
-    segmenter: new Intl.Segmenter(undefined, { granularity: "word" }),
+    wordSegmenter: new Intl.Segmenter(undefined, { granularity: "word" }),
+    sentenceSegmenter: new Intl.Segmenter(undefined, { granularity: "sentence" }),
   };
 
   void getSettings().then((s) => {
     state.target = s.targetLang;
     state.engine = s.engines.hover;
+    state.granularity = s.hoverGranularity;
   });
   watchSettings((s) => {
     state.target = s.targetLang;
     state.engine = s.engines.hover;
+    state.granularity = s.hoverGranularity;
   });
 
-  document.addEventListener("mousemove", (e) => onMove(e, state), {
-    passive: true,
-  });
+  document.addEventListener("mousemove", (e) => onMove(e, state), { passive: true });
   document.addEventListener("mouseleave", () => dismiss(state));
   document.addEventListener("scroll", () => dismiss(state), { passive: true });
 }
@@ -85,16 +90,15 @@ function onMove(e: MouseEvent, s: State): void {
 
 function fire(s: State): void {
   s.dwellTimer = null;
-  const hit = wordAt(s.pendingX, s.pendingY, s.segmenter);
+  const hit = hitAt(s.pendingX, s.pendingY, s.wordSegmenter, s.sentenceSegmenter, s.granularity);
   if (!hit) {
     dismiss(s);
     return;
   }
-  if (hit.text === s.lastWord) return;
-  s.lastWord = hit.text;
+  if (hit.text === s.lastText) return; // 同一翻译单元内移动不重发
+  s.lastText = hit.text;
   const mySeq = ++s.seq;
 
-  // 先显下划线反馈"识别到了"，再等译文
   setHighlight(hit.range);
   const anchor = hit.rect;
 
@@ -109,55 +113,109 @@ function fire(s: State): void {
     });
 }
 
-function wordAt(
+// ─── 取词 / 句 / 段 ──────────────────────────────────
+
+function hitAt(
   x: number,
   y: number,
-  seg: Intl.Segmenter,
-): WordHit | null {
+  wordSeg: Intl.Segmenter,
+  sentSeg: Intl.Segmenter,
+  granularity: HoverGranularity,
+): TextHit | null {
+  // 1. caret API 找文本节点 + offset
   const doc = document as CaretDoc;
   let node: Node | null = null;
   let offset = 0;
   if (doc.caretPositionFromPoint) {
     const p = doc.caretPositionFromPoint(x, y);
-    if (p) {
-      node = p.offsetNode;
-      offset = p.offset;
-    }
+    if (p) { node = p.offsetNode; offset = p.offset; }
   } else if (doc.caretRangeFromPoint) {
     const r = doc.caretRangeFromPoint(x, y);
-    if (r) {
-      node = r.startContainer;
-      offset = r.startOffset;
-    }
+    if (r) { node = r.startContainer; offset = r.startOffset; }
   }
   if (!node || node.nodeType !== Node.TEXT_NODE) return null;
   const textNode = node as Text;
   const text = textNode.nodeValue ?? "";
   if (!text.trim()) return null;
 
-  for (const s of seg.segment(text)) {
-    if (!s.isWordLike) continue;
-    const start = s.index;
-    const end = start + s.segment.length;
-    if (offset < start || offset > end) continue;
+  // 2. word segmenter 几何校验（防 caret 空白吸附）
+  let wordStart = -1;
+  let hitRect: DOMRect | null = null;
+  let hitWordText = "";
+  let hitWordRange: Range | null = null;
 
-    // caret API 会把词右侧空白吸附到词末尾 offset，必须用真实几何再校验一次。
-    // 跨行词有多个 rect，命中哪个用哪个。
-    const range = document.createRange();
-    range.setStart(textNode, start);
-    range.setEnd(textNode, end);
-    const rects = range.getClientRects();
+  for (const w of wordSeg.segment(text)) {
+    if (!w.isWordLike) continue;
+    const ws = w.index;
+    const we = ws + w.segment.length;
+    if (offset < ws || offset > we) continue;
+
+    const wr = document.createRange();
+    wr.setStart(textNode, ws);
+    wr.setEnd(textNode, we);
+    const rects = wr.getClientRects();
     for (let i = 0; i < rects.length; i++) {
       const r = rects[i];
       if (!r) continue;
       if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-        return { text: s.segment, rect: r, range };
+        wordStart = ws;
+        hitRect = r;
+        hitWordText = w.segment;
+        hitWordRange = wr;
+        break;
       }
+    }
+    break;
+  }
+  if (wordStart === -1 || !hitRect) return null;
+
+  // 3a. 词模式：几何校验已完成，直接返回命中词
+  if (granularity === "word") {
+    return { text: hitWordText, rect: hitRect, range: hitWordRange! };
+  }
+
+  // 3b. 句子模式：sentence segmenter 在同一文本节点内取句
+  if (granularity === "sentence") {
+    for (const sent of sentSeg.segment(text)) {
+      const ss = sent.index;
+      const se = ss + sent.segment.length;
+      if (wordStart < ss || wordStart >= se) continue;
+      const sentText = sent.segment.trim();
+      if (!sentText) return null;
+      const sentRange = document.createRange();
+      sentRange.setStart(textNode, ss);
+      sentRange.setEnd(textNode, se);
+      return { text: sentText, rect: hitRect, range: sentRange };
     }
     return null;
   }
-  return null;
+
+  // 3c. 段落模式：找最近 block 祖先，取 innerText
+  return paragraphHit(textNode, hitRect);
 }
+
+// block-level display 值判断（不含 inline-*）
+const BLOCK_RE = /^(block|flex|grid|list-item|table(?!-cell\b|-row\b)|table-cell|table-row)$/;
+
+function paragraphHit(textNode: Text, hitRect: DOMRect): TextHit | null {
+  let el: Element | null = textNode.parentElement;
+  while (el && el !== document.documentElement) {
+    const display = window.getComputedStyle(el).display;
+    if (BLOCK_RE.test(display)) break;
+    el = el.parentElement;
+  }
+  if (!el || el === document.documentElement || el === document.body) return null;
+
+  const paraText = (el as HTMLElement).innerText?.trim();
+  if (!paraText) return null;
+
+  const paraRange = document.createRange();
+  paraRange.selectNodeContents(el);
+
+  return { text: paraText, rect: hitRect, range: paraRange };
+}
+
+// ─── 显示 / 收起 ─────────────────────────────────────
 
 function show(s: State, translation: string, anchor: DOMRect): void {
   let el = s.tooltip;
@@ -172,7 +230,9 @@ function show(s: State, translation: string, anchor: DOMRect): void {
       "padding:6px 8px",
       "border-radius:4px",
       "font:12px/1.4 system-ui,sans-serif",
-      "max-width:320px",
+      "max-width:360px",
+      "white-space:pre-wrap",
+      "word-break:break-word",
       "pointer-events:none",
       "box-shadow:0 2px 8px rgba(0,0,0,.3)",
     ].join(";");
@@ -181,7 +241,6 @@ function show(s: State, translation: string, anchor: DOMRect): void {
   }
   el.textContent = translation;
 
-  // 先隐形放上去量尺寸，避免闪一下再定位
   el.style.visibility = "hidden";
   el.style.display = "block";
   const tw = el.offsetWidth;
@@ -190,7 +249,6 @@ function show(s: State, translation: string, anchor: DOMRect): void {
   const vh = window.innerHeight;
   const margin = 14;
 
-  // 默认在词上方；上面放不下就翻到下方；水平超出视口就左移
   let left = anchor.left;
   let top = anchor.top - th - margin;
   if (top < 4) top = Math.min(anchor.bottom + margin, vh - th - 4);
@@ -203,7 +261,7 @@ function show(s: State, translation: string, anchor: DOMRect): void {
 
 function dismiss(s: State): void {
   clearTimer(s);
-  s.lastWord = null;
+  s.lastText = null;
   s.seq++;
   clearHighlight();
   if (s.tooltip) s.tooltip.style.display = "none";
@@ -223,26 +281,22 @@ function isEditable(t: EventTarget | null): boolean {
   return (t as HTMLElement).isContentEditable;
 }
 
-// 鼠标进入我们自己注入的 UI（划词 logo / 卡片等）时不触发 hover，
-// 避免两条交互路径打架。
 function isOurUi(t: EventTarget | null): boolean {
   if (!(t instanceof Element)) return false;
-  // selection UI 都在 closed shadow root 里，事件 retarget 后 target 就是 host
   return !!t.closest("[data-onelingo-tooltip],[data-onelingo-host]");
 }
 
-// ---------- CSS Custom Highlight ----------
+// ─── CSS Custom Highlight ─────────────────────────────
 
 let highlightStyleInjected = false;
 
 function getRegistry(): HighlightRegistry | null {
-  const c = CSS as CSSWithHighlights;
-  return c.highlights ?? null;
+  return (CSS as CSSWithHighlights).highlights ?? null;
 }
 
 function setHighlight(range: Range): void {
   const reg = getRegistry();
-  if (!reg) return; // Firefox 没实现，先静默降级
+  if (!reg) return;
   injectHighlightStyle();
   const Ctor = (globalThis as { Highlight?: HighlightCtor }).Highlight;
   if (!Ctor) return;
