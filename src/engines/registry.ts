@@ -1,8 +1,10 @@
 import type { Engine } from "./types";
 import { google } from "./google";
+import { microsoft } from "./microsoft";
 
 const ENGINES: Record<string, Engine> = {
   [google.id]: google,
+  [microsoft.id]: microsoft,
 };
 
 export function getEngine(id: string): Engine {

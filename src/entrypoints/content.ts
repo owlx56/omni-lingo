@@ -1,4 +1,5 @@
 import { sendMessage } from "@/lib/messaging";
+import { initFullPage } from "@/features/immersive";
 import { initHover } from "@/features/hover";
 import { initSelection } from "@/features/selection";
 
@@ -12,6 +13,7 @@ export default defineContentScript({
     } catch (e) {
       console.warn("[OneLingo] ping failed:", e);
     }
+    initFullPage();
     initHover();
     initSelection();
   },

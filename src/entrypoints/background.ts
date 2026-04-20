@@ -1,4 +1,4 @@
-import { onMessage } from "@/lib/messaging";
+import { onMessage, sendTabMessage } from "@/lib/messaging";
 import { DEFAULT_ENGINE_ID, getEngine } from "@/engines/registry";
 import { translateCached } from "@/lib/cache/translate";
 
@@ -11,5 +11,13 @@ export default defineBackground(() => {
     const id = engine ?? DEFAULT_ENGINE_ID;
     const e = getEngine(id);
     return translateCached(id, req, () => e.translate(req));
+  });
+
+  onMessage("translatePage", async (input) => {
+    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    if (typeof tab?.id !== "number") {
+      throw new Error("当前没有可翻译的活动标签页");
+    }
+    return sendTabMessage(tab.id, "runPageTranslate", input);
   });
 });

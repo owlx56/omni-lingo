@@ -5,12 +5,31 @@ import type {
   TranslateRequest,
   TranslateResponse,
 } from "@/engines/types";
+import { browser } from "wxt/browser";
+
+export interface PageTranslateCommand {
+  target: string;
+  engine: string;
+}
+
+export interface PageTranslateAck {
+  accepted: boolean;
+  blocks: number;
+}
 
 export interface ProtocolMap {
   ping: { input: { text: string }; output: { echo: string; at: number } };
   translate: {
     input: TranslateRequest & { engine?: string };
     output: TranslateResponse;
+  };
+  translatePage: {
+    input: PageTranslateCommand;
+    output: PageTranslateAck;
+  };
+  runPageTranslate: {
+    input: PageTranslateCommand;
+    output: PageTranslateAck;
   };
 }
 
@@ -36,9 +55,14 @@ export async function sendMessage<K extends keyof ProtocolMap>(
   type: K,
   input: ProtocolMap[K]["input"],
 ): Promise<ProtocolMap[K]["output"]> {
-  const env: Envelope<K> = { __onelingo: true, type, input };
-  const send = () =>
-    browser.runtime.sendMessage(env) as Promise<ProtocolMap[K]["output"]>;
+  const env = makeEnvelope(type, input);
+  const send = () => {
+    const runtime = browser.runtime;
+    if (!runtime?.sendMessage) {
+      throw new Error("Extension context invalidated");
+    }
+    return runtime.sendMessage(env) as Promise<ProtocolMap[K]["output"]>;
+  };
   try {
     return await send();
   } catch (err) {
@@ -55,14 +79,38 @@ export async function sendMessage<K extends keyof ProtocolMap>(
   }
 }
 
+export async function sendTabMessage<K extends keyof ProtocolMap>(
+  tabId: number,
+  type: K,
+  input: ProtocolMap[K]["input"],
+): Promise<ProtocolMap[K]["output"]> {
+  if (!browser.tabs?.sendMessage) {
+    throw new Error("Extension context invalidated");
+  }
+  return browser.tabs.sendMessage(
+    tabId,
+    makeEnvelope(type, input),
+  ) as Promise<ProtocolMap[K]["output"]>;
+}
+
 export function onMessage<K extends keyof ProtocolMap>(
   type: K,
   handler: Handler<K>,
 ): () => void {
+  if (!browser.runtime?.onMessage) {
+    return () => {};
+  }
   const listener = (raw: unknown): Promise<unknown> | undefined => {
     if (!isEnvelope(raw) || raw.type !== type) return undefined;
     return Promise.resolve(handler(raw.input as ProtocolMap[K]["input"]));
   };
   browser.runtime.onMessage.addListener(listener);
   return () => browser.runtime.onMessage.removeListener(listener);
+}
+
+function makeEnvelope<K extends keyof ProtocolMap>(
+  type: K,
+  input: ProtocolMap[K]["input"],
+): Envelope<K> {
+  return { __onelingo: true, type, input };
 }

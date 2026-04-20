@@ -1,5 +1,25 @@
 import { defineConfig } from "wxt";
 
+function ensureScriptSrcOrigin(csp: string | undefined, origin: string): string {
+  const parts = (csp ?? "").split(";").map((part) => part.trim()).filter(Boolean);
+  let foundScriptSrc = false;
+
+  for (let i = 0; i < parts.length; i++) {
+    const tokens = parts[i]?.split(/\s+/).filter(Boolean) ?? [];
+    if (tokens[0] !== "script-src") continue;
+    foundScriptSrc = true;
+    if (!tokens.includes(origin)) tokens.push(origin);
+    parts[i] = tokens.join(" ");
+  }
+
+  if (!foundScriptSrc) parts.push(`script-src 'self' ${origin}`);
+  if (!parts.some((part) => part.startsWith("object-src "))) {
+    parts.push("object-src 'self'");
+  }
+
+  return `${parts.join("; ")};`;
+}
+
 export default defineConfig({
   srcDir: "src",
   modules: ["@wxt-dev/module-solid"],
@@ -16,6 +36,22 @@ export default defineConfig({
     content_security_policy: {
       extension_pages:
         "script-src 'self' 'wasm-unsafe-eval' http://localhost:3000; object-src 'self';",
+    },
+  },
+  hooks: {
+    // WXT dev 模式会重写 CSP 并追加动态端口，这里兜底保留 3000，
+    // 避免 popup.html（常驻 3000）与 manifest CSP 端口错位。
+    "build:manifestGenerated": (_wxt, manifest) => {
+      const csp = manifest.content_security_policy;
+      if (!csp || typeof csp === "string") return;
+      csp.extension_pages = ensureScriptSrcOrigin(
+        csp.extension_pages,
+        "http://localhost:3000",
+      );
+      csp.sandbox = ensureScriptSrcOrigin(
+        csp.sandbox,
+        "http://localhost:3000",
+      );
     },
   },
   webExt: {
