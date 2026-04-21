@@ -1,0 +1,127 @@
+:root {
+  color: #20242a;
+  background: #f6f7f9;
+  font-family:
+    "Segoe UI",
+    "Microsoft YaHei",
+    "PingFang SC",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+button {
+  font: inherit;
+}
+
+.page {
+  width: min(840px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 40px 0 56px;
+}
+
+.header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #dfe3e8;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #69717d;
+  font-size: 13px;
+}
+
+h1,
+h2 {
+  margin: 0;
+}
+
+h1 {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.scope {
+  color: #69717d;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.section {
+  padding: 26px 0 4px;
+}
+
+.option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.option-button {
+  min-height: 64px;
+  padding: 12px 14px;
+  border: 1px solid #d7dce2;
+  border-radius: 8px;
+  background: #fff;
+  color: #20242a;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.option-button:hover {
+  border-color: #8fa2ba;
+}
+
+.option-button.active {
+  border-color: #2563eb;
+  background: #f2f6ff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.option-button span {
+  display: block;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.option-button small {
+  display: block;
+  margin-top: 4px;
+  color: #687180;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+@media (max-width: 560px) {
+  .page {
+    width: min(100% - 24px, 840px);
+    padding-top: 24px;
+  }
+
+  .header {
+    align-items: start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}

@@ -10,17 +10,20 @@ export interface EngineMap {
 }
 
 export type HoverGranularity = "word" | "sentence" | "paragraph";
+export type FullPageMode = "replace" | "bilingual";
 
 export interface Settings {
   targetLang: "zh" | "en";
   engines: EngineMap;
   hoverGranularity: HoverGranularity;
+  fullPageMode: FullPageMode;
 }
 
 const DEFAULTS: Settings = {
   targetLang: "zh",
   engines: { hover: "google", selection: "google", fullPage: "google" },
   hoverGranularity: "sentence",
+  fullPageMode: "replace",
 };
 
 const KEY = "sync:settings" as const;

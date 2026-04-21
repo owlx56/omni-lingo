@@ -1,6 +1,11 @@
-import { For, createSignal } from "solid-js";
+import { For, createSignal, onMount } from "solid-js";
 import { sendMessage } from "@/lib/messaging";
-import { setSettings, useSettings, type HoverGranularity } from "@/lib/storage/settings";
+import {
+  setSettings,
+  useSettings,
+  type FullPageMode,
+  type HoverGranularity,
+} from "@/lib/storage/settings";
 import "./App.css";
 
 type EngineId = "google" | "microsoft";
@@ -14,6 +19,11 @@ const GRANULARITIES: { value: HoverGranularity; label: string }[] = [
 const ENGINES: { value: EngineId; label: string }[] = [
   { value: "google", label: "Google" },
   { value: "microsoft", label: "Microsoft" },
+];
+
+const FULL_PAGE_MODES: { value: FullPageMode; label: string }[] = [
+  { value: "replace", label: "译文" },
+  { value: "bilingual", label: "双语" },
 ];
 
 function Row(props: { label: string; children: import("solid-js").JSX.Element }) {
@@ -55,8 +65,11 @@ function SegBtn(props: { active: boolean; onClick: () => void; children: import(
 
 function App() {
   const settings = useSettings();
-  const [busy, setBusy] = createSignal(false);
+  const [action, setAction] = createSignal<"idle" | "starting" | "restoring">("idle");
   const [status, setStatus] = createSignal("");
+  const [immersiveActive, setImmersiveActive] = createSignal(false);
+  let actionSeq = 0;
+  let lastCommandId = 0;
 
   const unifiedEngine = (): EngineId | null => {
     const e = settings().engines;
@@ -72,25 +85,102 @@ function App() {
     });
   };
 
+  const openOptions = (): void => {
+    void browser.runtime.openOptionsPage().catch(() => {
+      window.open(browser.runtime.getURL("/options.html"), "_blank");
+    });
+  };
+
+  const nextCommandId = (): number => {
+    lastCommandId = Math.max(lastCommandId + 1, Date.now());
+    return lastCommandId;
+  };
+
+  const startedStatus = (blocks: number): string =>
+    blocks > 0
+      ? `已开始沉浸翻译，共 ${blocks} 个段落`
+      : "当前网页没有可翻译的段落";
+
+  const setFullPageMode = (mode: FullPageMode): void => {
+    void setSettings({ fullPageMode: mode });
+    if (!immersiveActive() || action() !== "idle") return;
+
+    const seq = ++actionSeq;
+    setAction("starting");
+    setStatus("正在切换显示模式…");
+    void (async () => {
+      await sendMessage("restorePage", { commandId: nextCommandId() });
+      const res = await sendMessage("translatePage", {
+        target: settings().targetLang,
+        engine: settings().engines.fullPage,
+        mode,
+        commandId: nextCommandId(),
+      });
+      if (seq !== actionSeq) return;
+      setImmersiveActive(res.active);
+      setStatus(startedStatus(res.blocks));
+    })()
+      .catch((e) => {
+        if (seq !== actionSeq) return;
+        setImmersiveActive(false);
+        setStatus(`错误: ${e instanceof Error ? e.message : String(e)}`);
+      })
+      .finally(() => {
+        if (seq === actionSeq) setAction("idle");
+      });
+  };
+
   const run = async () => {
-    setBusy(true);
-    setStatus("");
+    if (immersiveActive()) {
+      const seq = ++actionSeq;
+      const commandId = nextCommandId();
+      setAction("restoring");
+      setStatus("正在显示原文…");
+      try {
+        await sendMessage("restorePage", { commandId });
+        if (seq !== actionSeq) return;
+        setImmersiveActive(false);
+        setStatus("已显示原文");
+      } catch (e) {
+        if (seq !== actionSeq) return;
+        setStatus(`错误: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        if (seq === actionSeq) setAction("idle");
+      }
+      return;
+    }
+
+    const seq = ++actionSeq;
+    const commandId = nextCommandId();
+    setAction("starting");
+    setImmersiveActive(true);
+    setStatus("已开始沉浸翻译");
     try {
       const res = await sendMessage("translatePage", {
         target: settings().targetLang,
         engine: settings().engines.fullPage,
+        mode: settings().fullPageMode,
+        commandId,
       });
-      setStatus(
-        res.blocks > 0
-          ? `已开始翻译当前网页，共 ${res.blocks} 个段落`
-          : "当前网页没有可翻译的段落",
-      );
+      if (seq !== actionSeq) return;
+      setImmersiveActive(res.active);
+      setStatus(startedStatus(res.blocks));
     } catch (e) {
+      if (seq !== actionSeq) return;
+      setImmersiveActive(false);
       setStatus(`错误: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setBusy(false);
+      if (seq === actionSeq) setAction("idle");
     }
   };
+
+  onMount(() => {
+    void sendMessage("getPageTranslateStatus", {})
+      .then((res) => {
+        setImmersiveActive(res.active || res.translating);
+      })
+      .catch(() => {});
+  });
 
   return (
     <div style={{ padding: "12px", "font-family": "system-ui,sans-serif", width: "300px" }}>
@@ -141,23 +231,39 @@ function App() {
         </For>
       </Row>
 
-      {/* 网页翻译 */}
+      {/* 沉浸翻译 */}
       <div style={{ "border-top": "1px solid #eee", "padding-top": "10px", "margin-top": "4px" }}>
+        <Row label="显示模式">
+          <For each={FULL_PAGE_MODES}>
+            {(mode) => (
+              <SegBtn
+                active={settings().fullPageMode === mode.value}
+                onClick={() => setFullPageMode(mode.value)}
+              >
+                {mode.label}
+              </SegBtn>
+            )}
+          </For>
+        </Row>
         <button
           onClick={run}
-          disabled={busy()}
+          disabled={action() === "restoring"}
           style={{
             width: "100%",
             padding: "8px 10px",
             "font-size": "12px",
             "border-radius": "6px",
             border: "1px solid #d0d0d0",
-            background: busy() ? "#f2f2f2" : "#fff",
-            color: "#222",
-            cursor: busy() ? "default" : "pointer",
+            background: immersiveActive() ? "#222" : action() === "starting" ? "#f2f2f2" : "#fff",
+            color: immersiveActive() ? "#fff" : "#222",
+            cursor: action() === "restoring" ? "default" : "pointer",
           }}
         >
-          {busy() ? "启动中…" : "网页翻译"}
+          {action() === "restoring"
+            ? "显示原文中…"
+            : immersiveActive()
+              ? "显示原文"
+              : "沉浸翻译"}
         </button>
         <p
           style={{
@@ -170,6 +276,21 @@ function App() {
         >
           {status()}
         </p>
+        <button
+          onClick={openOptions}
+          style={{
+            width: "100%",
+            padding: "6px 10px",
+            "font-size": "12px",
+            "border-radius": "6px",
+            border: "1px solid #d0d0d0",
+            background: "#fff",
+            color: "#444",
+            cursor: "pointer",
+          }}
+        >
+          打开设置
+        </button>
       </div>
     </div>
   );

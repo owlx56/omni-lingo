@@ -1,10 +1,10 @@
-// background 常驻的翻译缓存。内存 LRU + 在途 Promise 去重。
-// service worker 被杀时整片丢失——没关系，IndexedDB 持久化是后续步骤。
+// background 常驻的翻译缓存。内存 LRU + IndexedDB 二级缓存 + 在途 Promise 去重。
 
 import type { TranslateRequest, TranslateResponse } from "@/engines/types";
 import { LRU } from "./lru";
+import { readTranslateCache, writeTranslateCache } from "./translate-db";
 
-const CAP = 500;
+const CAP = 5_000;
 
 const cache = new LRU<string, TranslateResponse>(CAP);
 const inflight = new Map<string, Promise<TranslateResponse>>();
@@ -26,14 +26,21 @@ export async function translateCached(
   const pending = inflight.get(k);
   if (pending) return pending;
 
-  const p = run()
-    .then((res) => {
-      cache.set(k, res);
-      return res;
-    })
-    .finally(() => {
-      inflight.delete(k);
-    });
+  const p = (async () => {
+    const persisted = await readTranslateCache(k).catch(() => undefined);
+    if (persisted) {
+      cache.set(k, persisted);
+      return persisted;
+    }
+
+    const res = await run();
+    cache.set(k, res);
+    void writeTranslateCache(k, res).catch(() => undefined);
+    return res;
+  })().finally(() => {
+    inflight.delete(k);
+  });
+
   inflight.set(k, p);
   return p;
 }

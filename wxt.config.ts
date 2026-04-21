@@ -26,8 +26,12 @@ export default defineConfig({
   manifest: {
     name: "OneLingo",
     description: "跨平台翻译拓展",
-    permissions: ["storage"],
+    permissions: ["storage", "unlimitedStorage"],
     host_permissions: ["<all_urls>"],
+    options_ui: {
+      page: "options.html",
+      open_in_tab: true,
+    },
     // dev 模式下 popup 脚本从 Vite HTTP server (localhost:3000) 加载。
     // WXT 本身会将 wxt.server.origin（Vite 实际绑定端口）追加到 CSP，
     // 但选择性重建时可能产生 manifest 与 popup.html 跨会话端口不一致。
@@ -42,6 +46,11 @@ export default defineConfig({
     // WXT dev 模式会重写 CSP 并追加动态端口，这里兜底保留 3000，
     // 避免 popup.html（常驻 3000）与 manifest CSP 端口错位。
     "build:manifestGenerated": (_wxt, manifest) => {
+      manifest.options_ui = {
+        page: "options.html",
+        open_in_tab: true,
+      };
+
       const csp = manifest.content_security_policy;
       if (!csp || typeof csp === "string") return;
       csp.extension_pages = ensureScriptSrcOrigin(

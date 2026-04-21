@@ -10,10 +10,23 @@ import { browser } from "wxt/browser";
 export interface PageTranslateCommand {
   target: string;
   engine: string;
+  mode?: "replace" | "bilingual";
+  commandId?: number;
+}
+
+export interface PageControlCommand {
+  commandId?: number;
 }
 
 export interface PageTranslateAck {
   accepted: boolean;
+  blocks: number;
+  active: boolean;
+}
+
+export interface PageTranslateStatus {
+  active: boolean;
+  translating: boolean;
   blocks: number;
 }
 
@@ -27,9 +40,25 @@ export interface ProtocolMap {
     input: PageTranslateCommand;
     output: PageTranslateAck;
   };
+  restorePage: {
+    input: PageControlCommand;
+    output: PageTranslateStatus;
+  };
+  getPageTranslateStatus: {
+    input: Record<string, never>;
+    output: PageTranslateStatus;
+  };
   runPageTranslate: {
     input: PageTranslateCommand;
     output: PageTranslateAck;
+  };
+  runPageRestore: {
+    input: PageControlCommand;
+    output: PageTranslateStatus;
+  };
+  readPageTranslateStatus: {
+    input: Record<string, never>;
+    output: PageTranslateStatus;
   };
 }
 
