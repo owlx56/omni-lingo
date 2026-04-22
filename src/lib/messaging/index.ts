@@ -22,12 +22,19 @@ export interface PageTranslateAck {
   accepted: boolean;
   blocks: number;
   active: boolean;
+  translating?: boolean;
+  mode?: "replace" | "bilingual";
+  engine?: string;
+  target?: string;
 }
 
 export interface PageTranslateStatus {
   active: boolean;
   translating: boolean;
   blocks: number;
+  mode?: "replace" | "bilingual";
+  engine?: string;
+  target?: string;
 }
 
 export interface ProtocolMap {
