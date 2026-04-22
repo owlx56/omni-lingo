@@ -15,7 +15,10 @@ const NAVIGATION_RETRANSLATE_DELAY_MS = 800;
 const TRANSLATION_ATTR = "data-onelingo-immersive";
 const ORIGINAL_ATTR = "data-onelingo-original";
 const INLINE_CODE_SELECTOR = "code,kbd,samp,var";
-const GITHUB_MARKDOWN_TITLE_SELECTOR = "a.js-navigation-open.markdown-title";
+const GITHUB_CONTENT_TEXT_SELECTOR = [
+  ".markdown-title",
+  "a.Link--primary.h4[href*='/security/advisories/']",
+].join(",");
 const GITHUB_UI_SELECTOR = [
   "header", "nav", "form", "button", "[role='button']",
   "[role='banner']", "[role='navigation']", "[role='menu']",
@@ -36,6 +39,24 @@ const INLINE_UI_CONTAINER_SELECTOR = [
   ".meta", ".tags", ".actions", ".pagehead", ".pagehead-actions",
   ".BtnGroup", ".Button", ".btn",
   ".vector-toc", ".vector-appearance", ".vector-page-tools",
+].join(",");
+const WIKIPEDIA_UI_TEXT_SELECTOR = [
+  ".vector-pinnable-header-label",
+  ".vector-menu-heading",
+  ".vector-dropdown-label-text",
+  ".vector-appearance legend",
+  ".vector-appearance .cdx-label__label",
+  ".vector-appearance .cdx-field__label",
+  ".vector-toc-text",
+  ".vector-toc-text > span:not(.vector-toc-numb)",
+].join(",");
+const REDDIT_CONTENT_TEXT_SELECTOR = [
+  "shreddit-post a[slot='title']",
+  "shreddit-post [slot='text-body']",
+  "shreddit-post [slot='text-body'] p",
+  "a[slot='title'][href*='/comments/']",
+  "[data-testid='post-title']",
+  "[data-testid='post-content']",
 ].join(",");
 
 const originalTexts = new WeakMap<HTMLElement, string>();
@@ -277,13 +298,13 @@ function removeTranslationNode(block: HTMLElement): void {
 function hideOriginalDom(block: HTMLElement): void {
   const existing = originalWrappers.get(block);
   if (existing?.isConnected) {
-    existing.hidden = true;
+    hideElement(existing);
     return;
   }
 
   const wrapper = document.createElement("span");
   wrapper.setAttribute(ORIGINAL_ATTR, "true");
-  wrapper.hidden = true;
+  hideElement(wrapper);
   while (block.firstChild) {
     wrapper.appendChild(block.firstChild);
   }
@@ -446,7 +467,8 @@ function collectBlocks(): HTMLElement[] {
 
   const blocks: HTMLElement[] = [];
   const picked = new Set<HTMLElement>();
-  for (const el of root.querySelectorAll("*")) {
+  const candidates = collectCandidateElements(root);
+  for (const el of candidates) {
     if (!(el instanceof HTMLElement)) continue;
     if (shouldSkipElement(el)) continue;
     if (isOurUi(el)) continue;
@@ -463,7 +485,7 @@ function collectBlocks(): HTMLElement[] {
     picked.add(el);
   }
 
-  for (const el of root.querySelectorAll("*")) {
+  for (const el of candidates) {
     if (!(el instanceof HTMLElement)) continue;
     if (picked.has(el)) continue;
     if (hasPickedAncestor(el, picked)) continue;
@@ -481,6 +503,19 @@ function collectBlocks(): HTMLElement[] {
   return blocks;
 }
 
+function collectCandidateElements(root: ParentNode): HTMLElement[] {
+  const elements: HTMLElement[] = [];
+  const visit = (node: ParentNode): void => {
+    for (const el of node.querySelectorAll("*")) {
+      if (!(el instanceof HTMLElement)) continue;
+      elements.push(el);
+      if (el.shadowRoot) visit(el.shadowRoot);
+    }
+  };
+  visit(root);
+  return elements;
+}
+
 function hasBlockChild(el: HTMLElement): boolean {
   for (const child of el.children) {
     if (!(child instanceof HTMLElement)) continue;
@@ -495,6 +530,7 @@ function hasBlockChild(el: HTMLElement): boolean {
 
 function shouldSkipElement(el: HTMLElement): boolean {
   if (SKIP_TAGS.has(el.tagName)) return true;
+  if (isAo3Page() && el.matches(".landmark")) return true;
   if (el.tagName === "BUTTON" && !isInlineTranslationTarget(el)) return true;
   if (el.isContentEditable) return true;
   if (el.closest(SKIP_ANCESTOR_SELECTOR)) return true;
@@ -518,7 +554,9 @@ function isCompactUiBlockCandidate(el: HTMLElement): boolean {
 }
 
 function isTextBlockCandidate(el: HTMLElement): boolean {
-  if (isGithubMarkdownTitle(el)) return true;
+  if (isGithubContentText(el)) return true;
+  if (isWikipediaHatnote(el)) return true;
+  if (isRedditContentText(el)) return true;
   if (TEXT_TAGS.has(el.tagName)) return true;
   if (!GENERIC_TEXT_TAGS.has(el.tagName)) return false;
 
@@ -589,27 +627,54 @@ function isLikelyTitle(el: HTMLElement): boolean {
 }
 
 function isLayoutCandidate(el: HTMLElement): boolean {
-  if (isGithubMarkdownTitle(el)) return true;
+  if (isGithubContentText(el)) return true;
+  if (isWikipediaHatnote(el)) return true;
+  if (isRedditContentText(el)) return true;
   if (HEADING_TAGS.has(el.tagName)) return true;
   return BLOCK_RE.test(window.getComputedStyle(el).display);
 }
 
-function isGithubMarkdownTitle(el: HTMLElement): boolean {
-  return el.matches(GITHUB_MARKDOWN_TITLE_SELECTOR);
+function isGithubContentText(el: HTMLElement): boolean {
+  return el.matches(GITHUB_CONTENT_TEXT_SELECTOR);
 }
 
 function isGithubUiText(el: HTMLElement): boolean {
-  return isGithubPage() && !isGithubMarkdownTitle(el) && !!el.closest(GITHUB_UI_SELECTOR);
+  return isGithubPage() && !isGithubContentText(el) && !!el.closest(GITHUB_UI_SELECTOR);
 }
 
 function isGithubPage(): boolean {
   return window.location.hostname === "github.com";
 }
 
+function isWikipediaHatnote(el: HTMLElement): boolean {
+  return isWikipediaPage() && el.matches(".hatnote");
+}
+
+function isWikipediaCompactUiText(el: HTMLElement): boolean {
+  return isWikipediaPage() && el.matches(WIKIPEDIA_UI_TEXT_SELECTOR);
+}
+
+function isWikipediaPage(): boolean {
+  return window.location.hostname.endsWith(".wikipedia.org");
+}
+
+function isAo3Page(): boolean {
+  return window.location.hostname === "archiveofourown.org";
+}
+
+function isRedditContentText(el: HTMLElement): boolean {
+  return isRedditPage() && el.matches(REDDIT_CONTENT_TEXT_SELECTOR);
+}
+
+function isRedditPage(): boolean {
+  return window.location.hostname === "reddit.com" || window.location.hostname.endsWith(".reddit.com");
+}
+
 function isInlineTranslationTarget(el: HTMLElement): boolean {
-  if (!INLINE_UI_TAGS.has(el.tagName)) return false;
+  const isWikipediaUiText = isWikipediaCompactUiText(el);
+  if (!INLINE_UI_TAGS.has(el.tagName) && !isWikipediaUiText) return false;
   if (isGithubUiText(el)) return false;
-  if (!el.closest(INLINE_UI_CONTAINER_SELECTOR)) return false;
+  if (!isWikipediaUiText && !el.closest(INLINE_UI_CONTAINER_SELECTOR)) return false;
   if (el.querySelector("a,button,label")) return false;
   return getDirectText(el).length > 0;
 }
@@ -838,7 +903,7 @@ function applyInlineTranslation(block: HTMLElement, translated: string): void {
     if (!parent) continue;
     const wrapper = document.createElement("span");
     wrapper.setAttribute(ORIGINAL_ATTR, "true");
-    wrapper.hidden = true;
+    hideElement(wrapper);
     parent.replaceChild(wrapper, textNode);
     wrapper.appendChild(textNode);
     if (wrappers.length === 0) {
@@ -867,6 +932,11 @@ function restoreInlineOriginal(block: HTMLElement): void {
   }
   replacement.translation.remove();
   inlineReplacements.delete(block);
+}
+
+function hideElement(el: HTMLElement): void {
+  el.hidden = true;
+  el.style.setProperty("display", "none", "important");
 }
 
 function getDirectTextNodes(el: HTMLElement): Text[] {

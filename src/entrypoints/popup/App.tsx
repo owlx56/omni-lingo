@@ -62,7 +62,7 @@ function SegBtn(props: { active: boolean; onClick: () => void; children: import(
 
 function App() {
   const settings = useSettings();
-  const [action, setAction] = createSignal<"idle" | "starting" | "restoring">("idle");
+  const [action, setAction] = createSignal<"idle" | "starting" | "restoring" | "retranslating">("idle");
   const [status, setStatus] = createSignal("");
   const [immersiveActive, setImmersiveActive] = createSignal(false);
   const [pageMode, setPageMode] = createSignal<FullPageMode | null>(null);
@@ -75,12 +75,6 @@ function App() {
       return e.hover as EngineId;
     }
     return null;
-  };
-
-  const setUnifiedEngine = (engine: EngineId): void => {
-    void setSettings({
-      engines: { hover: engine, selection: engine, fullPage: engine },
-    });
   };
 
   const openOptions = (): void => {
@@ -101,6 +95,9 @@ function App() {
 
   const modeLabel = (mode: FullPageMode): string =>
     mode === "replace" ? "译文" : "双语";
+
+  const engineLabel = (engine: EngineId): string =>
+    ENGINES.find((e) => e.value === engine)?.label ?? engine;
 
   const visibleFullPageMode = (): FullPageMode =>
     pageMode() ?? DEFAULT_FULL_PAGE_MODE;
@@ -144,6 +141,45 @@ function App() {
       .catch((e) => {
         if (seq !== actionSeq) return;
         setStatus(`错误: ${e instanceof Error ? e.message : String(e)}`);
+      });
+  };
+
+  const setUnifiedEngine = (engine: EngineId): void => {
+    const wasActive = immersiveActive();
+    const mode = visibleFullPageMode();
+    const seq = wasActive ? ++actionSeq : actionSeq;
+    if (wasActive) {
+      setAction("retranslating");
+      setStatus(`正在切换到 ${engineLabel(engine)} 并重新翻译…`);
+    }
+
+    void (async () => {
+      await setSettings({
+        engines: { hover: engine, selection: engine, fullPage: engine },
+      });
+      if (!wasActive) return;
+      const res = await sendMessage("translatePage", {
+        target: settings().targetLang,
+        engine,
+        mode,
+        commandId: nextCommandId(),
+      });
+      if (seq !== actionSeq) return;
+      const active = res.active || res.translating === true;
+      setImmersiveActive(active);
+      setPageMode(active ? (res.mode ?? mode) : null);
+      setStatus(
+        active
+          ? `已切换到 ${engineLabel(engine)}，正在重新翻译`
+          : startedStatus(res.blocks),
+      );
+    })()
+      .catch((e) => {
+        if (seq !== actionSeq) return;
+        setStatus(`错误: ${e instanceof Error ? e.message : String(e)}`);
+      })
+      .finally(() => {
+        if (seq === actionSeq) setAction("idle");
       });
   };
 
@@ -231,7 +267,9 @@ function App() {
           {(e) => (
             <SegBtn
               active={unifiedEngine() === e.value}
-              onClick={() => setUnifiedEngine(e.value)}
+              onClick={() => {
+                if (unifiedEngine() !== e.value) setUnifiedEngine(e.value);
+              }}
             >
               {e.label}
             </SegBtn>
