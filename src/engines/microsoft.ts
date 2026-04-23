@@ -49,10 +49,14 @@ export const microsoft: Engine = {
 
 async function callTranslate(req: TranslateRequest, token: string): Promise<unknown | null> {
   const from = req.source ? `from=${encodeURIComponent(req.source)}&` : "";
+  // textType=html：上游（immersive translate）会往文本里塞 <a href="#iN"> 这种
+  // 结构标记以保留链接/粗体。plain 模式下微软会把 #fragment 当无效 URL 清空、
+  // 甚至吃掉 <a> 标签名留残骸（Google 在 HTML-auto 下行为正好相反）。
+  // html 模式让微软把 <a>/<b> 当合法 HTML 元素原样保留，只翻标签内文本。
   const url =
     `${ENDPOINT}?${from}` +
     `to=${encodeURIComponent(req.target)}` +
-    "&api-version=3.0&includeSentenceLength=true&textType=plain";
+    "&api-version=3.0&includeSentenceLength=true&textType=html";
 
   const resp = await fetch(url, {
     method: "POST",
