@@ -1,7 +1,7 @@
 import { sendMessage } from "@/lib/messaging";
-import { initFullPage } from "@/features/immersive";
 import { initHover } from "@/features/hover";
 import { initSelection } from "@/features/selection";
+import { initFullPage } from "@/features/immersive";
 
 export default defineContentScript({
   matches: ["<all_urls>"],

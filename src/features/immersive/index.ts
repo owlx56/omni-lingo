@@ -5,6 +5,15 @@ import {
   type PageTranslateCommand,
   type PageTranslateStatus,
 } from "@/lib/messaging";
+import {
+  isCompactUiBlockCandidate,
+  isGithubContentText,
+  isGithubUiText,
+  isRedditContentText,
+  isWikipediaCompactUiText,
+  isWikipediaHatnote,
+  shouldSkipSiteElement,
+} from "./site-rules";
 
 const BLOCK_RE = /^(block|flex|grid|list-item|table(?!-cell\b|-row\b)|table-cell|table-row)$/;
 const MIN_TEXT_CHARS = 8;
@@ -15,49 +24,6 @@ const NAVIGATION_RETRANSLATE_DELAY_MS = 800;
 const TRANSLATION_ATTR = "data-onelingo-immersive";
 const ORIGINAL_ATTR = "data-onelingo-original";
 const INLINE_CODE_SELECTOR = "code,kbd,samp,var";
-const GITHUB_CONTENT_TEXT_SELECTOR = [
-  ".markdown-title",
-  "a.Link--primary.h4[href*='/security/advisories/']",
-].join(",");
-const GITHUB_UI_SELECTOR = [
-  "header", "nav", "form", "button", "[role='button']",
-  "[role='banner']", "[role='navigation']", "[role='menu']",
-  "[role='tablist']", "[role='toolbar']",
-  ".AppHeader", ".HeaderMenu", ".UnderlineNav", ".tabnav",
-  ".pagehead", ".pagehead-actions", ".BtnGroup", ".Button", ".btn",
-  ".subnav", ".SelectMenu", ".ActionList", ".filter-item",
-  "table[aria-labelledby='folders-and-files'] tr",
-  ".react-directory-row", ".react-directory-filename-column",
-  ".react-directory-row-commit-cell", ".react-directory-commit-age",
-  ".LatestCommit-module__Box__B25ZT",
-].join(",");
-const INLINE_UI_CONTAINER_SELECTOR = [
-  "nav", "header", "aside", "form", "dl", "dt", "dd",
-  "[role='banner']", "[role='navigation']", "[role='complementary']",
-  "[role='menu']", "[role='tablist']", "[role='toolbar']",
-  "#header", ".AppHeader", ".HeaderMenu", ".UnderlineNav", ".tabnav",
-  ".meta", ".tags", ".actions", ".pagehead", ".pagehead-actions",
-  ".BtnGroup", ".Button", ".btn",
-  ".vector-toc", ".vector-appearance", ".vector-page-tools",
-].join(",");
-const WIKIPEDIA_UI_TEXT_SELECTOR = [
-  ".vector-pinnable-header-label",
-  ".vector-menu-heading",
-  ".vector-dropdown-label-text",
-  ".vector-appearance legend",
-  ".vector-appearance .cdx-label__label",
-  ".vector-appearance .cdx-field__label",
-  ".vector-toc-text",
-  ".vector-toc-text > span:not(.vector-toc-numb)",
-].join(",");
-const REDDIT_CONTENT_TEXT_SELECTOR = [
-  "shreddit-post a[slot='title']",
-  "shreddit-post [slot='text-body']",
-  "shreddit-post [slot='text-body'] p",
-  "a[slot='title'][href*='/comments/']",
-  "[data-testid='post-title']",
-  "[data-testid='post-content']",
-].join(",");
 
 const originalTexts = new WeakMap<HTMLElement, string>();
 const appliedKeys = new WeakMap<HTMLElement, string>();
@@ -436,25 +402,44 @@ function pruneDisconnectedBlocks(): void {
 
 const TEXT_TAGS = new Set([
   "P", "LI", "DD", "DT", "BLOCKQUOTE", "FIGCAPTION", "CAPTION", "SUMMARY",
-  "H1", "H2", "H3", "H4", "H5", "H6", "TD", "TH",
+  "H1", "H2", "H3", "H4", "H5", "H6",
 ]);
 const INLINE_UI_TAGS = new Set(["A", "BUTTON", "LABEL", "SPAN", "DT", "DD", "LI"]);
 const HEADING_TAGS = new Set(["H1", "H2", "H3", "H4", "H5", "H6"]);
 const GENERIC_TEXT_TAGS = new Set(["DIV", "SECTION", "ARTICLE", "MAIN"]);
+// 整体跳过的标签：自身不作翻译块，后代也不进入候选。
+// 表格（TABLE/TR/TD/TH...）整体跳过，避免把数据表的表头/文字列翻成中文。
 const SKIP_TAGS = new Set([
   "SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK", "TEMPLATE",
   "SVG", "MATH", "IMG", "VIDEO", "AUDIO", "CANVAS", "IFRAME",
   "INPUT", "TEXTAREA", "SELECT", "FORM",
   "PRE", "CODE", "KBD", "SAMP", "VAR",
-  "TABLE", "THEAD", "TBODY", "TFOOT", "TR",
+  "TABLE", "THEAD", "TBODY", "TFOOT", "TR", "TD", "TH",
 ]);
+// 配合 SKIP_TAGS：任何被 <table>/<pre>/<code>... 包裹的内联元素也一并跳过。
+// 比如 <td><a>xxx</a></td> 的 <a> 不会被二遍扫描当成 inline UI target。
 const SKIP_ANCESTOR_SELECTOR = [
   "pre", "code", "kbd", "samp", "var",
   "svg", "math", "canvas", "iframe",
   "input", "textarea", "select",
+  "table",
   "[contenteditable='true']", "[translate='no']", "[aria-hidden='true']", "[hidden]",
   ".notranslate", ".sr-only", ".visually-hidden",
   `[${TRANSLATION_ATTR}]`, `[${ORIGINAL_ATTR}]`,
+].join(",");
+// 提取翻译输入时跳过的子树：元素本身不构成独立翻译块，
+// 但其文本内容是噪声，会污染上下文 / 破坏排版：
+//   - sup.reference：Wikipedia 引用角标（[1][2]）
+//   - .mw-editsection / .reference-text：Wikipedia 编辑按钮、引用正文
+//   - 无障碍隐藏文本（sr-only / visually-hidden / aria-hidden）
+const EXCLUDE_TEXT_SELECTOR = [
+  "sup.reference",
+  ".mw-editsection",
+  ".reference-text",
+  ".sr-only",
+  ".visually-hidden",
+  "[hidden]",
+  "[aria-hidden='true']",
 ].join(",");
 const DATAVIZ_RE =
   /(^|[-_\s])(chart|graph|plot|sparkline|axis|legend|recharts|highcharts|echarts|apexcharts|victory|visx|vega|nivo|d3)([-_\s]|$)/i;
@@ -480,7 +465,7 @@ function collectBlocks(): HTMLElement[] {
     const text = getOriginalText(el);
     if (text.length < getMinTextChars(el)) continue;
     if (shouldSkipText(text)) continue;
-    if (!isTableCell(el) && hasBlockChild(el)) continue;
+    if (hasBlockChild(el)) continue;
     blocks.push(el);
     picked.add(el);
   }
@@ -530,12 +515,10 @@ function hasBlockChild(el: HTMLElement): boolean {
 
 function shouldSkipElement(el: HTMLElement): boolean {
   if (SKIP_TAGS.has(el.tagName)) return true;
-  if (isAo3Page() && el.matches(".landmark")) return true;
+  if (shouldSkipSiteElement(el)) return true;
   if (el.tagName === "BUTTON" && !isInlineTranslationTarget(el)) return true;
   if (el.isContentEditable) return true;
   if (el.closest(SKIP_ANCESTOR_SELECTOR)) return true;
-  if (!isTableCell(el) && el.closest("td,th")) return true;
-  if (isTableCell(el) && hasCodeDescendant(el)) return true;
   if (isDataVizElement(el)) return true;
   return false;
 }
@@ -547,10 +530,6 @@ function hasPickedAncestor(el: HTMLElement, picked: Set<HTMLElement>): boolean {
     cur = cur.parentElement;
   }
   return false;
-}
-
-function isCompactUiBlockCandidate(el: HTMLElement): boolean {
-  return !!el.closest(INLINE_UI_CONTAINER_SELECTOR);
 }
 
 function isTextBlockCandidate(el: HTMLElement): boolean {
@@ -609,17 +588,9 @@ function isDataVizElement(el: HTMLElement): boolean {
 }
 
 function getMinTextChars(el: HTMLElement): number {
-  if (HEADING_TAGS.has(el.tagName) || isTableCell(el)) return 3;
+  if (HEADING_TAGS.has(el.tagName)) return 3;
   if (el.tagName === "DT" || el.tagName === "DD") return 2;
   return MIN_TEXT_CHARS;
-}
-
-function isTableCell(el: HTMLElement): boolean {
-  return el.tagName === "TD" || el.tagName === "TH";
-}
-
-function hasCodeDescendant(el: HTMLElement): boolean {
-  return !!el.querySelector(`pre,${INLINE_CODE_SELECTOR}`);
 }
 
 function isLikelyTitle(el: HTMLElement): boolean {
@@ -634,47 +605,11 @@ function isLayoutCandidate(el: HTMLElement): boolean {
   return BLOCK_RE.test(window.getComputedStyle(el).display);
 }
 
-function isGithubContentText(el: HTMLElement): boolean {
-  return el.matches(GITHUB_CONTENT_TEXT_SELECTOR);
-}
-
-function isGithubUiText(el: HTMLElement): boolean {
-  return isGithubPage() && !isGithubContentText(el) && !!el.closest(GITHUB_UI_SELECTOR);
-}
-
-function isGithubPage(): boolean {
-  return window.location.hostname === "github.com";
-}
-
-function isWikipediaHatnote(el: HTMLElement): boolean {
-  return isWikipediaPage() && el.matches(".hatnote");
-}
-
-function isWikipediaCompactUiText(el: HTMLElement): boolean {
-  return isWikipediaPage() && el.matches(WIKIPEDIA_UI_TEXT_SELECTOR);
-}
-
-function isWikipediaPage(): boolean {
-  return window.location.hostname.endsWith(".wikipedia.org");
-}
-
-function isAo3Page(): boolean {
-  return window.location.hostname === "archiveofourown.org";
-}
-
-function isRedditContentText(el: HTMLElement): boolean {
-  return isRedditPage() && el.matches(REDDIT_CONTENT_TEXT_SELECTOR);
-}
-
-function isRedditPage(): boolean {
-  return window.location.hostname === "reddit.com" || window.location.hostname.endsWith(".reddit.com");
-}
-
 function isInlineTranslationTarget(el: HTMLElement): boolean {
   const isWikipediaUiText = isWikipediaCompactUiText(el);
   if (!INLINE_UI_TAGS.has(el.tagName) && !isWikipediaUiText) return false;
   if (isGithubUiText(el)) return false;
-  if (!isWikipediaUiText && !el.closest(INLINE_UI_CONTAINER_SELECTOR)) return false;
+  if (!isWikipediaUiText && !isCompactUiBlockCandidate(el)) return false;
   if (el.querySelector("a,button,label")) return false;
   return getDirectText(el).length > 0;
 }
@@ -721,12 +656,37 @@ function getOriginalText(el: HTMLElement): string {
   const cached = originalTexts.get(el);
   if (cached !== undefined) return cached;
 
-  // 某些元素（尤其 SVG）没有可靠 innerText，回退到 textContent 避免 trim 崩溃。
+  // Inline 目标走 getDirectText（只拿直接文本节点，保留行内子元素由 token 重建）；
+  // Block 走 extractTranslatableText（TreeWalker 精确剔除 EXCLUDE_TEXT_SELECTOR 子树）。
   const text = isInlineTranslationTarget(el)
     ? getDirectText(el)
-    : readRawText(el).trim();
+    : extractTranslatableText(el);
   if (text) originalTexts.set(el, text);
   return text;
+}
+
+// 从 block 内部提取翻译用的原始文本。
+// 对比 innerText：TreeWalker 可以精确剔除 EXCLUDE_TEXT_SELECTOR 子树，
+// 避免 Wikipedia 引用角标 [1]、[edit] 按钮、无障碍隐藏文本污染译文上下文。
+function extractTranslatableText(el: HTMLElement): string {
+  const parts: string[] = [];
+  const walker = document.createTreeWalker(
+    el,
+    NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
+    {
+      acceptNode(node): number {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const e = node as HTMLElement;
+          if (e.matches?.(EXCLUDE_TEXT_SELECTOR)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_SKIP;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      },
+    },
+  );
+  let n: Node | null;
+  while ((n = walker.nextNode())) parts.push(n.nodeValue ?? "");
+  return parts.join("").replace(/\s+/g, " ").trim();
 }
 
 function isOurUi(el: Element): boolean {
