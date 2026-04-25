@@ -16,6 +16,17 @@ interface TranslateCacheRecord {
 let dbPromise: Promise<IDBDatabase> | undefined;
 let writesSincePrune = 0;
 
+export async function readTranslateCacheBulk(
+  keys: string[],
+): Promise<(TranslateResponse | undefined)[]> {
+  if (keys.length === 0) return [];
+  const db = await openDb();
+  const tx = db.transaction(STORE, "readonly");
+  const store = tx.objectStore(STORE);
+  const results = await Promise.all(keys.map((k) => requestResult<unknown>(store.get(k))));
+  return results.map((v) => (isRecord(v) ? v.value : undefined));
+}
+
 export async function readTranslateCache(
   key: string,
 ): Promise<TranslateResponse | undefined> {

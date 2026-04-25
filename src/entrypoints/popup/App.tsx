@@ -8,7 +8,7 @@ import {
 } from "@/lib/storage/settings";
 import "./App.css";
 
-type EngineId = "google" | "microsoft";
+type FullPageEngineId = "google2" | "microsoft";
 
 const GRANULARITIES: { value: HoverGranularity; label: string }[] = [
   { value: "word", label: "词" },
@@ -16,8 +16,8 @@ const GRANULARITIES: { value: HoverGranularity; label: string }[] = [
   { value: "paragraph", label: "段落" },
 ];
 
-const ENGINES: { value: EngineId; label: string }[] = [
-  { value: "google", label: "Google" },
+const ENGINES: { value: FullPageEngineId; label: string }[] = [
+  { value: "google2", label: "Google 2" },
   { value: "microsoft", label: "Microsoft" },
 ];
 
@@ -69,13 +69,8 @@ function App() {
   let actionSeq = 0;
   let lastCommandId = 0;
 
-  const unifiedEngine = (): EngineId | null => {
-    const e = settings().engines;
-    if (e.hover === e.selection && e.selection === e.fullPage) {
-      return e.hover as EngineId;
-    }
-    return null;
-  };
+  const fullPageEngine = (): FullPageEngineId =>
+    settings().engines.fullPage === "microsoft" ? "microsoft" : "google2";
 
   const openOptions = (): void => {
     void browser.runtime.openOptionsPage().catch(() => {
@@ -96,7 +91,7 @@ function App() {
   const modeLabel = (mode: FullPageMode): string =>
     mode === "replace" ? "译文" : "双语";
 
-  const engineLabel = (engine: EngineId): string =>
+  const engineLabel = (engine: FullPageEngineId): string =>
     ENGINES.find((e) => e.value === engine)?.label ?? engine;
 
   const visibleFullPageMode = (): FullPageMode =>
@@ -144,7 +139,7 @@ function App() {
       });
   };
 
-  const setUnifiedEngine = (engine: EngineId): void => {
+  const setFullPageEngine = (engine: FullPageEngineId): void => {
     const wasActive = immersiveActive();
     const mode = visibleFullPageMode();
     const seq = wasActive ? ++actionSeq : actionSeq;
@@ -154,9 +149,7 @@ function App() {
     }
 
     void (async () => {
-      await setSettings({
-        engines: { hover: engine, selection: engine, fullPage: engine },
-      });
+      await setSettings({ engines: { fullPage: engine } });
       if (!wasActive) return;
       const res = await sendMessage("translatePage", {
         target: settings().targetLang,
@@ -262,13 +255,13 @@ function App() {
         </SegBtn>
       </Row>
 
-      <Row label="翻译引擎">
+      <Row label="网页引擎">
         <For each={ENGINES}>
           {(e) => (
             <SegBtn
-              active={unifiedEngine() === e.value}
+              active={fullPageEngine() === e.value}
               onClick={() => {
-                if (unifiedEngine() !== e.value) setUnifiedEngine(e.value);
+                if (fullPageEngine() !== e.value) setFullPageEngine(e.value);
               }}
             >
               {e.label}

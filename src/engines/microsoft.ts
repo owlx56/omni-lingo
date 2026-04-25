@@ -2,6 +2,7 @@ import type { Engine, TranslateRequest, TranslateResponse } from "./types";
 
 const AUTH_URL = "https://edge.microsoft.com/translate/auth";
 const ENDPOINT = "https://api-edge.cognitive.microsofttranslator.com/translate";
+const RICH_HTML_TAG_RE = /<\/?(?:a|b|cite|em|i|img|small|span|strong|sub|sup|svg)\b/i;
 
 interface TokenCache {
   token: string;
@@ -15,15 +16,38 @@ export const microsoft: Engine = {
 
   async translate(req: TranslateRequest): Promise<TranslateResponse> {
     let token = await getAuthToken(false);
-    let data = await callTranslate(req, token);
+    let data = await callTranslateBatch([req], token);
 
     if (!data && !tokenCache) {
       token = await getAuthToken(true);
-      data = await callTranslate(req, token);
+      data = await callTranslateBatch([req], token);
     }
     if (!data) throw new Error("microsoft: empty response");
 
-    const first = Array.isArray(data) ? data[0] : null;
+    return parseTranslateResponse(data, 1)[0]!;
+  },
+
+  async translateBatch(reqs: TranslateRequest[]): Promise<TranslateResponse[]> {
+    if (reqs.length === 0) return [];
+
+    let token = await getAuthToken(false);
+    let data = await callTranslateBatch(reqs, token);
+
+    if (!data && !tokenCache) {
+      token = await getAuthToken(true);
+      data = await callTranslateBatch(reqs, token);
+    }
+    if (!data) throw new Error("microsoft: empty response");
+
+    return parseTranslateResponse(data, reqs.length);
+  },
+};
+
+function parseTranslateResponse(data: unknown, expectedCount: number): TranslateResponse[] {
+  if (!Array.isArray(data)) throw new Error("microsoft: bad shape");
+
+  return Array.from({ length: expectedCount }, (_, index) => {
+    const first = data[index];
     if (!first || typeof first !== "object") throw new Error("microsoft: bad shape");
 
     const translations = (first as { translations?: unknown }).translations;
@@ -44,19 +68,25 @@ export const microsoft: Engine = {
       detectedSource: detectedLang,
       engine: "microsoft",
     };
-  },
-};
+  });
+}
 
-async function callTranslate(req: TranslateRequest, token: string): Promise<unknown | null> {
-  const from = req.source ? `from=${encodeURIComponent(req.source)}&` : "";
-  // textType=html：上游（immersive translate）会往文本里塞 <a href="#iN"> 这种
-  // 结构标记以保留链接/粗体。plain 模式下微软会把 #fragment 当无效 URL 清空、
-  // 甚至吃掉 <a> 标签名留残骸（Google 在 HTML-auto 下行为正好相反）。
-  // html 模式让微软把 <a>/<b> 当合法 HTML 元素原样保留，只翻标签内文本。
+async function callTranslateBatch(
+  reqs: TranslateRequest[],
+  token: string,
+): Promise<unknown | null> {
+  const first = reqs[0];
+  if (!first) return [];
+  const from = first.source ? `from=${encodeURIComponent(first.source)}&` : "";
+  const textType = reqs.some((req) => RICH_HTML_TAG_RE.test(req.text))
+    ? "&textType=html"
+    : "";
+  // 默认使用 plain text。只有沉浸翻译富文本序列化产生真实安全 HTML 时，
+  // 才启用 Microsoft HTML 模式；伪标签占位符仍留在 plain text，避免被当作 HTML 重排。
   const url =
     `${ENDPOINT}?${from}` +
-    `to=${encodeURIComponent(req.target)}` +
-    "&api-version=3.0&includeSentenceLength=true&textType=html";
+    `to=${encodeURIComponent(first.target)}` +
+    `&api-version=3.0&includeSentenceLength=true${textType}`;
 
   const resp = await fetch(url, {
     method: "POST",
@@ -64,7 +94,7 @@ async function callTranslate(req: TranslateRequest, token: string): Promise<unkn
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify([{ Text: req.text }]),
+    body: JSON.stringify(reqs.map((req) => ({ Text: req.text }))),
   });
   if (resp.status === 401) {
     tokenCache = null;

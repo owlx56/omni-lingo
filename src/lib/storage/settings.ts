@@ -19,9 +19,13 @@ export interface Settings {
   fullPageMode: FullPageMode;
 }
 
+export type SettingsPatch = Omit<Partial<Settings>, "engines"> & {
+  engines?: Partial<EngineMap>;
+};
+
 const DEFAULTS: Settings = {
   targetLang: "zh",
-  engines: { hover: "google", selection: "google", fullPage: "google" },
+  engines: { hover: "google", selection: "google", fullPage: "google2" },
   hoverGranularity: "sentence",
   fullPageMode: "replace",
 };
@@ -31,6 +35,7 @@ const KEY = "sync:settings" as const;
 function withDefaults(raw: Partial<Settings> | null): Settings {
   // 浅 merge 会丢 engines 内部字段，必须二级合并
   const engines = { ...DEFAULTS.engines, ...(raw?.engines ?? {}) };
+  if (engines.fullPage === "google") engines.fullPage = "google2";
   return { ...DEFAULTS, ...(raw ?? {}), engines };
 }
 
@@ -39,7 +44,7 @@ export async function getSettings(): Promise<Settings> {
   return withDefaults(raw);
 }
 
-export async function setSettings(patch: Partial<Settings>): Promise<void> {
+export async function setSettings(patch: SettingsPatch): Promise<void> {
   const cur = await getSettings();
   const next: Settings = {
     ...cur,

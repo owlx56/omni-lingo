@@ -1,9 +1,11 @@
 import type { Engine } from "./types";
 import { google } from "./google";
+import { google2 } from "./google2";
 import { microsoft } from "./microsoft";
 
 const ENGINES: Record<string, Engine> = {
   [google.id]: google,
+  [google2.id]: google2,
   [microsoft.id]: microsoft,
 };
 

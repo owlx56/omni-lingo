@@ -67,6 +67,10 @@ export interface ProtocolMap {
     input: Record<string, never>;
     output: PageTranslateStatus;
   };
+  translateBatch: {
+    input: { texts: string[]; target: string; engine?: string; source?: string };
+    output: string[];
+  };
 }
 
 type Envelope<K extends keyof ProtocolMap = keyof ProtocolMap> = {

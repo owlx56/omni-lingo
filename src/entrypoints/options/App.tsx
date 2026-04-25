@@ -5,10 +5,10 @@ import {
   type HoverGranularity,
 } from "@/lib/storage/settings";
 
-type EngineId = "google" | "microsoft";
+type FullPageEngineId = "google2" | "microsoft";
 
-const ENGINES: { value: EngineId; label: string; note: string }[] = [
-  { value: "google", label: "Google", note: "translate.googleapis.com" },
+const ENGINES: { value: FullPageEngineId; label: string; note: string }[] = [
+  { value: "google2", label: "Google 2", note: "translate_a/t HTML" },
   { value: "microsoft", label: "Microsoft", note: "Edge Translator API" },
 ];
 
@@ -54,18 +54,11 @@ function Section(props: { title: string; children: import("solid-js").JSX.Elemen
 function App() {
   const settings = useSettings();
 
-  const unifiedEngine = (): EngineId | null => {
-    const e = settings().engines;
-    if (e.hover === e.selection && e.selection === e.fullPage) {
-      return e.hover as EngineId;
-    }
-    return null;
-  };
+  const fullPageEngine = (): FullPageEngineId =>
+    settings().engines.fullPage === "microsoft" ? "microsoft" : "google2";
 
-  const setUnifiedEngine = (engine: EngineId): void => {
-    void setSettings({
-      engines: { hover: engine, selection: engine, fullPage: engine },
-    });
+  const setFullPageEngine = (engine: FullPageEngineId): void => {
+    void setSettings({ engines: { fullPage: engine } });
   };
 
   return (
@@ -90,14 +83,14 @@ function App() {
         </For>
       </Section>
 
-      <Section title="翻译引擎">
+      <Section title="网页翻译引擎">
         <For each={ENGINES}>
           {(engine) => (
             <OptionButton
-              active={unifiedEngine() === engine.value}
+              active={fullPageEngine() === engine.value}
               label={engine.label}
               note={engine.note}
-              onClick={() => setUnifiedEngine(engine.value)}
+              onClick={() => setFullPageEngine(engine.value)}
             />
           )}
         </For>

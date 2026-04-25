@@ -13,4 +13,5 @@ export interface TranslateResponse {
 export interface Engine {
   id: string;
   translate(req: TranslateRequest): Promise<TranslateResponse>;
+  translateBatch?(reqs: TranslateRequest[]): Promise<TranslateResponse[]>;
 }
