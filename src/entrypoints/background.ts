@@ -13,12 +13,12 @@ export default defineBackground(() => {
     return translateCached(id, req, () => e.translate(req));
   });
 
-  onMessage("translateBatch", async ({ engine, source, target, texts }) => {
+  onMessage("translateBatch", async ({ engine, source, target, texts, format }) => {
     const id = engine ?? DEFAULT_ENGINE_ID;
     const e = getEngine(id);
     return translateCachedBatch(
       id,
-      texts.map((text) => ({ text, target, source })),
+      texts.map((text) => ({ text, target, source, format })),
       (req) => e.translate(req),
       e.translateBatch?.bind(e),
     );

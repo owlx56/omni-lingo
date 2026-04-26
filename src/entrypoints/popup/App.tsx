@@ -3,12 +3,11 @@ import { sendMessage } from "@/lib/messaging";
 import {
   setSettings,
   useSettings,
+  type FullPageEngineId,
   type FullPageMode,
   type HoverGranularity,
 } from "@/lib/storage/settings";
 import "./App.css";
-
-type FullPageEngineId = "google2" | "microsoft";
 
 const GRANULARITIES: { value: HoverGranularity; label: string }[] = [
   { value: "word", label: "词" },
@@ -69,8 +68,7 @@ function App() {
   let actionSeq = 0;
   let lastCommandId = 0;
 
-  const fullPageEngine = (): FullPageEngineId =>
-    settings().engines.fullPage === "microsoft" ? "microsoft" : "google2";
+  const fullPageEngine = (): FullPageEngineId => settings().engines.fullPage;
 
   const openOptions = (): void => {
     void browser.runtime.openOptionsPage().catch(() => {
@@ -123,7 +121,7 @@ function App() {
     void (async () => {
       const res = await sendMessage("translatePage", {
         target: settings().targetLang,
-        engine: settings().engines.fullPage,
+        engine: fullPageEngine(),
         mode,
         commandId: nextCommandId(),
       });
@@ -207,7 +205,7 @@ function App() {
     try {
       const res = await sendMessage("translatePage", {
         target: settings().targetLang,
-        engine: settings().engines.fullPage,
+        engine: fullPageEngine(),
         mode,
         commandId,
       });

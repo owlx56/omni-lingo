@@ -1,4 +1,5 @@
 import type { PageTranslateCommand } from "@/lib/messaging";
+import type { FullPageEngineId } from "@/lib/storage/settings";
 
 export const GLOBAL_RULE_KEY = "*" as const;
 
@@ -20,7 +21,8 @@ export interface FullPageRule {
   keepSelector: string;
   rootsSelector: string;
   ignoreSelector: string;
-  apiSlug: string;
+  richHtmlSelector?: string;
+  richHtmlExcludeSelector?: string;
   fromLang: string;
   toLang: string;
   transOpen: RuleToggle;
@@ -45,7 +47,9 @@ export interface ResolvedFullPageRule {
   keepSelector: string;
   rootsSelector: string;
   ignoreSelector: string;
-  engine: string;
+  richHtmlSelector: string;
+  richHtmlExcludeSelector: string;
+  engine: FullPageEngineId;
   source?: string;
   target: string;
   transOnly: boolean;
@@ -69,6 +73,10 @@ const DEFAULT_KEEP_SELECTOR = "code, cite, math, .math, a:has(code)";
 const DEFAULT_SELECT_STYLE = "-webkit-line-clamp: unset; max-height: none; height: auto;";
 
 const WIKIPEDIA_CHROME_SELECTOR = [
+  "#p-associated-pages .mw-list-item > a > span",
+  "#p-views .mw-list-item > a > span",
+  "#p-cactions .vector-dropdown-label-text",
+  "#p-cactions .mw-list-item > a > span",
   "#vector-main-menu-dropdown .vector-dropdown-label-text",
   "#vector-main-menu .vector-pinnable-header-label",
   "#vector-main-menu .vector-pinnable-header-toggle-button",
@@ -115,13 +123,28 @@ const WIKIPEDIA_MAIN_PAGE_ROOTS = [
   "#vector-appearance",
 ].join(", ");
 
+const QUORA_ROOTS_SELECTOR = [
+  "main",
+  "[role='main']",
+  "#mainContent",
+  "aside",
+].join(", ");
+
+const QUORA_IGNORE_SELECTOR = [
+  "+ header",
+  "+ [role='banner']",
+  "+ .q-fixed",
+  "+ .q-sticky",
+].join(", ");
+
 export const DEFAULT_FULL_PAGE_RULE: FullPageRule = {
   pattern: GLOBAL_RULE_KEY,
   selector: DEFAULT_SELECTOR,
   keepSelector: DEFAULT_KEEP_SELECTOR,
   rootsSelector: "body",
   ignoreSelector: DEFAULT_IGNORE_SELECTOR,
-  apiSlug: GLOBAL_RULE_KEY,
+  richHtmlSelector: "",
+  richHtmlExcludeSelector: "",
   fromLang: "auto",
   toLang: GLOBAL_RULE_KEY,
   transOpen: "false",
@@ -148,7 +171,7 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     rootsSelector: "",
     ignoreSelector:
       ".button, code, footer, mark, pre, .mwe-math-element, .mw-editsection",
-    apiSlug: GLOBAL_RULE_KEY,
+    richHtmlSelector: "body",
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -172,7 +195,7 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     keepSelector: "",
     rootsSelector: WIKIPEDIA_MAIN_PAGE_ROOTS,
     ignoreSelector: "",
-    apiSlug: GLOBAL_RULE_KEY,
+    richHtmlSelector: "#mp-tfa, #mp-tfl, #mp-dyk, #mp-itn, #mp-otd, #mp-tfp",
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -197,7 +220,6 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     keepSelector: "code, img, svg, pre, .sitebit",
     rootsSelector: "",
     ignoreSelector: "button, code, footer, form, header, mark, nav, pre, .reply",
-    apiSlug: GLOBAL_RULE_KEY,
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -222,7 +244,6 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     keepSelector: "img, svg, a, span:has(a), div:has(a)",
     rootsSelector: "",
     ignoreSelector: "[data-testid='videoPlayer'], [data-testid^='tweetTextarea']",
-    apiSlug: GLOBAL_RULE_KEY,
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -246,7 +267,6 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     keepSelector: "",
     rootsSelector: "div#items",
     ignoreSelector: "",
-    apiSlug: GLOBAL_RULE_KEY,
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -271,7 +291,6 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     rootsSelector: "ytd-page-manager",
     ignoreSelector:
       "aside, button, footer, form, header, pre, mark, nav, #player, #container, .caption-window, .ytp-settings-menu, #kiss-youtube-subtitle-list-container",
-    apiSlug: GLOBAL_RULE_KEY,
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -295,7 +314,6 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     keepSelector: "",
     rootsSelector: ".Transition",
     ignoreSelector: "",
-    apiSlug: GLOBAL_RULE_KEY,
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -321,7 +339,6 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     rootsSelector: "main, [role='main'], body",
     ignoreSelector:
       "button, p.pinned-item-desc+p, header, nav, .AppHeader, .UnderlineNav, .tabnav, .pagehead-actions, .BtnGroup, .Button, .btn, .subnav, .SelectMenu, .ActionList, table[aria-labelledby='folders-and-files'] tr, .react-directory-row, .react-directory-filename-column, .react-directory-row-commit-cell, .react-directory-commit-age, .LatestCommit-module__Box__B25ZT",
-    apiSlug: GLOBAL_RULE_KEY,
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -342,12 +359,12 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
   {
     pattern: "archiveofourown.org",
     selector:
-      "h1, h2, h3, h4, h5, h6, dt, dd, p, blockquote, li, .userstuff p, .summary blockquote, .meta dt, .meta dd",
-    keepSelector: "a:has(code), code, pre",
+      "h1, h2, h3, h4, h5, h6, dt, dd:not(.series), p, blockquote, li:not(:has(> span.series)), .userstuff p, .summary blockquote, .meta dt, .meta dd, dd.series > span.series, #series li > span.series",
+    keepSelector: "a:has(code), code, pre, .divider",
+    richHtmlExcludeSelector: "dd.series > span.series, #series li > span.series",
     rootsSelector: "#main, .wrapper",
     ignoreSelector:
       "button, nav, header, footer, .landmark, .actions, .navigation, .share, .download",
-    apiSlug: GLOBAL_RULE_KEY,
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -386,12 +403,34 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     rootsSelector: "main, shreddit-app, body",
     ignoreSelector:
       "button, nav, header, aside, faceplate-number, [slot='share-button'], [slot='comment-cta'], [slot='credit-bar'], [aria-label*='vote'], [data-testid='comment-submission-form-toolbar']",
-    apiSlug: GLOBAL_RULE_KEY,
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
     transOnly: GLOBAL_RULE_KEY,
     autoScan: "false",
+    hasRichText: GLOBAL_RULE_KEY,
+    hasShadowroot: GLOBAL_RULE_KEY,
+    scanAll: GLOBAL_RULE_KEY,
+    transTag: GLOBAL_RULE_KEY,
+    transTitle: GLOBAL_RULE_KEY,
+    splitParagraph: GLOBAL_RULE_KEY,
+    splitLength: 0,
+    textExtStyle: "",
+    selectStyle: "",
+    parentStyle: "",
+    grandStyle: "",
+  },
+  {
+    pattern: "quora.com",
+    selector: GLOBAL_RULE_KEY,
+    keepSelector: GLOBAL_RULE_KEY,
+    rootsSelector: QUORA_ROOTS_SELECTOR,
+    ignoreSelector: QUORA_IGNORE_SELECTOR,
+    fromLang: GLOBAL_RULE_KEY,
+    toLang: GLOBAL_RULE_KEY,
+    transOpen: GLOBAL_RULE_KEY,
+    transOnly: GLOBAL_RULE_KEY,
+    autoScan: GLOBAL_RULE_KEY,
     hasRichText: GLOBAL_RULE_KEY,
     hasShadowroot: GLOBAL_RULE_KEY,
     scanAll: GLOBAL_RULE_KEY,
@@ -441,7 +480,7 @@ export function resolveFullPageRule(
   input: PageTranslateCommand,
 ): ResolvedFullPageRule {
   const target = input.target || normalizeLangValue(rule.toLang) || "zh";
-  const engine = normalizeFullPageEngine(input.engine || normalizeEngineId(rule.apiSlug));
+  const engine = input.engine;
   const mode = input.mode ?? "replace";
   const transOnly = mode === "replace" ? true : toggleValue(rule.transOnly, false);
   return {
@@ -450,6 +489,8 @@ export function resolveFullPageRule(
     keepSelector: rule.keepSelector.trim() || DEFAULT_FULL_PAGE_RULE.keepSelector,
     rootsSelector: rule.rootsSelector.trim() || DEFAULT_FULL_PAGE_RULE.rootsSelector,
     ignoreSelector: rule.ignoreSelector.trim() || DEFAULT_FULL_PAGE_RULE.ignoreSelector,
+    richHtmlSelector: rule.richHtmlSelector?.trim() ?? "",
+    richHtmlExcludeSelector: rule.richHtmlExcludeSelector?.trim() ?? "",
     engine,
     source: normalizeSourceLang(rule.fromLang),
     target,
@@ -475,7 +516,8 @@ function normalizeFullPageRule(raw: unknown): FullPageRule | null {
     keepSelector: stringValue(raw.keepSelector),
     rootsSelector: stringValue(raw.rootsSelector),
     ignoreSelector: stringValue(raw.ignoreSelector),
-    apiSlug: stringValue(raw.apiSlug, GLOBAL_RULE_KEY),
+    richHtmlSelector: stringValue(raw.richHtmlSelector),
+    richHtmlExcludeSelector: stringValue(raw.richHtmlExcludeSelector),
     fromLang: stringValue(raw.fromLang, GLOBAL_RULE_KEY),
     toLang: stringValue(raw.toLang, GLOBAL_RULE_KEY),
     transOpen: toggleField(raw.transOpen),
@@ -520,8 +562,15 @@ function mergeRules(baseRule: FullPageRule, overrideRule: FullPageRule | undefin
   merged.keepSelector = mergeSelectors(baseRule.keepSelector, overrideRule.keepSelector);
   merged.rootsSelector = mergeSelectors(baseRule.rootsSelector, overrideRule.rootsSelector);
   merged.ignoreSelector = mergeSelectors(baseRule.ignoreSelector, overrideRule.ignoreSelector);
+  merged.richHtmlSelector = mergeSelectors(
+    baseRule.richHtmlSelector ?? "",
+    overrideRule.richHtmlSelector ?? "",
+  );
+  merged.richHtmlExcludeSelector = mergeSelectors(
+    baseRule.richHtmlExcludeSelector ?? "",
+    overrideRule.richHtmlExcludeSelector ?? "",
+  );
 
-  if (overrideRule.apiSlug !== GLOBAL_RULE_KEY) merged.apiSlug = overrideRule.apiSlug;
   if (overrideRule.fromLang !== GLOBAL_RULE_KEY) merged.fromLang = overrideRule.fromLang;
   if (overrideRule.toLang !== GLOBAL_RULE_KEY) merged.toLang = overrideRule.toLang;
   if (overrideRule.transOpen !== GLOBAL_RULE_KEY) merged.transOpen = overrideRule.transOpen;
@@ -701,17 +750,6 @@ function normalizeSourceLang(value: string): string | undefined {
   const lang = normalizeLangValue(value);
   if (!lang || lang === "auto") return undefined;
   return lang;
-}
-
-function normalizeEngineId(value: string): string | undefined {
-  const trimmed = value.trim();
-  if (!trimmed || trimmed === GLOBAL_RULE_KEY) return undefined;
-  return trimmed;
-}
-
-function normalizeFullPageEngine(value: string | undefined): string {
-  if (!value || value === "google" || value === "google-free") return "google2";
-  return value;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

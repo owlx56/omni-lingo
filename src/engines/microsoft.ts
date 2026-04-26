@@ -2,7 +2,6 @@ import type { Engine, TranslateRequest, TranslateResponse } from "./types";
 
 const AUTH_URL = "https://edge.microsoft.com/translate/auth";
 const ENDPOINT = "https://api-edge.cognitive.microsofttranslator.com/translate";
-const RICH_HTML_TAG_RE = /<\/?(?:a|b|cite|em|i|img|small|span|strong|sub|sup|svg)\b/i;
 
 interface TokenCache {
   token: string;
@@ -78,11 +77,7 @@ async function callTranslateBatch(
   const first = reqs[0];
   if (!first) return [];
   const from = first.source ? `from=${encodeURIComponent(first.source)}&` : "";
-  const textType = reqs.some((req) => RICH_HTML_TAG_RE.test(req.text))
-    ? "&textType=html"
-    : "";
-  // 默认使用 plain text。只有沉浸翻译富文本序列化产生真实安全 HTML 时，
-  // 才启用 Microsoft HTML 模式；伪标签占位符仍留在 plain text，避免被当作 HTML 重排。
+  const textType = first.format === "html" ? "&textType=html" : "";
   const url =
     `${ENDPOINT}?${from}` +
     `to=${encodeURIComponent(first.target)}` +

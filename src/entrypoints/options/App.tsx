@@ -2,10 +2,9 @@ import { For } from "solid-js";
 import {
   setSettings,
   useSettings,
+  type FullPageEngineId,
   type HoverGranularity,
 } from "@/lib/storage/settings";
-
-type FullPageEngineId = "google2" | "microsoft";
 
 const ENGINES: { value: FullPageEngineId; label: string; note: string }[] = [
   { value: "google2", label: "Google 2", note: "translate_a/t HTML" },
@@ -54,8 +53,7 @@ function Section(props: { title: string; children: import("solid-js").JSX.Elemen
 function App() {
   const settings = useSettings();
 
-  const fullPageEngine = (): FullPageEngineId =>
-    settings().engines.fullPage === "microsoft" ? "microsoft" : "google2";
+  const fullPageEngine = (): FullPageEngineId => settings().engines.fullPage;
 
   const setFullPageEngine = (engine: FullPageEngineId): void => {
     void setSettings({ engines: { fullPage: engine } });

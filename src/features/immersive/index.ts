@@ -1,6 +1,7 @@
 // 全文翻译核心逻辑 — 参照 kiss-translator 实现
 // 核心差异保留：使用 onelingo 的 LRU + IndexedDB 二级缓存（通过 translateBatch 消息）
 
+import type { TranslateFormat } from "@/engines/types";
 import {
   onMessage,
   sendMessage,
@@ -9,11 +10,34 @@ import {
   type PageTranslateStatus,
 } from "@/lib/messaging";
 import { getFullPageRules } from "@/lib/storage/full-page-rules";
+import type { FullPageEngineId } from "@/lib/storage/settings";
+import { INNER_ATTR, WRAPPER_ATTR } from "./dom-attrs";
+import {
+  appendTranslatedContent,
+  pickSerializeFormat,
+  serializeNodes,
+} from "./markup";
 import {
   matchFullPageRule,
   resolveFullPageRule,
   type ResolvedFullPageRule,
 } from "./rules";
+import {
+  matchesSelectorSafe,
+  querySelectorAllSafe,
+} from "./selectors";
+import {
+  appendInlineStyle,
+  applyRuleStyles,
+  isBlockNode,
+  isOurUiNode,
+  isOurWrapper,
+  isVisible,
+  restoreRuleStyles,
+  scanNode,
+  shouldIgnoreNode,
+  type ScanContext,
+} from "./scan";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const BATCH_INTERVAL = 400;          // ms debounce before sending batch
@@ -25,8 +49,6 @@ const NEWLINE_LENGTH = 20;           // add <br> separator if text > 20 chars
 const NAVIGATION_CHECK_MS = 500;
 const NAVIGATION_RETRANSLATE_DELAY_MS = 800;
 
-const WRAPPER_ATTR = "data-onelingo-wrapper";
-const INNER_ATTR = "data-onelingo-inner";
 const LOADING_STYLE_ID = "onelingo-immersive-loading-style";
 const MAIN_PAGE_LAYOUT_STYLE_ID = "onelingo-wikipedia-main-page-layout-style";
 
@@ -53,83 +75,6 @@ const COMBINED_SKIP_RE = new RegExp(
 
 // ── DOM tag sets (from kiss-translator Translator.TAGS) ───────────────────────
 const BREAK_LINE_TAGS = new Set(["BR", "WBR"]);
-const BLOCK_TAGS = new Set([
-  "ADDRESS", "ARTICLE", "ASIDE", "BLOCKQUOTE", "CANVAS", "DD", "DIV", "DL",
-  "DT", "FIELDSET", "FIGCAPTION", "FIGURE", "FOOTER", "FORM",
-  "H1", "H2", "H3", "H4", "H5", "H6", "HEADER", "HR", "LI", "MAIN",
-  "NAV", "NOSCRIPT", "OL", "P", "PRE", "SECTION", "TABLE", "TFOOT", "UL", "VIDEO",
-]);
-const INLINE_TAGS = new Set([
-  "ABBR", "ACRONYM", "B", "BDO", "BIG", "BR", "BUTTON", "CITE", "CODE", "DFN",
-  "DEL", "FONT", "EM", "I", "IMG", "INPUT", "INS", "KBD", "LABEL", "MAP", "MARK",
-  "OBJECT", "OUTPUT", "Q", "RUBY", "SAMP", "SCRIPT", "SELECT", "SMALL",
-  "STRONG", "SUB", "SUP", "TEXTAREA", "TIME", "TT", "U", "VAR",
-]);
-// Tags whose outerHTML is replaced entirely by a placeholder {n}
-const RICH_TEXT_REPLACE_TAGS = new Set([
-  "ABBR", "BR", "CODE", "DFN", "IMG", "KBD", "OUTPUT", "RP", "RT",
-  "SAMP", "SUB", "SUP", "SVG", "TIME", "VAR", "WBR",
-]);
-// Tags wrapped in <i n>…</i n> placeholder (content translated, tag restored)
-const RICH_TEXT_WRAP_TAGS = new Set([
-  "A", "B", "BDO", "BDI", "BIG", "CITE", "DEL", "EM", "FONT", "I", "INS",
-  "MARK", "Q", "RUBY", "S", "SMALL", "SPAN", "STRONG", "U",
-]);
-const RICH_HTML_INLINE_TAGS = new Set([
-  "A", "B", "CITE", "EM", "I", "SMALL", "SPAN", "STRONG", "SUB", "SUP",
-]);
-const OPAQUE_PRESERVE_SELECTOR = [
-  "code", "kbd", "samp", "var",
-  "math", ".math",
-  "a:has(code)",
-  "sup.reference",
-].join(", ");
-
-// Tags that should never be translated, nor their descendants scanned.
-// NOTE: TABLE/TR/TD/TH are intentionally NOT here — we recurse into tables
-// so that content like Wikipedia's featured-article descriptions (which live
-// inside <table><tbody><tr><td><p>…</p></td></tr></tbody></table>) gets picked
-// up, matching kiss-translator behaviour.
-const HARD_SKIP_TAGS = new Set([
-  "SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK", "TEMPLATE",
-  "SVG", "MATH", "IMG", "VIDEO", "AUDIO", "CANVAS", "IFRAME",
-  "INPUT", "TEXTAREA", "SELECT",
-  "PRE", "CODE", "KBD", "SAMP", "VAR",
-]);
-
-// Ancestors that force a skip for any descendant
-const SKIP_ANCESTOR_SELECTOR = [
-  "pre", "code", "kbd", "samp", "var",
-  "svg", "math", "canvas", "iframe",
-  "input", "textarea", "select",
-  "[contenteditable='true']", "[translate='no']", "[aria-hidden='true']", "[hidden]",
-  ".notranslate", ".sr-only", ".visually-hidden",
-  `[${WRAPPER_ATTR}]`,
-].join(",");
-
-// Sub-trees excluded from serialisation (noise text).
-// Wikipedia reference bodies are intentionally kept; dropping .reference-text
-// leaves only backlinks such as "^" or "a b c d" in Notes/References.
-// NOTE: "sup.reference" is intentionally NOT here — Wikipedia citation markers
-// like [1][2] are SUP elements, and SUP is in RICH_TEXT_REPLACE_TAGS, so they
-// become opaque {n} placeholders and are restored verbatim after translation,
-// matching kiss-translator behaviour. Dropping them here would strip them.
-const EXCLUDE_TEXT_SELECTOR = [
-  ".mw-editsection",
-  ".sr-only", ".visually-hidden", "[hidden]", "[aria-hidden='true']",
-].join(",");
-
-// kiss-translator's BUILTIN_IGNORE_SELECTOR
-const BUILTIN_IGNORE_SELECTOR = [
-  "address", "area", "audio", "br", "canvas", "data", "datalist", "embed",
-  "head", "iframe", "input", "noscript", "map", "object", "option", "param",
-  "picture", "progress", "select", "script", "style", "svg", "track",
-  "textarea", "template", "video", "wbr",
-  ".notranslate", "[contenteditable='true']", "[translate='no']",
-].join(", ");
-
-// computed-display cache (same as kiss's static displayCache WeakMap)
-const displayCache = new WeakMap<Element, boolean>();
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type PageTranslateMode = NonNullable<PageTranslateCommand["mode"]>;
@@ -139,12 +84,7 @@ interface WrapperState {
   isHide: boolean;
 }
 
-interface WrappedPlaceholder {
-  openTag: string;
-  closeTag: string;
-}
-
-type PlaceholderMap = Map<string, string | WrappedPlaceholder>;
+const QUEUE_DESTROYED_ERROR = "Queue destroyed";
 
 // ── BatchQueue (kiss-translator batchQueue.js pattern) ────────────────────────
 interface BatchTask {
@@ -162,6 +102,7 @@ class TranslateBatchQueue {
     readonly engine: string,
     readonly target: string,
     readonly source: string | undefined,
+    readonly format: TranslateFormat,
   ) {}
 
   addTask(text: string): Promise<string> {
@@ -209,6 +150,7 @@ class TranslateBatchQueue {
         target: this.target,
         engine: this.engine,
         source: this.source,
+        format: this.format,
       });
       batch.forEach((task, i) => task.resolve(results[i] ?? ""));
     } catch (err) {
@@ -225,7 +167,7 @@ class TranslateBatchQueue {
 
   destroy(): void {
     if (this.timer !== undefined) window.clearTimeout(this.timer);
-    const err = new Error("Queue destroyed");
+    const err = new Error(QUEUE_DESTROYED_ERROR);
     this.queue.forEach((t) => t.reject(err));
     this.queue.length = 0;
   }
@@ -244,10 +186,10 @@ let runSeq = 0;
 let lastCommandId = 0;
 let pendingCount = 0;
 let currentMode: PageTranslateMode | null = null;
-let currentEngine: string | null = null;
+let currentEngine: FullPageEngineId | null = null;
 let currentTarget: string | null = null;
 let originalTitle: string | null = null;
-let batchQueue: TranslateBatchQueue | null = null;
+let batchQueues: Record<TranslateFormat, TranslateBatchQueue> | null = null;
 
 // Navigation
 let lastLocationKey = getLocationKey();
@@ -258,9 +200,6 @@ let navigationTimer: number | undefined;
 const processedNodes = new WeakMap<HTMLElement, ResolvedFullPageRule>();
 const hostWrappers = new WeakMap<HTMLElement, Set<HTMLElement>>();
 const wrapperState = new WeakMap<HTMLElement, WrapperState>();
-const selectStyleAttrs = new WeakMap<HTMLElement, { original: string | null; count: number }>();
-const parentStyleAttrs = new WeakMap<HTMLElement, { original: string | null; count: number }>();
-const grandStyleAttrs = new WeakMap<HTMLElement, { original: string | null; count: number }>();
 
 // Live node sets
 const observedNodes = new Set<HTMLElement>();
@@ -268,6 +207,10 @@ const viewNodes = new Set<HTMLElement>();
 const rootNodes = new Set<ParentNode>();
 const translatedHosts = new Set<HTMLElement>();
 const rescanQueue = new Set<Node>();
+// Per-session content cache: serialized text → translated text.
+// Keyed on content, not DOM nodes, so it survives virtual-DOM re-creation
+// (Discourse, Rust Forum) where old nodes are destroyed and new ones inserted.
+const localTranslationCache = new Map<string, string>();
 
 // Mutation guard
 const mutedMutationRoots = new Set<Node>();
@@ -319,11 +262,11 @@ async function startPageTranslate(input: PageTranslateCommand): Promise<PageTran
 
   const mode = input.mode ?? "replace";
   currentMode = mode;
-  currentEngine = input.engine;
-  currentTarget = input.target;
-  lastTranslateInput = { target: input.target, engine: input.engine, mode };
 
   currentRule = await loadRule(input);
+  currentEngine = currentRule.engine;
+  currentTarget = currentRule.target;
+  lastTranslateInput = { target: currentRule.target, engine: currentRule.engine, mode };
   ensureSiteLayoutStyles();
 
   const seq = ++runSeq;
@@ -332,8 +275,9 @@ async function startPageTranslate(input: PageTranslateCommand): Promise<PageTran
   cleanupAllTranslations();
   stopObservation();
 
-  batchQueue?.destroy();
-  batchQueue = new TranslateBatchQueue(currentRule.engine, currentRule.target, currentRule.source);
+  batchQueues?.text.destroy();
+  batchQueues?.html.destroy();
+  batchQueues = createBatchQueues(currentRule);
 
   startObserveRoots();
   void updateDocumentTitle(seq).catch(() => {});
@@ -358,8 +302,9 @@ function restoreOriginals(): void {
   restoreDocumentTitle();
   cleanupAllTranslations();
   stopObservation();
-  batchQueue?.destroy();
-  batchQueue = null;
+  batchQueues?.text.destroy();
+  batchQueues?.html.destroy();
+  batchQueues = null;
   currentRule = null;
   removeSiteLayoutStyles();
 }
@@ -368,6 +313,15 @@ async function loadRule(input: PageTranslateCommand): Promise<ResolvedFullPageRu
   const userRules = await getFullPageRules();
   const matched = matchFullPageRule(window.location.href, userRules);
   return resolveFullPageRule(matched, input);
+}
+
+function createBatchQueues(
+  rule: ResolvedFullPageRule,
+): Record<TranslateFormat, TranslateBatchQueue> {
+  return {
+    text: new TranslateBatchQueue(rule.engine, rule.target, rule.source, "text"),
+    html: new TranslateBatchQueue(rule.engine, rule.target, rule.source, "html"),
+  };
 }
 
 // ── Observer setup ────────────────────────────────────────────────────────────
@@ -440,103 +394,52 @@ function startObserveRoots(): void {
 }
 
 function startObserveRoot(root: ParentNode): void {
+  if (!currentRule) return;
+  const rule = currentRule;
+  const ctx = makeScanCtx();
+  if (!ctx) return;
   if (rootNodes.has(root) || !mutationObserver) return;
   rootNodes.add(root);
   mutationObserver.observe(root, {
     childList: true, subtree: true, characterData: true, characterDataOldValue: true,
   });
-  if (currentRule?.hasShadowroot && root instanceof Element) {
+  if (rule.hasShadowroot && root instanceof Element) {
     findAndObserveShadowRoots(root);
   }
-  scanNode(root);
+  scanNode(root, rule, ctx);
 }
 
 function startObserveShadowRoot(root: ShadowRoot): void {
   if (!rootNodes.has(root)) startObserveRoot(root);
 }
 
-// ── DOM Scan (mirrors kiss-translator #scanNode / #queryNode) ─────────────────
-
-function scanNode(rootNode: ParentNode): void {
-  if (!currentRule) return;
-  if (rootNode instanceof HTMLElement && shouldIgnoreNode(rootNode)) return;
-
-  if (!currentRule.autoScan) {
-    queryNodes(rootNode);
-    return;
-  }
-
-  if (rootNode instanceof HTMLElement) {
-    const hasText = hasDirectText(rootNode);
-
-    // Kiss optimisation: single-child wrapper — descend immediately
-    if (!hasText && rootNode.children.length === 1) {
-      const child = rootNode.children.item(0);
-      if (child) scanNode(child);
-      return;
-    }
-
-    const hasBlock = hasBlockNode(rootNode);
-    // Node has direct text OR no block children → treat as a translatable unit
-    if (hasText || !hasBlock) startObserveNode(rootNode);
-    // Descend into block children
-    if (hasBlock) {
-      for (const child of Array.from(rootNode.children)) {
-        if (!hasText || isBlockNode(child)) scanNode(child);
-      }
-    }
-    return;
-  }
-
-  // DocumentFragment / ShadowRoot
-  for (const child of Array.from(rootNode.childNodes)) {
-    if (child instanceof HTMLElement) scanNode(child);
-  }
-}
-
-function queryNodes(rootNode: ParentNode): void {
-  if (!currentRule?.selector) return;
-  const sel = currentRule.selector;
-  if (rootNode instanceof HTMLElement && matchesSelectorSafe(rootNode, sel)) {
-    startObserveNode(rootNode);
-  }
-  querySelectorAllSafe(rootNode, sel).forEach((node) => {
-    if (node instanceof HTMLElement) startObserveNode(node);
-  });
-}
-
-function startObserveNode(node: HTMLElement): void {
-  if (!currentRule || !intersectionObserver || shouldIgnoreNode(node)) return;
-  applyRuleStyles(node);
-
-  if (!observedNodes.has(node)) {
-    observedNodes.add(node);
-    intersectionObserver.observe(node);
-  }
-
-  if (processedNodes.has(node)) return; // already processed, IO will trigger sync if needed
-
-  if (currentRule.scanAll || viewNodes.has(node) || isVisible(node)) {
-    viewNodes.add(node);
-    void scheduleProcessNode(node, runSeq);
-  }
+function makeScanCtx(): ScanContext | null {
+  if (!intersectionObserver) return null;
+  return {
+    intersectionObserver,
+    observedNodes,
+    viewNodes,
+    processedNodes,
+    onNodeReady: (node) => void scheduleProcessNode(node, runSeq),
+  };
 }
 
 // ── Core processing (kiss-translator #processNode / #translateNodeGroup) ───────
 
 async function scheduleProcessNode(node: HTMLElement, seq: number): Promise<void> {
-  if (seq !== runSeq || !currentRule || !batchQueue) return;
-  if (!node.isConnected || shouldIgnoreNode(node)) return;
+  if (seq !== runSeq || !currentRule || !batchQueues) return;
+  const rule = currentRule;
+  if (!node.isConnected || shouldIgnoreNode(node, rule)) return;
   if (processedNodes.has(node)) return;
 
-  processedNodes.set(node, currentRule);
+  processedNodes.set(node, rule);
 
   // Early out: if the entire textContent is junk, skip
   if (isInvalidText(node.textContent ?? "")) return;
 
   // Collect groups of consecutive non-break child nodes
   const childList = Array.from(node.childNodes).filter((c) => !isOurWrapper(c));
-  const groups = collectNodeGroups(childList, node);
+  const groups = collectNodeGroups(childList, rule);
 
   for (const group of groups) {
     if (seq !== runSeq || !node.isConnected) return;
@@ -545,14 +448,17 @@ async function scheduleProcessNode(node: HTMLElement, seq: number): Promise<void
 }
 
 // Mirrors kiss-translator's inline node grouping in #processNode
-function collectNodeGroups(childNodes: ChildNode[], host: HTMLElement): ChildNode[][] {
+function collectNodeGroups(
+  childNodes: ChildNode[],
+  rule: ResolvedFullPageRule,
+): ChildNode[][] {
   const groups: ChildNode[][] = [];
   let current: ChildNode[] = [];
 
   for (const node of childNodes) {
     const shouldGroup =
       node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE;
-    if (shouldGroup && !shouldBreakGroup(node, host)) {
+    if (shouldGroup && !shouldBreakGroup(node, rule)) {
       current.push(node);
     } else {
       if (current.length > 0) { groups.push(current); current = []; }
@@ -563,20 +469,19 @@ function collectNodeGroups(childNodes: ChildNode[], host: HTMLElement): ChildNod
 }
 
 // Mirrors kiss-translator's #shouldBreak
-function shouldBreakGroup(node: ChildNode, host: HTMLElement): boolean {
+function shouldBreakGroup(node: ChildNode, rule: ResolvedFullPageRule): boolean {
   if (!(node instanceof Element)) return false;
-  if (!currentRule) return false;
-  if (matchesSelectorSafe(node, currentRule.keepSelector)) return false;
+  if (matchesSelectorSafe(node, rule.keepSelector)) return false;
   if (!(node instanceof HTMLElement)) {
     return BREAK_LINE_TAGS.has((node as Element).tagName);
   }
-  if (BREAK_LINE_TAGS.has(node.tagName) || shouldIgnoreNode(node) || isOurWrapper(node)) {
+  if (BREAK_LINE_TAGS.has(node.tagName) || shouldIgnoreNode(node, rule) || isOurWrapper(node)) {
     return true;
   }
-  if (currentRule.autoScan && isBlockNode(node)) return true;
-  if (!currentRule.autoScan && currentRule.selector) {
-    if (matchesSelectorSafe(node, currentRule.selector)) return true;
-    if (querySelectorAllSafe(node, currentRule.selector).length > 0) return true;
+  if (rule.autoScan && isBlockNode(node)) return true;
+  if (!rule.autoScan && rule.selector) {
+    if (matchesSelectorSafe(node, rule.selector)) return true;
+    if (querySelectorAllSafe(node, rule.selector).length > 0) return true;
   }
   return false;
 }
@@ -587,17 +492,17 @@ async function translateNodeGroup(
   host: HTMLElement,
   seq: number,
 ): Promise<void> {
-  if (!currentRule || !batchQueue || seq !== runSeq) return;
+  if (!currentRule || !batchQueues || seq !== runSeq) return;
 
-  const { html: serialized, placeholders } = shouldUseRichHtmlSerialization(host)
-    ? serializeNodesAsRichHtml(nodes)
-    : serializeNodesForTranslation(nodes);
+  const rule = currentRule;
+  const format = pickSerializeFormat(host, rule);
+  const { html: serialized, placeholders } = serializeNodes(nodes, format, rule);
   if (!serialized || isInvalidText(serialized)) return;
 
-  const transOnly = shouldUseTranslationOnly(currentMode ?? "replace");
+  const transOnly = shouldUseTranslationOnly(currentMode ?? "replace", rule);
 
   // Create wrapper and insert after last original node (kiss-translator pattern)
-  const wrapper = createLoadingWrapper(serialized, transOnly);
+  const wrapper = createLoadingWrapper(serialized, transOnly, rule);
   runWithMutedMutations(host, () => {
     const last = nodes[nodes.length - 1]!;
     if (last.parentNode === host) {
@@ -613,7 +518,8 @@ async function translateNodeGroup(
   pendingCount++;
 
   try {
-    const translated = await batchQueue.addTask(serialized);
+    const translated = localTranslationCache.get(serialized)
+      ?? await batchQueues[format].addTask(serialized);
     pendingCount = Math.max(0, pendingCount - 1);
 
     if (seq !== runSeq || !host.isConnected || !wrapper.isConnected) return;
@@ -636,8 +542,10 @@ async function translateNodeGroup(
       appendTranslatedContent(inner, translated, placeholders);
     });
     translatedHosts.add(host);
+    localTranslationCache.set(serialized, translated);
   } catch (err) {
     pendingCount = Math.max(0, pendingCount - 1);
+    if (isQueueDestroyedError(err)) return;
     if (seq === runSeq && wrapper.isConnected) {
       runWithMutedMutations(host, () => {
         if (transOnly) restoreWrapperNodes(wrapper);
@@ -651,8 +559,11 @@ async function translateNodeGroup(
 
 // ── Wrapper DOM management ────────────────────────────────────────────────────
 
-function createLoadingWrapper(original: string, transOnly: boolean): HTMLElement {
-  const rule = currentRule!;
+function createLoadingWrapper(
+  original: string,
+  transOnly: boolean,
+  rule: ResolvedFullPageRule,
+): HTMLElement {
   const wrapper = document.createElement("span");
   wrapper.setAttribute(WRAPPER_ATTR, "true");
 
@@ -696,10 +607,6 @@ function getHostWrappers(host: HTMLElement): HTMLElement[] {
   return Array.from(hostWrappers.get(host) ?? []);
 }
 
-function isOurWrapper(node: Node): boolean {
-  return node instanceof Element && node.hasAttribute(WRAPPER_ATTR);
-}
-
 // Move nodes into a detached fragment (hides them; they can be restored)
 function moveNodesToFragment(nodes: ChildNode[]): void {
   const frag = document.createDocumentFragment();
@@ -739,7 +646,7 @@ function switchAppliedMode(mode: PageTranslateMode): void {
   if (currentEngine !== null && currentTarget !== null) {
     lastTranslateInput = { target: currentTarget, engine: currentEngine, mode };
   }
-  const transOnly = shouldUseTranslationOnly(mode);
+  const transOnly = shouldUseTranslationOnly(mode, currentRule);
 
   for (const host of Array.from(translatedHosts)) {
     if (!host.isConnected) continue;
@@ -787,6 +694,7 @@ function cleanupAllTranslations(): void {
   const hosts = new Set([...observedNodes, ...translatedHosts]);
   for (const host of hosts) cleanupHostNode(host);
   translatedHosts.clear();
+  localTranslationCache.clear();
 }
 
 // Mirrors kiss-translator's #removeTranslationElement
@@ -820,6 +728,7 @@ function stopObservation(): void {
 
 function queueRescan(target: Node): void {
   if (!currentRule) return;
+  if (findActiveTranslationHost(target)) return;
   rescanQueue.add(target);
   if (rescanTimer !== undefined) return;
   rescanTimer = window.setTimeout(() => {
@@ -832,13 +741,19 @@ function queueRescan(target: Node): void {
 }
 
 function rescanContainer(changedNode: Node): void {
+  if (!currentRule) return;
+  const rule = currentRule;
+  const ctx = makeScanCtx();
+  if (!ctx) return;
+  if (findActiveTranslationHost(changedNode)) return;
   const container = findChangeContainer(changedNode);
   if (!container) return;
+  if (hasActiveTranslation(container)) return;
   cleanupHostNode(container);
   if (intersectionObserver) intersectionObserver.unobserve(container);
   observedNodes.delete(container);
   viewNodes.delete(container);
-  scanNode(container);
+  scanNode(container, rule, ctx);
 }
 
 function findChangeContainer(startNode: Node): HTMLElement | null {
@@ -850,6 +765,22 @@ function findChangeContainer(startNode: Node): HTMLElement | null {
       }
     }
     current = current.parentNode;
+  }
+  return null;
+}
+
+function hasActiveTranslation(host: HTMLElement): boolean {
+  if (translatedHosts.has(host)) return true;
+  return getHostWrappers(host).some((wrapper) => wrapper.isConnected);
+}
+
+function findActiveTranslationHost(startNode: Node): HTMLElement | null {
+  let current: Element | null = startNode instanceof Element
+    ? startNode
+    : startNode.parentElement;
+  while (current && current !== document.body) {
+    if (current instanceof HTMLElement && hasActiveTranslation(current)) return current;
+    current = current.parentElement;
   }
   return null;
 }
@@ -936,7 +867,21 @@ function checkLocationChange(): void {
 }
 
 function getLocationKey(): string {
-  return `${window.location.origin}${window.location.pathname}${window.location.search}`;
+  return `${window.location.origin}${getCanonicalPathname()}${window.location.search}`;
+}
+
+function getCanonicalPathname(): string {
+  const path = window.location.pathname.replace(/\/+$/, "");
+  if (isDiscourseTopicPage()) {
+    return path.replace(/^(\/t\/.+\/\d+)\/\d+$/u, "$1");
+  }
+  return path || "/";
+}
+
+function isDiscourseTopicPage(): boolean {
+  if (!/^\/t\/.+\/\d+(?:\/\d+)?$/u.test(window.location.pathname)) return false;
+  const generator = document.querySelector('meta[name="generator"]')?.getAttribute("content") ?? "";
+  return /discourse/i.test(generator) || !!document.querySelector("#data-discourse-setup");
 }
 
 function handleSoftNavigation(): void {
@@ -949,8 +894,9 @@ function handleSoftNavigation(): void {
   restoreDocumentTitle();
   cleanupAllTranslations();
   stopObservation();
-  batchQueue?.destroy();
-  batchQueue = null;
+  batchQueues?.text.destroy();
+  batchQueues?.html.destroy();
+  batchQueues = null;
   currentRule = null;
   removeSiteLayoutStyles();
 
@@ -962,259 +908,6 @@ function handleSoftNavigation(): void {
       console.warn("[OneLingo] navigation retranslate failed:", error);
     });
   }, NAVIGATION_RETRANSLATE_DELAY_MS);
-}
-
-// ── Text serialisation (kiss-translator #serializeForTranslation) ─────────────
-
-// Single-brace placeholders match kiss-translator's default "{ }" delimiter format.
-// Some engines normalize "{{1}}" into "{1}", breaking double-brace restoration.
-// Single braces "{1}" are more stable across the plain-text fallback path.
-const PLACEHOLDER_START = "{";
-const PLACEHOLDER_END = "}";
-const PLACEHOLDER_RE = /\{\d+\}/g;
-const PLACEHOLDER_TAG = "i";
-const PLACEHOLDER_SAFE_TAG = "span";
-// Compact format: <i1>content</i1> — matches kiss-translator's default placetagFormat.
-// Attribute forms like <i i=1> can be confused with opaque placeholders by engines;
-// compact tags keep wrapped ranges visually distinct from "{N}" replace tokens.
-const PLACEHOLDER_OPEN_RE = /<i(\d+)>/gi;
-const PLACEHOLDER_CLOSE_RE = /<\/i\d+>/gi;
-const PRESERVE_HTML_ATTR = "data-onelingo-preserve";
-
-function serializeNodesForTranslation(nodes: Iterable<Node>): {
-  html: string;
-  placeholders: PlaceholderMap;
-} {
-  let replaceCounter = 0;
-  let wrapCounter = 0;
-  const placeholders: PlaceholderMap = new Map();
-
-  const pushReplace = (html: string): string => {
-    replaceCounter++;
-    const key = `${PLACEHOLDER_START}${replaceCounter}${PLACEHOLDER_END}`;
-    placeholders.set(key, html);
-    return key;
-  };
-
-  const traverse = (node: Node): string => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = (node.nodeValue ?? "").replace(/\r?\n/g, () => pushReplace("&#10;"));
-      return escapeHtml(text);
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE) return "";
-
-    const el = node as HTMLElement;
-
-    // Excluded sub-trees (noise text: edit links, screen-reader-only text, etc.)
-    if (shouldDropNodeFromSerialization(el)) return "";
-
-    // BUILTIN_IGNORE_SELECTOR → replace whole element as opaque placeholder
-    if (shouldIgnoreNodeForSerialization(el)) {
-      return pushReplace(el.outerHTML);
-    }
-
-    if (
-      shouldPreserveNode(el) ||
-      (currentRule?.hasRichText && RICH_TEXT_REPLACE_TAGS.has(el.tagName)) ||
-      matchesSelectorSafe(el, currentRule?.keepSelector ?? "") ||
-      !el.textContent?.trim()
-    ) {
-      if (el.tagName === "IMG" || el.tagName === "SVG") {
-        el.style.width = `${el.offsetWidth}px`;
-        el.style.height = `${el.offsetHeight}px`;
-      }
-      return pushReplace(el.outerHTML);
-    }
-
-    let innerContent = "";
-    el.childNodes.forEach((child) => { innerContent += traverse(child); });
-
-    if (currentRule?.hasRichText && RICH_TEXT_WRAP_TAGS.has(el.tagName)) {
-      wrapCounter++;
-      placeholders.set(`TAG_${wrapCounter}`, {
-        openTag: buildOpeningTag(el),
-        closeTag: `</${el.localName}>`,
-      });
-      return `<${PLACEHOLDER_TAG}${wrapCounter}>${innerContent}</${PLACEHOLDER_TAG}${wrapCounter}>`;
-    }
-
-    return innerContent;
-  };
-
-  const html = Array.from(nodes).map(traverse).join("").trim();
-  return { html, placeholders };
-}
-
-function serializeNodesAsRichHtml(nodes: Iterable<Node>): {
-  html: string;
-  placeholders: PlaceholderMap;
-} {
-  let preserveCounter = 0;
-  const placeholders: PlaceholderMap = new Map();
-
-  const preserveHtml = (el: HTMLElement): string => {
-    preserveCounter++;
-    const clone = el.cloneNode(true) as HTMLElement;
-    clone.setAttribute("translate", "no");
-    clone.setAttribute(PRESERVE_HTML_ATTR, String(preserveCounter));
-    placeholders.set(`HTML_${preserveCounter}`, el.outerHTML);
-    return clone.outerHTML;
-  };
-
-  const traverse = (node: Node): string => {
-    if (node.nodeType === Node.TEXT_NODE) return escapeHtml(node.nodeValue ?? "");
-    if (!(node instanceof HTMLElement)) return "";
-    if (shouldDropNodeFromSerialization(node)) return "";
-    if (shouldPreserveNode(node)) return preserveHtml(node);
-    if (node.tagName === "BR" || node.tagName === "WBR") return " ";
-    if (node.tagName === "IMG" || node.tagName === "SVG") return node.outerHTML;
-    if (shouldSkipInlineTextNode(node)) return "";
-    if (shouldIgnoreNodeForSerialization(node)) return preserveHtml(node);
-
-    const inner = Array.from(node.childNodes).map(traverse).join("");
-    if (!inner.trim()) return "";
-    if (!RICH_HTML_INLINE_TAGS.has(node.tagName)) return inner;
-    return `${buildRichHtmlOpeningTag(node)}${inner}</${node.localName}>`;
-  };
-
-  const html = normalizeInlineText(Array.from(nodes).map(traverse).join(""));
-  placeholders.set("__html__", "");
-  return { html, placeholders };
-}
-
-function shouldUseRichHtmlSerialization(host: HTMLElement): boolean {
-  return (currentEngine === "google2" || currentEngine === "microsoft") &&
-    !!currentRule?.hasRichText &&
-    (!isWikipediaMainPage() ||
-      !!host.closest("#mp-tfa, #mp-tfl, #mp-dyk, #mp-itn, #mp-otd, #mp-tfp"));
-}
-
-function buildRichHtmlOpeningTag(el: HTMLElement): string {
-  if (el.tagName !== "A") return `<${el.localName}>`;
-
-  const attrs: string[] = [];
-  const href = el.getAttribute("href");
-  const title = el.getAttribute("title");
-  if (href && isSafeLinkHref(href)) attrs.push(`href="${escapeHtmlAttr(href)}"`);
-  if (title) attrs.push(`title="${escapeHtmlAttr(title)}"`);
-
-  return `<${el.localName}${attrs.length > 0 ? ` ${attrs.join(" ")}` : ""}>`;
-}
-
-function shouldPreserveNode(el: HTMLElement): boolean {
-  return matchesSelectorSafe(el, OPAQUE_PRESERVE_SELECTOR);
-}
-
-function shouldDropNodeFromSerialization(el: Element): boolean {
-  return matchesSelectorSafe(el, EXCLUDE_TEXT_SELECTOR);
-}
-
-function shouldIgnoreNodeForSerialization(el: Element): boolean {
-  return matchesSelectorSafe(el, BUILTIN_IGNORE_SELECTOR);
-}
-
-function isSafeLinkHref(href: string): boolean {
-  return !/^(?:javascript|data|vbscript):/i.test(href.trim());
-}
-
-function restoreFromTranslation(translatedText: string, placeholders: PlaceholderMap): string {
-  if (!translatedText || placeholders.size === 0) return translatedText;
-
-  const restoreAttr = "data-onelingo-restore";
-  let textToParse = translatedText;
-  let result = translatedText;
-
-  try {
-    textToParse = textToParse.replace(
-      PLACEHOLDER_OPEN_RE,
-      `<${PLACEHOLDER_SAFE_TAG} ${restoreAttr}="$1">`,
-    );
-    textToParse = textToParse.replace(PLACEHOLDER_CLOSE_RE, `</${PLACEHOLDER_SAFE_TAG}>`);
-
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(textToParse, "text/html");
-    const nodes = Array.from(
-      doc.querySelectorAll(`${PLACEHOLDER_SAFE_TAG}[${restoreAttr}]`),
-    );
-
-    nodes.reverse().forEach((node) => {
-      const index = node.getAttribute(restoreAttr);
-      if (!index) return;
-      const value = placeholders.get(`TAG_${index}`);
-      if (!isWrappedPlaceholder(value)) return;
-      node.outerHTML = `${value.openTag}${node.innerHTML}${value.closeTag}`;
-    });
-
-    Array.from(doc.querySelectorAll(`[${PRESERVE_HTML_ATTR}]`)).reverse().forEach((node) => {
-      const index = normalizeRestoreIndex(node.getAttribute(PRESERVE_HTML_ATTR));
-      if (!index) return;
-      const value = placeholders.get(`HTML_${index}`);
-      if (typeof value !== "string") return;
-      node.outerHTML = value;
-    });
-
-    result = doc.body.innerHTML;
-  } catch {
-    result = translatedText;
-  }
-
-  return result.replace(PLACEHOLDER_RE, (key) => {
-    const value = placeholders.get(key);
-    return typeof value === "string" ? value : key;
-  });
-}
-
-function buildOpeningTag(node: HTMLElement): string {
-  const escapeAttr = (s: string): string => s.replace(/"/g, "&quot;");
-  let tag = `<${node.tagName.toLowerCase()}`;
-  for (const attr of Array.from(node.attributes)) {
-    tag += ` ${attr.name}="${escapeAttr(attr.value)}"`;
-  }
-  return tag + ">";
-}
-
-function normalizeRestoreIndex(value: string | null): string | null {
-  const match = value?.match(/\d+/);
-  return match?.[0] ?? null;
-}
-
-function isWrappedPlaceholder(
-  value: string | WrappedPlaceholder | undefined,
-): value is WrappedPlaceholder {
-  return !!value && typeof value !== "string";
-}
-
-// ── Translation rendering ─────────────────────────────────────────────────────
-
-const MARKER_JUNK_RE =
-  /<\/?\s*(?:a|b|i)\b[^>]{0,80}>|(?:data-|#)i\s*=?\s*["'""''`]{0,2}\d+["'""''`]{0,2}>?|\{\d+\}/gi;
-
-function cleanMarkerJunk(text: string): string {
-  return decodeHtmlEntities(text).replace(MARKER_JUNK_RE, "").replace(/\s{2,}/g, " ");
-}
-
-let entityDecoder: HTMLTextAreaElement | null = null;
-function decodeHtmlEntities(s: string): string {
-  if (!/&[#\w]+;/.test(s)) return s;
-  if (!entityDecoder) entityDecoder = document.createElement("textarea");
-  entityDecoder.innerHTML = s;
-  return entityDecoder.value;
-}
-
-function appendTranslatedContent(
-  container: HTMLElement,
-  translated: string,
-  placeholders: PlaceholderMap,
-): void {
-  if (!placeholders || placeholders.size === 0) {
-    container.textContent = cleanMarkerJunk(translated);
-    return;
-  }
-  const html = restoreFromTranslation(translated, placeholders);
-  if (!html.trim()) return;
-  const template = document.createElement("template");
-  template.innerHTML = html;
-  container.appendChild(template.content.cloneNode(true));
 }
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
@@ -1374,62 +1067,13 @@ function isWikipediaMainPage(): boolean {
     window.location.pathname === "/wiki/Main_Page";
 }
 
-// ── Rule styles ───────────────────────────────────────────────────────────────
-
-function applyRuleStyles(node: HTMLElement): void {
-  if (!currentRule) return;
-  applyRuleStyle(node, currentRule.selectStyle, selectStyleAttrs);
-  applyRuleStyle(node.parentElement, currentRule.parentStyle, parentStyleAttrs);
-  applyRuleStyle(
-    node.parentElement?.parentElement ?? null, currentRule.grandStyle, grandStyleAttrs,
-  );
-}
-
-function restoreRuleStyles(node: HTMLElement): void {
-  restoreRuleStyle(node, selectStyleAttrs);
-  restoreRuleStyle(node.parentElement, parentStyleAttrs);
-  restoreRuleStyle(node.parentElement?.parentElement ?? null, grandStyleAttrs);
-}
-
-function applyRuleStyle(
-  el: HTMLElement | null,
-  cssText: string,
-  cache: WeakMap<HTMLElement, { original: string | null; count: number }>,
-): void {
-  if (!el || !cssText.trim()) return;
-  const existing = cache.get(el);
-  if (existing) { existing.count++; return; }
-  cache.set(el, { original: el.getAttribute("style"), count: 1 });
-  appendInlineStyle(el, cssText);
-}
-
-function restoreRuleStyle(
-  el: HTMLElement | null,
-  cache: WeakMap<HTMLElement, { original: string | null; count: number }>,
-): void {
-  if (!el) return;
-  const state = cache.get(el);
-  if (!state) return;
-  if (--state.count > 0) return;
-  if (state.original === null) {
-    el.removeAttribute("style");
-  } else {
-    el.setAttribute("style", state.original);
-  }
-  cache.delete(el);
-}
-
-function appendInlineStyle(el: HTMLElement, cssText: string): void {
-  const patch = cssText.trim();
-  if (!patch) return;
-  const base = el.getAttribute("style")?.trim();
-  el.setAttribute("style", base ? `${base}${base.endsWith(";") ? "" : ";"} ${patch}` : patch);
-}
-
 // ── DOM utilities (mirrors kiss-translator static helpers) ────────────────────
 
-function shouldUseTranslationOnly(mode: PageTranslateMode): boolean {
-  return mode === "replace" || currentRule?.transOnly === true;
+function shouldUseTranslationOnly(
+  mode: PageTranslateMode,
+  rule: ResolvedFullPageRule | null,
+): boolean {
+  return mode === "replace" || rule?.transOnly === true;
 }
 
 // Kiss-translator's #isInvalidText
@@ -1441,76 +1085,17 @@ function isInvalidText(text: string): boolean {
   return COMBINED_SKIP_RE.test(trimmed);
 }
 
-// Kiss-translator's isBlockNode (with displayCache)
-function isBlockNode(node: Node): boolean {
-  if (!(node instanceof HTMLElement)) return false;
-  if (INLINE_TAGS.has(node.tagName)) return false;
-  if (BLOCK_TAGS.has(node.tagName)) return true;
-  if (displayCache.has(node)) return displayCache.get(node)!;
-  const display = window.getComputedStyle(node).display;
-  const isBlock = !display.startsWith("inline") &&
-    /^(block|flex|grid|list-item|table)/.test(display);
-  displayCache.set(node, isBlock);
-  return isBlock;
-}
-
-// Kiss-translator's hasTextNode (direct non-empty text nodes)
-function hasDirectText(el: HTMLElement): boolean {
-  return Array.from(el.childNodes).some(
-    (c) => c.nodeType === Node.TEXT_NODE && /\S/.test(c.nodeValue ?? ""),
-  );
-}
-
-// Kiss-translator's hasBlockNode
-function hasBlockNode(el: HTMLElement): boolean {
-  return Array.from(el.childNodes).some((c) => isBlockNode(c));
-}
-
-// Kiss-translator's shouldIgnoreNode equivalent
-function shouldIgnoreNode(el: HTMLElement): boolean {
-  if (isOurUiNode(el)) return true;
-  if (HARD_SKIP_TAGS.has(el.tagName)) return true;
-  if (el.isContentEditable) return true;
-  if (el.closest(SKIP_ANCESTOR_SELECTOR)) return true;
-  if (!currentRule) return false;
-  // Check rule's ignoreSelector (plus the built-in one when autoScan is on)
-  const ignore = buildIgnoreSelector();
-  if (ignore && matchesSelectorSafe(el, ignore)) return true;
-  if (ignore && closestSelectorSafe(el, ignore)) return true;
-  return false;
-}
-
-function buildIgnoreSelector(): string {
-  if (!currentRule) return BUILTIN_IGNORE_SELECTOR;
-  const parts: string[] = [BUILTIN_IGNORE_SELECTOR];
-  if (currentRule.ignoreSelector.trim()) parts.push(currentRule.ignoreSelector);
-  return parts.join(", ");
-}
-
-function isOurUiNode(el: Element): boolean {
-  return (
-    el.hasAttribute(WRAPPER_ATTR) ||
-    el.hasAttribute(INNER_ATTR) ||
-    !!el.closest(`[data-onelingo-tooltip],[data-onelingo-host],[${WRAPPER_ATTR}]`)
-  );
-}
-
-function isVisible(el: HTMLElement): boolean {
-  const style = window.getComputedStyle(el);
-  if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
-    return false;
-  }
-  if (el.getClientRects().length > 0) return true;
-  if (el.offsetParent !== null) return true;
-  return style.position === "fixed" || style.position === "sticky" || style.position === "absolute";
-}
-
 function shouldIgnoreMutationNode(node: Node): boolean {
-  if (node instanceof Element && isOurUiNode(node)) return true;
+  const element = node instanceof Element ? node : node.parentElement;
+  if (element && isOurUiNode(element)) return true;
   for (const root of mutedMutationRoots) {
     if (root === node || root.contains(node)) return true;
   }
   return false;
+}
+
+function isQueueDestroyedError(err: unknown): boolean {
+  return err instanceof Error && err.message === QUEUE_DESTROYED_ERROR;
 }
 
 function runWithMutedMutations(root: Node, run: () => void): void {
@@ -1523,16 +1108,22 @@ function runWithMutedMutations(root: Node, run: () => void): void {
 // ── Shadow DOM ────────────────────────────────────────────────────────────────
 
 function getOpenOrClosedShadowRoot(element: Element): ShadowRoot | null {
+  if (element.shadowRoot) return element.shadowRoot;
   const ff = (element as Element & { openOrClosedShadowRoot?: ShadowRoot | null })
     .openOrClosedShadowRoot;
   if (ff) return ff;
+  if (!(element instanceof HTMLElement)) return null;
   const chromeFn = (
     globalThis as typeof globalThis & {
-      chrome?: { dom?: { openOrClosedShadowRoot?: (el: Element) => ShadowRoot | null } };
+      chrome?: { dom?: { openOrClosedShadowRoot?: (el: HTMLElement) => ShadowRoot | null } };
     }
   ).chrome?.dom?.openOrClosedShadowRoot;
-  if (chromeFn) return chromeFn(element);
-  return element.shadowRoot;
+  if (!chromeFn) return null;
+  try {
+    return chromeFn(element);
+  } catch {
+    return null;
+  }
 }
 
 function findAndObserveShadowRoots(root: ParentNode): void {
@@ -1544,64 +1135,3 @@ function findAndObserveShadowRoots(root: ParentNode): void {
   }
 }
 
-// ── CSS selector helpers ──────────────────────────────────────────────────────
-
-function matchesSelectorSafe(el: Element, selector: string): boolean {
-  const s = selector.trim();
-  if (!s) return false;
-  try { return el.matches(s); } catch { return false; }
-}
-
-function closestSelectorSafe(el: Element, selector: string): Element | null {
-  const s = selector.trim();
-  if (!s) return null;
-  try { return el.closest(s); } catch { return null; }
-}
-
-function querySelectorAllSafe(root: ParentNode, selector: string): Element[] {
-  const s = selector.trim();
-  if (!s) return [];
-  try { return Array.from(root.querySelectorAll(s)); } catch { return []; }
-}
-
-// ── Misc ──────────────────────────────────────────────────────────────────────
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function escapeHtmlAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, "&quot;");
-}
-
-function normalizeInlineText(s: string): string {
-  return s.replace(/\s+/g, " ").trim();
-}
-
-function getVisibleInlineText(root: Node): string {
-  const parts: string[] = [];
-
-  const visit = (node: Node): void => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      parts.push(node.nodeValue ?? "");
-      return;
-    }
-    if (!(node instanceof Element)) return;
-    if (shouldSkipInlineTextNode(node)) return;
-    if (node.tagName === "BR" || node.tagName === "WBR") {
-      parts.push(" ");
-      return;
-    }
-    node.childNodes.forEach(visit);
-    if (BLOCK_TAGS.has(node.tagName)) parts.push(" ");
-  };
-
-  visit(root);
-  return normalizeInlineText(parts.join(""));
-}
-
-function shouldSkipInlineTextNode(el: Element): boolean {
-  if (shouldDropNodeFromSerialization(el)) return true;
-  if (HARD_SKIP_TAGS.has(el.tagName)) return true;
-  return false;
-}

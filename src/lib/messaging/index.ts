@@ -2,14 +2,16 @@
 // 不直接碰 browser.runtime.sendMessage。
 
 import type {
+  TranslateFormat,
   TranslateRequest,
   TranslateResponse,
 } from "@/engines/types";
+import type { FullPageEngineId } from "@/lib/storage/settings";
 import { browser } from "wxt/browser";
 
 export interface PageTranslateCommand {
   target: string;
-  engine: string;
+  engine: FullPageEngineId;
   mode?: "replace" | "bilingual";
   commandId?: number;
 }
@@ -24,7 +26,7 @@ export interface PageTranslateAck {
   active: boolean;
   translating?: boolean;
   mode?: "replace" | "bilingual";
-  engine?: string;
+  engine?: FullPageEngineId;
   target?: string;
 }
 
@@ -33,7 +35,7 @@ export interface PageTranslateStatus {
   translating: boolean;
   blocks: number;
   mode?: "replace" | "bilingual";
-  engine?: string;
+  engine?: FullPageEngineId;
   target?: string;
 }
 
@@ -68,7 +70,13 @@ export interface ProtocolMap {
     output: PageTranslateStatus;
   };
   translateBatch: {
-    input: { texts: string[]; target: string; engine?: string; source?: string };
+    input: {
+      texts: string[];
+      target: string;
+      engine?: string;
+      source?: string;
+      format?: TranslateFormat;
+    };
     output: string[];
   };
 }

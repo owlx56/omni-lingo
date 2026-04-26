@@ -1,7 +1,10 @@
+export type TranslateFormat = "text" | "html";
+
 export interface TranslateRequest {
   text: string;
   source?: string; // BCP-47; 省略即 auto
   target: string;
+  format?: TranslateFormat;
 }
 
 export interface TranslateResponse {

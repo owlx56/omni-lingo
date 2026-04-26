@@ -24,7 +24,7 @@ async function translateGoogle2Batch(reqs: TranslateRequest[]): Promise<Translat
     dt: "t",
     sl: first.source ?? "auto",
     tl: first.target,
-    format: "html",
+    format: first.format ?? "text",
   });
   const body = new URLSearchParams();
   reqs.forEach((req) => body.append("q", req.text));

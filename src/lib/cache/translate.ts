@@ -10,7 +10,7 @@ const cache = new LRU<string, TranslateResponse>(CAP);
 const inflight = new Map<string, Promise<TranslateResponse>>();
 
 export function cacheKey(engine: string, req: TranslateRequest): string {
-  return `${engine}|${req.source ?? "auto"}|${req.target}|${req.text}`;
+  return `${engine}|${req.format ?? "text"}|${req.source ?? "auto"}|${req.target}|${req.text}`;
 }
 
 export async function translateCached(
@@ -126,6 +126,7 @@ async function translateJoinedBatch(
     text: joinedText,
     target: reqs[0]!.target,
     source: reqs[0]!.source,
+    format: reqs[0]!.format,
   };
   const batchRes = await run(batchReq);
   const parts = splitBatchResult(batchRes.text, reqs.length, BATCH_SEP);

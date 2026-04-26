@@ -1,12 +1,14 @@
 import { createSignal, onCleanup, type Accessor } from "solid-js";
 
+export type FullPageEngineId = "google2" | "microsoft";
+
 // 按场景挂引擎，而不是全局一个：hover 是高频热路径，禁用 AI；
 // selection / fullPage 是低频用户主动触发，可以接 AI。UI 层在引擎选择
 // 上做能力过滤即可。
 export interface EngineMap {
   hover: string;
   selection: string;
-  fullPage: string;
+  fullPage: FullPageEngineId;
 }
 
 export type HoverGranularity = "word" | "sentence" | "paragraph";
@@ -35,7 +37,6 @@ const KEY = "sync:settings" as const;
 function withDefaults(raw: Partial<Settings> | null): Settings {
   // 浅 merge 会丢 engines 内部字段，必须二级合并
   const engines = { ...DEFAULTS.engines, ...(raw?.engines ?? {}) };
-  if (engines.fullPage === "google") engines.fullPage = "google2";
   return { ...DEFAULTS, ...(raw ?? {}), engines };
 }
 
