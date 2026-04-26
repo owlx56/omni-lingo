@@ -86,6 +86,7 @@ src/
 
 docs/
   architecture.md       # 当前架构和模块边界
+  immersive-debugging.md # 全文翻译 bug 定位流程
   agent-guidelines.md   # AI agent 协作规则
 ```
 
@@ -105,6 +106,7 @@ docs/
 | `dom-attrs.ts` | 共享 `data-onelingo-*` wrapper 属性名 |
 
 改这个模块前建议先读 [docs/architecture.md#全文翻译-immersive](docs/architecture.md#全文翻译-immersive)。
+修全文翻译 bug 时先按 [docs/immersive-debugging.md](docs/immersive-debugging.md) 分层定位。
 
 ## 开发原则
 

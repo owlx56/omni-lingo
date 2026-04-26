@@ -8,6 +8,7 @@ OneLingo（一译）是跨 Chrome / Firefox / Safari 的浏览器翻译拓展。
 
 - [docs/agent-guidelines.md](docs/agent-guidelines.md)：工程规则、浏览器拓展陷阱、协作约定。
 - [docs/architecture.md](docs/architecture.md)：当前代码布局和模块所有权。
+- [docs/immersive-debugging.md](docs/immersive-debugging.md)：全文翻译 bug 的分层定位和修复优先级。
 - [README.md](README.md)：产品概览和开发启动方式。
 
 ## 硬约束
@@ -30,6 +31,7 @@ OneLingo（一译）是跨 Chrome / Firefox / Safari 的浏览器翻译拓展。
 - 共享 wrapper 属性名放在 `dom-attrs.ts`。
 
 改全文翻译前先读 [docs/architecture.md#全文翻译-immersive](docs/architecture.md#全文翻译-immersive)。
+修全文翻译 bug 前先读 [docs/immersive-debugging.md](docs/immersive-debugging.md)。
 
 ## 常用命令
 

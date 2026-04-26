@@ -92,6 +92,8 @@ popup/background command
 - `markup.ts` 尽量保持纯转换 / 回填边界。
 - 共享 wrapper 属性名放在 `dom-attrs.ts`，不要放在 scan 或 orchestration 文件里。
 
+调试全文翻译 bug 时，先按 [immersive-debugging.md](immersive-debugging.md) 分层定位。优先修通用 DOM / 流水线问题，再考虑站点 rule，最后才写域名特例。
+
 ## 站点规则
 
 全文翻译的站点行为配置在 `src/features/immersive/rules.ts`。优先用规则更新解决站点差异，只有 selector、style、rule flag 表达不了时才加代码分支。
