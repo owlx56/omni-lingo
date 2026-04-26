@@ -75,10 +75,15 @@ export interface SerializedNodes {
   placeholders: PlaceholderMap;
 }
 
+export interface SerializeNodesOptions {
+  separator?: string;
+}
+
 export function serializeNodes(
   nodes: Iterable<Node>,
   format: TranslateFormat,
   rule: ResolvedFullPageRule,
+  options: SerializeNodesOptions = {},
 ): SerializedNodes {
   let replaceCounter = 0;
   let wrapCounter = 0;
@@ -136,6 +141,15 @@ export function serializeNodes(
 
     if (shouldDropNodeFromSerialization(el)) return "";
 
+    const semanticLabel = getSemanticTranslationLabel(el);
+    if (semanticLabel) {
+      const label = escapeHtml(semanticLabel);
+      if (isHtml && RICH_HTML_INLINE_TAGS.has(el.tagName)) {
+        return `${buildRichHtmlOpeningTag(el)}${label}</${el.localName}>`;
+      }
+      return label;
+    }
+
     if (isHtml) {
       if (shouldPreserveNode(el)) {
         return preserveHtmlNode(el);
@@ -172,7 +186,11 @@ export function serializeNodes(
     return innerContent;
   };
 
-  const raw = Array.from(nodes).map(traverse).join("");
+  const separator = options.separator ? escapeHtml(options.separator) : "";
+  const chunks = Array.from(nodes).map(traverse);
+  const raw = separator
+    ? chunks.map((chunk) => chunk.trim()).filter(Boolean).join(separator)
+    : chunks.join("");
   const html = isHtml ? normalizeInlineText(raw) : raw.trim();
   if (isHtml) placeholders.set("__html__", "");
   return { html, format, placeholders };
@@ -235,6 +253,11 @@ function shouldSkipInlineTextNode(el: Element): boolean {
   if (shouldDropNodeFromSerialization(el)) return true;
   if (HARD_SKIP_TAGS.has(el.tagName)) return true;
   return false;
+}
+
+function getSemanticTranslationLabel(el: HTMLElement): string | null {
+  const languageName = el.getAttribute("data-language-local-name")?.trim();
+  return languageName || null;
 }
 
 function isSafeLinkHref(href: string): boolean {

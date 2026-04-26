@@ -51,6 +51,8 @@ const NAVIGATION_RETRANSLATE_DELAY_MS = 800;
 
 const LOADING_STYLE_ID = "onelingo-immersive-loading-style";
 const MAIN_PAGE_LAYOUT_STYLE_ID = "onelingo-wikipedia-main-page-layout-style";
+const INLINE_RUN_SEPARATOR_RE = /^[\s,.;:|/\\()[\]{}·•●‧・\-–—←→]+$/u;
+const INLINE_RUN_TRANSLATION_SEPARATOR = " · ";
 
 // ── Skip patterns (from kiss-translator BUILTIN_SKIP_PATTERNS) ────────────────
 const BUILTIN_SKIP_PATTERNS = [
@@ -82,6 +84,14 @@ type PageTranslateMode = NonNullable<PageTranslateCommand["mode"]>;
 interface WrapperState {
   nodes: ChildNode[];
   isHide: boolean;
+}
+
+interface InlineSiblingRun {
+  host: HTMLElement;
+  nodes: ChildNode[];
+  processedHosts: HTMLElement[];
+  format?: TranslateFormat;
+  separator?: string;
 }
 
 const QUEUE_DESTROYED_ERROR = "Queue destroyed";
@@ -432,6 +442,17 @@ async function scheduleProcessNode(node: HTMLElement, seq: number): Promise<void
   if (!node.isConnected || shouldIgnoreNode(node, rule)) return;
   if (processedNodes.has(node)) return;
 
+  const inlineRun = collectInlineSiblingRun(node, rule);
+  if (inlineRun) {
+    inlineRun.processedHosts.forEach((host) => processedNodes.set(host, rule));
+    if (isInvalidText(getNodesText(inlineRun.nodes))) return;
+    await translateNodeGroup(inlineRun.nodes, inlineRun.host, seq, {
+      format: inlineRun.format,
+      separator: inlineRun.separator,
+    });
+    return;
+  }
+
   processedNodes.set(node, rule);
 
   // Early out: if the entire textContent is junk, skip
@@ -486,23 +507,92 @@ function shouldBreakGroup(node: ChildNode, rule: ResolvedFullPageRule): boolean 
   return false;
 }
 
+function collectInlineSiblingRun(
+  node: HTMLElement,
+  rule: ResolvedFullPageRule,
+): InlineSiblingRun | null {
+  const parent = node.parentElement;
+  if (!parent || !isInlineRunCandidate(node, rule)) return null;
+
+  const siblings = Array.from(parent.childNodes);
+  const nodeIndex = siblings.indexOf(node);
+  if (nodeIndex < 0) return null;
+
+  let start = nodeIndex;
+  while (start > 0 && canJoinInlineRun(siblings[start - 1]!, rule)) start--;
+
+  let end = nodeIndex;
+  while (end < siblings.length - 1 && canJoinInlineRun(siblings[end + 1]!, rule)) end++;
+
+  const nodes = siblings.slice(start, end + 1);
+  const processedHosts = nodes.filter(
+    (child): child is HTMLElement =>
+      child instanceof HTMLElement && isInlineRunCandidate(child, rule),
+  );
+
+  if (processedHosts.length < 2) return null;
+  const isListRun = parent instanceof HTMLUListElement || parent instanceof HTMLOListElement;
+  return {
+    host: parent,
+    nodes,
+    processedHosts,
+    format: isListRun && supportsHtmlFormat(rule.engine) ? "html" : undefined,
+    separator: isListRun ? INLINE_RUN_TRANSLATION_SEPARATOR : undefined,
+  };
+}
+
+function isInlineRunCandidate(el: HTMLElement, rule: ResolvedFullPageRule): boolean {
+  return (
+    !!rule.selector &&
+    matchesSelectorSafe(el, rule.selector) &&
+    !isOurWrapper(el) &&
+    !shouldIgnoreNode(el, rule) &&
+    isInlineFlowElement(el)
+  );
+}
+
+function canJoinInlineRun(node: ChildNode, rule: ResolvedFullPageRule): boolean {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.nodeValue ?? "";
+    return text === "" || INLINE_RUN_SEPARATOR_RE.test(text);
+  }
+  if (!(node instanceof HTMLElement)) return false;
+  if (isOurWrapper(node) || shouldIgnoreNode(node, rule)) return false;
+  if (BREAK_LINE_TAGS.has(node.tagName)) return false;
+  return isInlineFlowElement(node);
+}
+
+function isInlineFlowElement(el: HTMLElement): boolean {
+  const display = window.getComputedStyle(el).display;
+  return display === "contents" || display === "ruby" || display.startsWith("inline");
+}
+
+function getNodesText(nodes: Iterable<Node>): string {
+  let text = "";
+  for (const node of nodes) text += node.textContent ?? "";
+  return text;
+}
+
 // Mirrors kiss-translator's #translateNodeGroup
 async function translateNodeGroup(
   nodes: ChildNode[],
   host: HTMLElement,
   seq: number,
+  options: { format?: TranslateFormat; separator?: string } = {},
 ): Promise<void> {
   if (!currentRule || !batchQueues || seq !== runSeq) return;
 
   const rule = currentRule;
-  const format = pickSerializeFormat(host, rule);
-  const { html: serialized, placeholders } = serializeNodes(nodes, format, rule);
+  const format = options.format ?? pickSerializeFormat(host, rule);
+  const { html: serialized, placeholders } = serializeNodes(nodes, format, rule, {
+    separator: options.separator,
+  });
   if (!serialized || isInvalidText(serialized)) return;
 
   const transOnly = shouldUseTranslationOnly(currentMode ?? "replace", rule);
 
   // Create wrapper and insert after last original node (kiss-translator pattern)
-  const wrapper = createLoadingWrapper(serialized, transOnly, rule);
+  const wrapper = createLoadingWrapper(serialized, transOnly, rule, host);
   runWithMutedMutations(host, () => {
     const last = nodes[nodes.length - 1]!;
     if (last.parentNode === host) {
@@ -563,12 +653,18 @@ function createLoadingWrapper(
   original: string,
   transOnly: boolean,
   rule: ResolvedFullPageRule,
+  host: HTMLElement,
 ): HTMLElement {
-  const wrapper = document.createElement("span");
+  const wrapperTag = getTranslationWrapperTag(host);
+  const wrapper = document.createElement(wrapperTag);
   wrapper.setAttribute(WRAPPER_ATTR, "true");
+  if (wrapperTag === "li") {
+    wrapper.style.display = "block";
+    wrapper.style.listStyle = "none";
+  }
 
   // Optional line-break before translation (hidden in transOnly, visible in bilingual)
-  if (original.length > NEWLINE_LENGTH) {
+  if (wrapperTag === "span" && shouldStartTranslationOnNewLine(host, original)) {
     const br = document.createElement("br");
     br.hidden = transOnly;
     wrapper.appendChild(br);
@@ -590,6 +686,20 @@ function createLoadingWrapper(
   appendLoadingLines(inner, original, false);
   wrapper.appendChild(inner);
   return wrapper;
+}
+
+function getTranslationWrapperTag(host: HTMLElement): "li" | "span" {
+  return host instanceof HTMLUListElement || host instanceof HTMLOListElement
+    ? "li"
+    : "span";
+}
+
+function shouldStartTranslationOnNewLine(host: HTMLElement, original: string): boolean {
+  return original.length > NEWLINE_LENGTH || !isInlineFlowElement(host);
+}
+
+function supportsHtmlFormat(engine: FullPageEngineId): boolean {
+  return engine === "google2" || engine === "microsoft";
 }
 
 function addHostWrapper(host: HTMLElement, wrapper: HTMLElement): void {
