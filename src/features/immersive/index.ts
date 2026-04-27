@@ -7,6 +7,7 @@ import {
   sendMessage,
   type PageTranslateAck,
   type PageTranslateCommand,
+  type PageTranslatePrefs,
   type PageTranslateStatus,
 } from "@/lib/messaging";
 import { getFullPageRules } from "@/lib/storage/full-page-rules";
@@ -198,6 +199,9 @@ let pendingCount = 0;
 let currentMode: PageTranslateMode | null = null;
 let currentEngine: FullPageEngineId | null = null;
 let currentTarget: string | null = null;
+let preferredMode: PageTranslateMode | null = null;
+let preferredEngine: FullPageEngineId | null = null;
+let preferredTarget: string | null = null;
 let originalTitle: string | null = null;
 let batchQueues: Record<TranslateFormat, TranslateBatchQueue> | null = null;
 
@@ -254,6 +258,11 @@ export function initFullPage(): void {
   });
 
   onMessage("readPageTranslateStatus", () => getStatus());
+
+  onMessage("updatePageTranslatePrefs", (input) => {
+    updatePageTranslatePrefs(input);
+    return getStatus();
+  });
 }
 
 function isStaleCommand(id: number | undefined): boolean {
@@ -276,6 +285,9 @@ async function startPageTranslate(input: PageTranslateCommand): Promise<PageTran
   currentRule = await loadRule(input);
   currentEngine = currentRule.engine;
   currentTarget = currentRule.target;
+  preferredMode = mode;
+  preferredEngine = currentEngine;
+  preferredTarget = currentTarget;
   lastTranslateInput = { target: currentRule.target, engine: currentRule.engine, mode };
   ensureSiteLayoutStyles();
 
@@ -317,6 +329,12 @@ function restoreOriginals(): void {
   batchQueues = null;
   currentRule = null;
   removeSiteLayoutStyles();
+}
+
+function updatePageTranslatePrefs(input: PageTranslatePrefs): void {
+  if (input.mode) preferredMode = input.mode;
+  if (input.engine) preferredEngine = input.engine;
+  if (input.target) preferredTarget = input.target;
 }
 
 async function loadRule(input: PageTranslateCommand): Promise<ResolvedFullPageRule> {
@@ -905,9 +923,9 @@ function getStatus(): PageTranslateStatus {
     active: translatedHosts.size > 0 || pendingCount > 0,
     translating: pendingCount > 0,
     blocks,
-    mode: currentMode ?? undefined,
-    engine: currentEngine ?? undefined,
-    target: currentTarget ?? undefined,
+    mode: currentMode ?? preferredMode ?? undefined,
+    engine: currentEngine ?? preferredEngine ?? undefined,
+    target: currentTarget ?? preferredTarget ?? undefined,
   };
 }
 
@@ -997,7 +1015,12 @@ function isDiscourseTopicPage(): boolean {
 function handleSoftNavigation(): void {
   const input = lastTranslateInput;
   pruneDisconnectedNodes();
-  if (!input) return;
+  if (!input) {
+    preferredMode = null;
+    preferredEngine = null;
+    preferredTarget = null;
+    return;
+  }
 
   runSeq++;
   pendingCount = 0;

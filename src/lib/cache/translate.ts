@@ -4,7 +4,7 @@ import type { TranslateRequest, TranslateResponse } from "@/engines/types";
 import { LRU } from "./lru";
 import { readTranslateCache, readTranslateCacheBulk, writeTranslateCache } from "./translate-db";
 
-const CAP = 5_000;
+const CAP = 10_000;
 
 const cache = new LRU<string, TranslateResponse>(CAP);
 const inflight = new Map<string, Promise<TranslateResponse>>();

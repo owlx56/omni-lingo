@@ -47,4 +47,12 @@ export default defineBackground(() => {
     }
     return sendTabMessage(tab.id, "readPageTranslateStatus", {});
   });
+
+  onMessage("setPageTranslatePrefs", async (input) => {
+    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    if (typeof tab?.id !== "number") {
+      throw new Error("当前没有活动标签页");
+    }
+    return sendTabMessage(tab.id, "updatePageTranslatePrefs", input);
+  });
 });

@@ -1,26 +1,25 @@
 import { For, createSignal, onMount } from "solid-js";
 import { sendMessage } from "@/lib/messaging";
 import {
-  setSettings,
-  useSettings,
+  getSettings,
   type FullPageEngineId,
   type FullPageMode,
-  type HoverGranularity,
 } from "@/lib/storage/settings";
 import "./App.css";
-
-const GRANULARITIES: { value: HoverGranularity; label: string }[] = [
-  { value: "word", label: "词" },
-  { value: "sentence", label: "句子" },
-  { value: "paragraph", label: "段落" },
-];
 
 const ENGINES: { value: FullPageEngineId; label: string }[] = [
   { value: "google2", label: "Google 2" },
   { value: "microsoft", label: "Microsoft" },
 ];
 
+const LANGS = [
+  { value: "zh", label: "中文" },
+  { value: "en", label: "English" },
+] as const;
+
 const DEFAULT_FULL_PAGE_MODE: FullPageMode = "replace";
+const DEFAULT_FULL_PAGE_ENGINE: FullPageEngineId = "google2";
+const DEFAULT_TARGET = "zh";
 
 function Row(props: { label: string; children: import("solid-js").JSX.Element }) {
   return (
@@ -60,15 +59,14 @@ function SegBtn(props: { active: boolean; onClick: () => void; children: import(
 }
 
 function App() {
-  const settings = useSettings();
   const [action, setAction] = createSignal<"idle" | "starting" | "restoring" | "retranslating">("idle");
   const [status, setStatus] = createSignal("");
   const [immersiveActive, setImmersiveActive] = createSignal(false);
-  const [pageMode, setPageMode] = createSignal<FullPageMode | null>(null);
+  const [pageMode, setPageMode] = createSignal<FullPageMode>(DEFAULT_FULL_PAGE_MODE);
+  const [pageEngine, setPageEngine] = createSignal<FullPageEngineId>(DEFAULT_FULL_PAGE_ENGINE);
+  const [pageTarget, setPageTarget] = createSignal(DEFAULT_TARGET);
   let actionSeq = 0;
   let lastCommandId = 0;
-
-  const fullPageEngine = (): FullPageEngineId => settings().engines.fullPage;
 
   const openOptions = (): void => {
     void browser.runtime.openOptionsPage().catch(() => {
@@ -92,24 +90,64 @@ function App() {
   const engineLabel = (engine: FullPageEngineId): string =>
     ENGINES.find((e) => e.value === engine)?.label ?? engine;
 
-  const visibleFullPageMode = (): FullPageMode =>
-    pageMode() ?? DEFAULT_FULL_PAGE_MODE;
-
   const nextFullPageMode = (): FullPageMode =>
-    visibleFullPageMode() === "replace" ? "bilingual" : "replace";
+    pageMode() === "replace" ? "bilingual" : "replace";
 
   const pageStateText = (): string =>
     immersiveActive()
-      ? `当前网页：已翻译（全文 / ${modeLabel(visibleFullPageMode())}）`
-      : pageMode()
-        ? `当前网页：未翻译（全文 / 待用${modeLabel(visibleFullPageMode())}）`
-        : `当前网页：未翻译（全文 / 默认${modeLabel(DEFAULT_FULL_PAGE_MODE)}）`;
+      ? `当前网页：已翻译（${engineLabel(pageEngine())} / ${pageTarget()} / ${modeLabel(pageMode())}）`
+      : `当前网页：未翻译（待用 ${engineLabel(pageEngine())} / ${pageTarget()} / ${modeLabel(pageMode())}）`;
+
+  const updatePagePrefs = (patch: {
+    target?: string;
+    engine?: FullPageEngineId;
+    mode?: FullPageMode;
+  }): void => {
+    void sendMessage("setPageTranslatePrefs", patch).catch(() => {});
+  };
+
+  const retranslateCurrentPage = (
+    patch: { target?: string; engine?: FullPageEngineId; mode?: FullPageMode },
+    message: string,
+  ): void => {
+    const target = patch.target ?? pageTarget();
+    const engine = patch.engine ?? pageEngine();
+    const mode = patch.mode ?? pageMode();
+    const seq = ++actionSeq;
+
+    setAction("retranslating");
+    setStatus(message);
+
+    void sendMessage("translatePage", {
+      target,
+      engine,
+      mode,
+      commandId: nextCommandId(),
+    })
+      .then((res) => {
+        if (seq !== actionSeq) return;
+        const active = res.active || res.translating === true;
+        setImmersiveActive(active);
+        setPageMode(res.mode ?? mode);
+        setPageEngine(res.engine ?? engine);
+        setPageTarget(res.target ?? target);
+        setStatus(active ? "当前网页已重新翻译" : startedStatus(res.blocks));
+      })
+      .catch((e) => {
+        if (seq !== actionSeq) return;
+        setStatus(`错误: ${e instanceof Error ? e.message : String(e)}`);
+      })
+      .finally(() => {
+        if (seq === actionSeq) setAction("idle");
+      });
+  };
 
   const toggleFullPageMode = (): void => {
     const mode = nextFullPageMode();
     if (!immersiveActive() || action() !== "idle") {
       if (!immersiveActive()) {
         setPageMode(mode);
+        updatePagePrefs({ mode });
         setStatus(`显示模式：${modeLabel(mode)}，开始沉浸翻译后生效`);
       }
       return;
@@ -120,15 +158,17 @@ function App() {
     setStatus("已切换显示模式");
     void (async () => {
       const res = await sendMessage("translatePage", {
-        target: settings().targetLang,
-        engine: fullPageEngine(),
+        target: pageTarget(),
+        engine: pageEngine(),
         mode,
         commandId: nextCommandId(),
       });
       if (seq !== actionSeq) return;
       const active = res.active || res.translating === true;
       setImmersiveActive(active);
-      setPageMode(active ? (res.mode ?? mode) : null);
+      setPageMode(res.mode ?? mode);
+      setPageEngine(res.engine ?? pageEngine());
+      setPageTarget(res.target ?? pageTarget());
       setStatus(res.active ? "已切换显示模式" : startedStatus(res.blocks));
     })()
       .catch((e) => {
@@ -138,40 +178,28 @@ function App() {
   };
 
   const setFullPageEngine = (engine: FullPageEngineId): void => {
-    const wasActive = immersiveActive();
-    const mode = visibleFullPageMode();
-    const seq = wasActive ? ++actionSeq : actionSeq;
-    if (wasActive) {
-      setAction("retranslating");
-      setStatus(`正在切换到 ${engineLabel(engine)} 并重新翻译…`);
-    }
-
-    void (async () => {
-      await setSettings({ engines: { fullPage: engine } });
-      if (!wasActive) return;
-      const res = await sendMessage("translatePage", {
-        target: settings().targetLang,
-        engine,
-        mode,
-        commandId: nextCommandId(),
-      });
-      if (seq !== actionSeq) return;
-      const active = res.active || res.translating === true;
-      setImmersiveActive(active);
-      setPageMode(active ? (res.mode ?? mode) : null);
-      setStatus(
-        active
-          ? `已切换到 ${engineLabel(engine)}，正在重新翻译`
-          : startedStatus(res.blocks),
+    if (pageEngine() === engine) return;
+    setPageEngine(engine);
+    if (immersiveActive()) {
+      retranslateCurrentPage(
+        { engine },
+        `正在切换到 ${engineLabel(engine)} 并重新翻译当前网页…`,
       );
-    })()
-      .catch((e) => {
-        if (seq !== actionSeq) return;
-        setStatus(`错误: ${e instanceof Error ? e.message : String(e)}`);
-      })
-      .finally(() => {
-        if (seq === actionSeq) setAction("idle");
-      });
+    } else {
+      updatePagePrefs({ engine });
+      setStatus(`当前网页引擎：${engineLabel(engine)}`);
+    }
+  };
+
+  const setTargetLang = (target: string): void => {
+    if (pageTarget() === target) return;
+    setPageTarget(target);
+    if (immersiveActive()) {
+      retranslateCurrentPage({ target }, "正在切换目标语言并重新翻译当前网页…");
+    } else {
+      updatePagePrefs({ target });
+      setStatus(`当前网页目标语言：${target}`);
+    }
   };
 
   const run = async () => {
@@ -184,7 +212,6 @@ function App() {
         await sendMessage("restorePage", { commandId });
         if (seq !== actionSeq) return;
         setImmersiveActive(false);
-        setPageMode(null);
         setStatus("已显示原文");
       } catch (e) {
         if (seq !== actionSeq) return;
@@ -197,21 +224,23 @@ function App() {
 
     const seq = ++actionSeq;
     const commandId = nextCommandId();
-    const mode = visibleFullPageMode();
+    const mode = pageMode();
     setAction("starting");
     setImmersiveActive(true);
     setPageMode(mode);
     setStatus("已开始沉浸翻译");
     try {
       const res = await sendMessage("translatePage", {
-        target: settings().targetLang,
-        engine: fullPageEngine(),
+        target: pageTarget(),
+        engine: pageEngine(),
         mode,
         commandId,
       });
       if (seq !== actionSeq) return;
       setImmersiveActive(res.active);
-      setPageMode(res.active || res.translating === true ? (res.mode ?? mode) : null);
+      setPageMode(res.mode ?? mode);
+      setPageEngine(res.engine ?? pageEngine());
+      setPageTarget(res.target ?? pageTarget());
       setStatus(startedStatus(res.blocks));
     } catch (e) {
       if (seq !== actionSeq) return;
@@ -223,12 +252,25 @@ function App() {
   };
 
   onMount(() => {
-    void sendMessage("getPageTranslateStatus", {})
-      .then((res) => {
-        setImmersiveActive(res.active || res.translating);
-        setPageMode(res.active || res.translating ? (res.mode ?? null) : null);
-      })
-      .catch(() => {});
+    void (async () => {
+      const defaults = await getSettings();
+      const res = await sendMessage("getPageTranslateStatus", {});
+      const mode = res.mode ?? defaults.fullPageMode;
+      const engine = res.engine ?? defaults.engines.fullPage;
+      const target = res.target ?? defaults.targetLang;
+
+      setPageMode(mode);
+      setPageEngine(engine);
+      setPageTarget(target);
+      setImmersiveActive(res.active || res.translating);
+    })()
+      .catch(() => {
+        void getSettings().then((defaults) => {
+          setPageMode(defaults.fullPageMode);
+          setPageEngine(defaults.engines.fullPage);
+          setPageTarget(defaults.targetLang);
+        });
+      });
   });
 
   return (
@@ -239,44 +281,26 @@ function App() {
 
       {/* 目标语言 */}
       <Row label="目标语言">
-        <SegBtn
-          active={settings().targetLang === "zh"}
-          onClick={() => void setSettings({ targetLang: "zh" })}
-        >
-          中文
-        </SegBtn>
-        <SegBtn
-          active={settings().targetLang === "en"}
-          onClick={() => void setSettings({ targetLang: "en" })}
-        >
-          English
-        </SegBtn>
+        <For each={LANGS}>
+          {(lang) => (
+            <SegBtn
+              active={pageTarget() === lang.value}
+              onClick={() => setTargetLang(lang.value)}
+            >
+              {lang.label}
+            </SegBtn>
+          )}
+        </For>
       </Row>
 
       <Row label="网页引擎">
         <For each={ENGINES}>
           {(e) => (
             <SegBtn
-              active={fullPageEngine() === e.value}
-              onClick={() => {
-                if (fullPageEngine() !== e.value) setFullPageEngine(e.value);
-              }}
+              active={pageEngine() === e.value}
+              onClick={() => setFullPageEngine(e.value)}
             >
               {e.label}
-            </SegBtn>
-          )}
-        </For>
-      </Row>
-
-      {/* hover 粒度 */}
-      <Row label="划词粒度">
-        <For each={GRANULARITIES}>
-          {(g) => (
-            <SegBtn
-              active={settings().hoverGranularity === g.value}
-              onClick={() => void setSettings({ hoverGranularity: g.value })}
-            >
-              {g.label}
             </SegBtn>
           )}
         </For>
@@ -286,7 +310,7 @@ function App() {
       <div style={{ "border-top": "1px solid #eee", "padding-top": "10px", "margin-top": "4px" }}>
         <Row label="显示模式">
           <SegBtn active={immersiveActive()} onClick={toggleFullPageMode}>
-            {modeLabel(visibleFullPageMode())}，点击切换
+            {modeLabel(pageMode())}，点击切换
           </SegBtn>
         </Row>
         <p style={{ margin: "0 0 8px", "font-size": "12px", color: "#666" }}>

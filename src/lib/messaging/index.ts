@@ -16,6 +16,12 @@ export interface PageTranslateCommand {
   commandId?: number;
 }
 
+export interface PageTranslatePrefs {
+  target?: string;
+  engine?: FullPageEngineId;
+  mode?: "replace" | "bilingual";
+}
+
 export interface PageControlCommand {
   commandId?: number;
 }
@@ -57,6 +63,10 @@ export interface ProtocolMap {
     input: Record<string, never>;
     output: PageTranslateStatus;
   };
+  setPageTranslatePrefs: {
+    input: PageTranslatePrefs;
+    output: PageTranslateStatus;
+  };
   runPageTranslate: {
     input: PageTranslateCommand;
     output: PageTranslateAck;
@@ -67,6 +77,10 @@ export interface ProtocolMap {
   };
   readPageTranslateStatus: {
     input: Record<string, never>;
+    output: PageTranslateStatus;
+  };
+  updatePageTranslatePrefs: {
+    input: PageTranslatePrefs;
     output: PageTranslateStatus;
   };
   translateBatch: {

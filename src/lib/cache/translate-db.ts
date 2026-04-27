@@ -4,7 +4,7 @@ const DB_NAME = "onelingo-cache";
 const DB_VERSION = 1;
 const STORE = "translate";
 const UPDATED_AT = "updatedAt";
-const MAX_RECORDS = 5_000;
+const MAX_RECORDS = 10_000;
 const PRUNE_EVERY_WRITES = 25;
 
 interface TranslateCacheRecord {

@@ -3,6 +3,7 @@ import {
   setSettings,
   useSettings,
   type FullPageEngineId,
+  type FullPageMode,
   type HoverGranularity,
 } from "@/lib/storage/settings";
 
@@ -20,6 +21,11 @@ const GRANULARITIES: { value: HoverGranularity; label: string; note: string }[] 
   { value: "word", label: "词", note: "命中单词后翻译单词" },
   { value: "sentence", label: "句子", note: "命中单词后翻译所在句子" },
   { value: "paragraph", label: "段落", note: "命中单词后翻译最近段落" },
+];
+
+const MODES: { value: FullPageMode; label: string; note: string }[] = [
+  { value: "replace", label: "译文", note: "默认替换原文" },
+  { value: "bilingual", label: "双语", note: "默认显示原文和译文" },
 ];
 
 function OptionButton(props: {
@@ -89,6 +95,19 @@ function App() {
               label={engine.label}
               note={engine.note}
               onClick={() => setFullPageEngine(engine.value)}
+            />
+          )}
+        </For>
+      </Section>
+
+      <Section title="全文显示模式">
+        <For each={MODES}>
+          {(mode) => (
+            <OptionButton
+              active={settings().fullPageMode === mode.value}
+              label={mode.label}
+              note={mode.note}
+              onClick={() => void setSettings({ fullPageMode: mode.value })}
             />
           )}
         </For>
