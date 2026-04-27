@@ -144,18 +144,17 @@ function App() {
 
   const toggleFullPageMode = (): void => {
     const mode = nextFullPageMode();
-    if (!immersiveActive() || action() !== "idle") {
-      if (!immersiveActive()) {
-        setPageMode(mode);
-        updatePagePrefs({ mode });
-        setStatus(`显示模式：${modeLabel(mode)}，开始沉浸翻译后生效`);
-      }
+    if (!immersiveActive()) {
+      setPageMode(mode);
+      updatePagePrefs({ mode });
+      setStatus(`显示模式：${modeLabel(mode)}，开始沉浸翻译后生效`);
       return;
     }
 
     const seq = ++actionSeq;
     setPageMode(mode);
-    setStatus("已切换显示模式");
+    setAction("retranslating");
+    setStatus("正在切换显示模式…");
     void (async () => {
       const res = await sendMessage("translatePage", {
         target: pageTarget(),
@@ -174,6 +173,9 @@ function App() {
       .catch((e) => {
         if (seq !== actionSeq) return;
         setStatus(`错误: ${e instanceof Error ? e.message : String(e)}`);
+      })
+      .finally(() => {
+        if (seq === actionSeq) setAction("idle");
       });
   };
 
