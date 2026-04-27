@@ -198,20 +198,66 @@ export function serializeNodes(
 
 export function pickSerializeFormat(
   host: HTMLElement,
+  nodes: Iterable<Node>,
   rule: ResolvedFullPageRule,
 ): TranslateFormat {
   if (!rule.hasRichText) return "text";
-  if (!rule.richHtmlSelector) return "text";
   const engine = rule.engine;
   if (engine !== "google2" && engine !== "microsoft") return "text";
-  if (!closestSelectorSafe(host, rule.richHtmlSelector)) return "text";
   if (
     rule.richHtmlExcludeSelector &&
     closestSelectorSafe(host, rule.richHtmlExcludeSelector)
   ) {
     return "text";
   }
-  return "html";
+  if (rule.richHtmlSelector) {
+    return closestSelectorSafe(host, rule.richHtmlSelector) ? "html" : "text";
+  }
+  return shouldUseImplicitRichHtml(nodes) ? "html" : "text";
+}
+
+function shouldUseImplicitRichHtml(nodes: Iterable<Node>): boolean {
+  const stack = Array.from(nodes);
+  let sawRichInline = false;
+
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) continue;
+    if (!(node instanceof HTMLElement)) continue;
+    if (shouldDropNodeFromSerialization(node)) continue;
+
+    if (
+      shouldIgnoreNodeForSerialization(node) ||
+      shouldPreserveNode(node) ||
+      HARD_SKIP_TAGS.has(node.tagName)
+    ) {
+      continue;
+    }
+
+    if (isImplicitRichHtmlInlineTag(node)) {
+      // Real inline markup is more stable in engine HTML mode than fake text
+      // placeholder tags, which engines may drop or align to the wrong phrase.
+      sawRichInline = true;
+    }
+
+    for (let index = node.childNodes.length - 1; index >= 0; index--) {
+      const child = node.childNodes[index];
+      if (child) stack.push(child);
+    }
+  }
+
+  return sawRichInline;
+}
+
+function isImplicitRichHtmlInlineTag(el: HTMLElement): boolean {
+  if (!RICH_HTML_INLINE_TAGS.has(el.tagName)) return false;
+  if (el.tagName !== "SPAN") return true;
+  return !!(
+    getSemanticTranslationLabel(el) ||
+    el.getAttribute("lang") ||
+    el.getAttribute("dir") ||
+    el.getAttribute("title")
+  );
 }
 
 function buildRichHtmlOpeningTag(el: HTMLElement): string {

@@ -624,7 +624,7 @@ async function translateNodeGroup(
   if (!currentRule || !batchQueues || seq !== runSeq) return;
 
   const rule = currentRule;
-  const format = options.format ?? pickSerializeFormat(host, rule);
+  const format = options.format ?? pickSerializeFormat(host, nodes, rule);
   const { html: serialized, placeholders } = serializeNodes(nodes, format, rule, {
     separator: options.separator,
   });
