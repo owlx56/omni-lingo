@@ -77,6 +77,10 @@ const WIKIPEDIA_CHROME_SELECTOR = [
   "#p-views .mw-list-item > a > span",
   "#p-cactions .vector-dropdown-label-text",
   "#p-cactions .mw-list-item > a > span",
+  "#p-personal .mw-list-item > a > span:not(.vector-icon)",
+  "#p-vector-user-menu-overflow .mw-list-item > a > span:not(.vector-icon)",
+  ".vector-user-links .mw-list-item > a > span:not(.vector-icon)",
+  "#vector-user-links-dropdown .vector-dropdown-label-text",
   "#vector-main-menu-dropdown .vector-dropdown-label-text",
   "#vector-main-menu .vector-pinnable-header-label",
   "#vector-main-menu .vector-pinnable-header-toggle-button",
@@ -112,16 +116,12 @@ const WIKIPEDIA_MAIN_PAGE_SELECTOR = [
   "+ .wikipedia-languages > p",
   "+ .wikipedia-languages-count",
   "+ .wikipedia-languages-langs li",
+  "+ .mwe-popups .mwe-popups-title",
+  "+ .mwe-popups .mwe-popups-extract",
+  "+ .mwe-popups .mwe-popups-extract p",
 ].join(", ");
 
-const WIKIPEDIA_MAIN_PAGE_ROOTS = [
-  "#content",
-  "#vector-main-menu",
-  "#footer",
-  "#vector-appearance-pinned-container",
-  "#vector-appearance-unpinned-container",
-  "#vector-appearance",
-].join(", ");
+const WIKIPEDIA_MAIN_PAGE_ROOTS = "body";
 
 const QUORA_ROOTS_SELECTOR = [
   "main",
