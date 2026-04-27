@@ -49,9 +49,11 @@ const TRANS_MAX_LENGTH = 100_000;
 const NEWLINE_LENGTH = 20;           // add <br> separator if text > 20 chars
 const NAVIGATION_CHECK_MS = 500;
 const NAVIGATION_RETRANSLATE_DELAY_MS = 800;
+const VIRTUAL_LAYOUT_REFRESH_DELAY_MS = 80;
 
 const LOADING_STYLE_ID = "onelingo-immersive-loading-style";
 const MAIN_PAGE_LAYOUT_STYLE_ID = "onelingo-wikipedia-main-page-layout-style";
+const HIDDEN_ORIGINAL_ATTR = "data-onelingo-hidden-original";
 const INLINE_RUN_SEPARATOR_RE = /^[\s,.;:|/\\()[\]{}·•●‧・\-–—←→]+$/u;
 const INLINE_RUN_TRANSLATION_SEPARATOR = " · ";
 const INTERACTIVE_HOST_SELECTOR = [
@@ -92,10 +94,14 @@ const BREAK_LINE_TAGS = new Set(["BR", "WBR"]);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type PageTranslateMode = NonNullable<PageTranslateCommand["mode"]>;
+type OriginalHideMode = "detached" | "collapsed";
 
 interface WrapperState {
   nodes: ChildNode[];
   isHide: boolean;
+  host: HTMLElement;
+  hideMode?: OriginalHideMode;
+  hiddenOriginal?: HTMLElement;
 }
 
 interface InlineSiblingRun {
@@ -220,6 +226,7 @@ let batchQueues: Record<TranslateFormat, TranslateBatchQueue> | null = null;
 let lastLocationKey = getLocationKey();
 let lastTranslateInput: PageTranslateCommand | null = null;
 let navigationTimer: number | undefined;
+let virtualLayoutRefreshTimer: number | undefined;
 
 // Per-node state (WeakMaps don't leak)
 const processedNodes = new WeakMap<HTMLElement, ResolvedFullPageRule>();
@@ -624,9 +631,11 @@ async function translateNodeGroup(
   if (!serialized || isInvalidText(serialized)) return;
 
   const transOnly = shouldUseTranslationOnly(currentMode ?? "replace", rule);
+  const hideMode = transOnly ? getOriginalHideMode(host) : undefined;
 
   // Create wrapper and insert after last original node (kiss-translator pattern)
-  const wrapper = createLoadingWrapper(serialized, transOnly, rule, host);
+  const wrapper = createLoadingWrapper(serialized, transOnly, rule, host, hideMode);
+  let hiddenOriginal: HTMLElement | undefined;
   runWithMutedMutations(host, () => {
     const last = nodes[nodes.length - 1]!;
     if (last.parentNode === host) {
@@ -634,11 +643,13 @@ async function translateNodeGroup(
     } else {
       host.appendChild(wrapper);
     }
-    // transOnly: move original nodes off-screen (into a detached fragment)
-    if (transOnly) moveNodesToFragment(nodes);
+    if (transOnly && hideMode) {
+      hiddenOriginal = hideOriginalNodes(nodes, host, hideMode, wrapper);
+    }
   });
+  if (transOnly) scheduleVirtualizedLayoutRefresh();
   addHostWrapper(host, wrapper);
-  wrapperState.set(wrapper, { nodes, isHide: transOnly });
+  wrapperState.set(wrapper, { nodes, isHide: transOnly, host, hideMode, hiddenOriginal });
   pendingCount++;
 
   try {
@@ -665,6 +676,7 @@ async function translateNodeGroup(
       inner.textContent = "";
       appendTranslatedContent(inner, translated, placeholders, format);
     });
+    if (transOnly) scheduleVirtualizedLayoutRefresh();
     translatedHosts.add(host);
     localTranslationCache.set(serialized, translated);
   } catch (err) {
@@ -688,10 +700,12 @@ function createLoadingWrapper(
   transOnly: boolean,
   rule: ResolvedFullPageRule,
   host: HTMLElement,
+  hideMode: OriginalHideMode | undefined,
 ): HTMLElement {
   const wrapperTag = getTranslationWrapperTag(host);
   const wrapper = document.createElement(wrapperTag);
   wrapper.setAttribute(WRAPPER_ATTR, "true");
+  wrapper.style.visibility = "visible";
   if (isInsideInteractiveHost(host)) {
     wrapper.style.pointerEvents = "none";
   }
@@ -712,11 +726,7 @@ function createLoadingWrapper(
   inner.setAttribute("aria-busy", "true");
   inner.lang = rule.target;
 
-  if (!transOnly) {
-    inner.style.color = "#6b7280";
-    inner.style.fontSize = "0.95em";
-    inner.style.lineHeight = "1.55";
-  }
+  applyTranslationInnerModeStyles(inner, transOnly, host, hideMode);
   appendInlineStyle(inner, rule.textExtStyle);
 
   ensureLoadingStyles();
@@ -743,6 +753,31 @@ function supportsHtmlFormat(engine: FullPageEngineId): boolean {
   return engine === "google2" || engine === "microsoft";
 }
 
+function applyTranslationInnerModeStyles(
+  inner: HTMLElement,
+  transOnly: boolean,
+  host: HTMLElement,
+  hideMode: OriginalHideMode | undefined,
+): void {
+  inner.style.visibility = "visible";
+  if (!transOnly) {
+    inner.style.color = "#6b7280";
+    inner.style.fontSize = "0.95em";
+    inner.style.lineHeight = "1.55";
+    return;
+  }
+  if (hideMode === "collapsed") {
+    const style = window.getComputedStyle(host);
+    inner.style.color = style.color;
+    inner.style.fontSize = style.fontSize;
+    inner.style.lineHeight = style.lineHeight;
+    return;
+  }
+  inner.style.removeProperty("color");
+  inner.style.removeProperty("font-size");
+  inner.style.removeProperty("line-height");
+}
+
 function addHostWrapper(host: HTMLElement, wrapper: HTMLElement): void {
   let set = hostWrappers.get(host);
   if (!set) { set = new Set(); hostWrappers.set(host, set); }
@@ -758,6 +793,45 @@ function getHostWrappers(host: HTMLElement): HTMLElement[] {
   return Array.from(hostWrappers.get(host) ?? []);
 }
 
+function getOriginalHideMode(host: HTMLElement): OriginalHideMode {
+  return isDomPreservingReplaceHost(host) ? "collapsed" : "detached";
+}
+
+function isDomPreservingReplaceHost(_host: HTMLElement): boolean {
+  return isDiscourseTopicPage();
+}
+
+function hideOriginalNodes(
+  nodes: ChildNode[],
+  host: HTMLElement,
+  mode: OriginalHideMode,
+  wrapper: HTMLElement,
+): HTMLElement | undefined {
+  if (mode === "collapsed") {
+    return moveNodesToHiddenContainer(nodes, host, wrapper);
+  }
+  moveNodesToFragment(nodes);
+  return undefined;
+}
+
+function moveNodesToHiddenContainer(
+  nodes: ChildNode[],
+  host: HTMLElement,
+  wrapper: HTMLElement,
+): HTMLElement {
+  const hidden = document.createElement("span");
+  hidden.setAttribute(HIDDEN_ORIGINAL_ATTR, "true");
+  hidden.hidden = true;
+  hidden.style.display = "none";
+  if (wrapper.parentNode === host) {
+    host.insertBefore(hidden, wrapper);
+  } else {
+    host.appendChild(hidden);
+  }
+  nodes.forEach((n) => hidden.appendChild(n));
+  return hidden;
+}
+
 // Move nodes into a detached fragment (hides them; they can be restored)
 function moveNodesToFragment(nodes: ChildNode[]): void {
   const frag = document.createDocumentFragment();
@@ -768,6 +842,11 @@ function moveNodesToFragment(nodes: ChildNode[]): void {
 function restoreWrapperNodes(wrapper: HTMLElement): void {
   const state = wrapperState.get(wrapper);
   if (!state || !state.isHide) return;
+  if (state.hideMode === "collapsed") {
+    restoreHiddenOriginalNodes(state, wrapper);
+    state.isHide = false;
+    return;
+  }
   const parent = wrapper.parentElement;
   if (parent) {
     const frag = document.createDocumentFragment();
@@ -775,6 +854,19 @@ function restoreWrapperNodes(wrapper: HTMLElement): void {
     parent.insertBefore(frag, wrapper);
   }
   state.isHide = false;
+}
+
+function restoreHiddenOriginalNodes(state: WrapperState, wrapper: HTMLElement): void {
+  const hidden = state.hiddenOriginal;
+  const frag = document.createDocumentFragment();
+  state.nodes.forEach((n) => frag.appendChild(n));
+  if (hidden?.parentNode) {
+    hidden.parentNode.insertBefore(frag, hidden);
+    hidden.remove();
+  } else {
+    wrapper.parentNode?.insertBefore(frag, wrapper);
+  }
+  state.hiddenOriginal = undefined;
 }
 
 // ── Mode switching ────────────────────────────────────────────────────────────
@@ -813,25 +905,17 @@ function switchAppliedMode(mode: PageTranslateMode): void {
 
         // Show/hide original nodes
         if (transOnly && !state.isHide) {
-          moveNodesToFragment(state.nodes);
+          state.hideMode = getOriginalHideMode(host);
+          state.hiddenOriginal = hideOriginalNodes(state.nodes, host, state.hideMode, wrapper);
           state.isHide = true;
         } else if (!transOnly && state.isHide) {
-          const frag = document.createDocumentFragment();
-          state.nodes.forEach((n) => frag.appendChild(n));
-          wrapper.parentNode?.insertBefore(frag, wrapper);
-          state.isHide = false;
+          restoreWrapperNodes(wrapper);
         }
 
         // Adjust inner element styling
         const inner = wrapper.querySelector(`[${INNER_ATTR}]`) as HTMLElement | null;
         if (inner) {
-          if (!transOnly) {
-            inner.style.color = "#6b7280";
-            inner.style.fontSize = "0.95em";
-          } else {
-            inner.style.removeProperty("color");
-            inner.style.removeProperty("font-size");
-          }
+          applyTranslationInnerModeStyles(inner, transOnly, host, state.hideMode);
         }
       }
     });
@@ -866,6 +950,10 @@ function cleanupHostNode(host: HTMLElement): void {
 
 function stopObservation(): void {
   if (rescanTimer !== undefined) { window.clearTimeout(rescanTimer); rescanTimer = undefined; }
+  if (virtualLayoutRefreshTimer !== undefined) {
+    window.clearTimeout(virtualLayoutRefreshTimer);
+    virtualLayoutRefreshTimer = undefined;
+  }
   if (intersectionObserver) intersectionObserver.disconnect();
   if (mutationObserver) mutationObserver.disconnect();
   observedNodes.clear();
@@ -1033,6 +1121,20 @@ function isDiscourseTopicPage(): boolean {
   if (!/^\/t\/.+\/\d+(?:\/\d+)?$/u.test(window.location.pathname)) return false;
   const generator = document.querySelector('meta[name="generator"]')?.getAttribute("content") ?? "";
   return /discourse/i.test(generator) || !!document.querySelector("#data-discourse-setup");
+}
+
+function scheduleVirtualizedLayoutRefresh(): void {
+  if (!isDiscourseTopicPage()) return;
+  if (virtualLayoutRefreshTimer !== undefined) {
+    window.clearTimeout(virtualLayoutRefreshTimer);
+  }
+  virtualLayoutRefreshTimer = window.setTimeout(() => {
+    virtualLayoutRefreshTimer = undefined;
+    window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event("resize"));
+      window.dispatchEvent(new Event("scroll"));
+    });
+  }, VIRTUAL_LAYOUT_REFRESH_DELAY_MS);
 }
 
 function handleSoftNavigation(): void {
