@@ -264,19 +264,34 @@ function isSafeLinkHref(href: string): boolean {
   return !/^(?:javascript|data|vbscript):/i.test(href.trim());
 }
 
-function restoreFromTranslation(translatedText: string, placeholders: PlaceholderMap): string {
+function restoreFromTranslation(
+  translatedText: string,
+  placeholders: PlaceholderMap,
+  format: TranslateFormat,
+): string {
   if (!translatedText || placeholders.size === 0) return translatedText;
 
   const restoreAttr = "data-onelingo-restore";
-  let textToParse = translatedText;
+  const openTokenPrefix = "\uE000onelingo-open-";
+  const closeToken = "\uE000onelingo-close\uE000";
+  let textToParse = format === "text" ? decodeHtmlEntities(translatedText) : translatedText;
   let result = translatedText;
 
   try {
     textToParse = textToParse.replace(
       PLACEHOLDER_OPEN_RE,
+      (_match, index: string) => `${openTokenPrefix}${index}\uE000`,
+    );
+    textToParse = textToParse.replace(PLACEHOLDER_CLOSE_RE, closeToken);
+    if (format === "text") textToParse = escapeHtml(textToParse);
+    textToParse = textToParse.replace(
+      new RegExp(`${openTokenPrefix}(\\d+)\\uE000`, "g"),
       `<${PLACEHOLDER_SAFE_TAG} ${restoreAttr}="$1">`,
     );
-    textToParse = textToParse.replace(PLACEHOLDER_CLOSE_RE, `</${PLACEHOLDER_SAFE_TAG}>`);
+    textToParse = textToParse.replace(
+      new RegExp(closeToken, "g"),
+      `</${PLACEHOLDER_SAFE_TAG}>`,
+    );
 
     const parser = new DOMParser();
     const doc = parser.parseFromString(textToParse, "text/html");
@@ -350,12 +365,13 @@ export function appendTranslatedContent(
   container: HTMLElement,
   translated: string,
   placeholders: PlaceholderMap,
+  format: TranslateFormat,
 ): void {
   if (!placeholders || placeholders.size === 0) {
     container.textContent = cleanMarkerJunk(translated);
     return;
   }
-  const html = restoreFromTranslation(translated, placeholders);
+  const html = restoreFromTranslation(translated, placeholders, format);
   if (!html.trim()) return;
   const template = document.createElement("template");
   template.innerHTML = html;

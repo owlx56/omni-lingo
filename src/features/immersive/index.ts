@@ -663,7 +663,7 @@ async function translateNodeGroup(
       if (!inner) return;
       inner.removeAttribute("aria-busy");
       inner.textContent = "";
-      appendTranslatedContent(inner, translated, placeholders);
+      appendTranslatedContent(inner, translated, placeholders, format);
     });
     translatedHosts.add(host);
     localTranslationCache.set(serialized, translated);
