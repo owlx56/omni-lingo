@@ -54,6 +54,17 @@ const LOADING_STYLE_ID = "onelingo-immersive-loading-style";
 const MAIN_PAGE_LAYOUT_STYLE_ID = "onelingo-wikipedia-main-page-layout-style";
 const INLINE_RUN_SEPARATOR_RE = /^[\s,.;:|/\\()[\]{}·•●‧・\-–—←→]+$/u;
 const INLINE_RUN_TRANSLATION_SEPARATOR = " · ";
+const INTERACTIVE_HOST_SELECTOR = [
+  "a[href]",
+  "button",
+  "label",
+  "summary",
+  "[role='button']",
+  "[role='link']",
+  "[role='menuitem']",
+  "[role='tab']",
+  "[onclick]",
+].join(", ");
 
 // ── Skip patterns (from kiss-translator BUILTIN_SKIP_PATTERNS) ────────────────
 const BUILTIN_SKIP_PATTERNS = [
@@ -549,6 +560,7 @@ function collectInlineSiblingRun(
   );
 
   if (processedHosts.length < 2) return null;
+  if (rule.transOnly && nodes.some(isInteractiveRunNode)) return null;
   const isListRun = parent instanceof HTMLUListElement || parent instanceof HTMLOListElement;
   return {
     host: parent,
@@ -578,6 +590,10 @@ function canJoinInlineRun(node: ChildNode, rule: ResolvedFullPageRule): boolean 
   if (isOurWrapper(node) || shouldIgnoreNode(node, rule)) return false;
   if (BREAK_LINE_TAGS.has(node.tagName)) return false;
   return isInlineFlowElement(node);
+}
+
+function isInteractiveRunNode(node: ChildNode): boolean {
+  return node instanceof HTMLElement && isInsideInteractiveHost(node);
 }
 
 function isInlineFlowElement(el: HTMLElement): boolean {
@@ -676,6 +692,9 @@ function createLoadingWrapper(
   const wrapperTag = getTranslationWrapperTag(host);
   const wrapper = document.createElement(wrapperTag);
   wrapper.setAttribute(WRAPPER_ATTR, "true");
+  if (isInsideInteractiveHost(host)) {
+    wrapper.style.pointerEvents = "none";
+  }
   if (wrapperTag === "li") {
     wrapper.style.display = "block";
     wrapper.style.listStyle = "none";
@@ -710,6 +729,10 @@ function getTranslationWrapperTag(host: HTMLElement): "li" | "span" {
   return host instanceof HTMLUListElement || host instanceof HTMLOListElement
     ? "li"
     : "span";
+}
+
+function isInsideInteractiveHost(host: HTMLElement): boolean {
+  return !!host.closest(INTERACTIVE_HOST_SELECTOR);
 }
 
 function shouldStartTranslationOnNewLine(host: HTMLElement, original: string): boolean {
