@@ -115,7 +115,7 @@ const WIKIPEDIA_MAIN_PAGE_SELECTOR = [
   "+ #sister-projects-list li > div:last-child",
   "+ .wikipedia-languages > p",
   "+ .wikipedia-languages-count",
-  "+ .wikipedia-languages-langs li",
+  "+ .wikipedia-languages-langs a",
   "+ .mwe-popups .mwe-popups-title",
   "+ .mwe-popups .mwe-popups-extract",
   "+ .mwe-popups .mwe-popups-extract p",
