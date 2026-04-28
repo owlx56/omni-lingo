@@ -13,16 +13,27 @@ export interface EngineMap {
 
 export type HoverGranularity = "word" | "sentence" | "paragraph";
 export type FullPageMode = "replace" | "bilingual";
+export type TranslationFontFamily = "inherit" | "serif" | "sans" | "mono";
+export type TranslationColor = "inherit" | "muted" | "blue" | "green" | "red" | "custom";
+
+export interface TranslationStyle {
+  underline: boolean;
+  fontFamily: TranslationFontFamily;
+  color: TranslationColor;
+  customColor: string;
+}
 
 export interface Settings {
   targetLang: "zh" | "en";
   engines: EngineMap;
   hoverGranularity: HoverGranularity;
   fullPageMode: FullPageMode;
+  translationStyle: TranslationStyle;
 }
 
-export type SettingsPatch = Omit<Partial<Settings>, "engines"> & {
+export type SettingsPatch = Omit<Partial<Settings>, "engines" | "translationStyle"> & {
   engines?: Partial<EngineMap>;
+  translationStyle?: Partial<TranslationStyle>;
 };
 
 const DEFAULTS: Settings = {
@@ -30,6 +41,12 @@ const DEFAULTS: Settings = {
   engines: { hover: "google", selection: "google", fullPage: "google2" },
   hoverGranularity: "sentence",
   fullPageMode: "replace",
+  translationStyle: {
+    underline: false,
+    fontFamily: "inherit",
+    color: "inherit",
+    customColor: "#2563eb",
+  },
 };
 
 const KEY = "sync:settings" as const;
@@ -37,7 +54,11 @@ const KEY = "sync:settings" as const;
 function withDefaults(raw: Partial<Settings> | null): Settings {
   // 浅 merge 会丢 engines 内部字段，必须二级合并
   const engines = { ...DEFAULTS.engines, ...(raw?.engines ?? {}) };
-  return { ...DEFAULTS, ...(raw ?? {}), engines };
+  const translationStyle = {
+    ...DEFAULTS.translationStyle,
+    ...(raw?.translationStyle ?? {}),
+  };
+  return { ...DEFAULTS, ...(raw ?? {}), engines, translationStyle };
 }
 
 export async function getSettings(): Promise<Settings> {
@@ -51,6 +72,10 @@ export async function setSettings(patch: SettingsPatch): Promise<void> {
     ...cur,
     ...patch,
     engines: { ...cur.engines, ...(patch.engines ?? {}) },
+    translationStyle: {
+      ...cur.translationStyle,
+      ...(patch.translationStyle ?? {}),
+    },
   };
   await storage.setItem<Settings>(KEY, next);
 }

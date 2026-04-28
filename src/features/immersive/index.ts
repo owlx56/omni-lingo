@@ -11,7 +11,11 @@ import {
   type PageTranslateStatus,
 } from "@/lib/messaging";
 import { getFullPageRules } from "@/lib/storage/full-page-rules";
-import type { FullPageEngineId } from "@/lib/storage/settings";
+import {
+  getSettings,
+  type FullPageEngineId,
+  type TranslationStyle,
+} from "@/lib/storage/settings";
 import { INNER_ATTR, WRAPPER_ATTR } from "./dom-attrs";
 import {
   appendTranslatedContent,
@@ -356,9 +360,57 @@ function updatePageTranslatePrefs(input: PageTranslatePrefs): void {
 }
 
 async function loadRule(input: PageTranslateCommand): Promise<ResolvedFullPageRule> {
-  const userRules = await getFullPageRules();
+  const [userRules, settings] = await Promise.all([
+    getFullPageRules(),
+    getSettings(),
+  ]);
   const matched = matchFullPageRule(window.location.href, userRules);
-  return resolveFullPageRule(matched, input);
+  const rule = resolveFullPageRule(matched, input);
+  return {
+    ...rule,
+    textExtStyle: appendCssText(
+      rule.textExtStyle,
+      buildTranslationStyleCss(settings.translationStyle),
+    ),
+  };
+}
+
+function buildTranslationStyleCss(style: TranslationStyle): string {
+  const css: string[] = [];
+
+  if (style.underline) css.push("text-decoration: underline;");
+
+  if (style.fontFamily === "serif") {
+    css.push('font-family: Georgia, "Times New Roman", serif;');
+  } else if (style.fontFamily === "sans") {
+    css.push('font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;');
+  } else if (style.fontFamily === "mono") {
+    css.push('font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;');
+  }
+
+  const color = resolveTranslationColor(style);
+  if (color) css.push(`color: ${color};`);
+
+  return css.join(" ");
+}
+
+function resolveTranslationColor(style: TranslationStyle): string {
+  if (style.color === "muted") return "#6b7280";
+  if (style.color === "blue") return "#2563eb";
+  if (style.color === "green") return "#047857";
+  if (style.color === "red") return "#dc2626";
+  if (style.color === "custom" && /^#[0-9a-f]{6}$/i.test(style.customColor)) {
+    return style.customColor;
+  }
+  return "";
+}
+
+function appendCssText(baseCss: string, patchCss: string): string {
+  const base = baseCss.trim();
+  const patch = patchCss.trim();
+  if (!base) return patch;
+  if (!patch) return base;
+  return `${base}${base.endsWith(";") ? "" : ";"} ${patch}`;
 }
 
 function createBatchQueues(
@@ -567,7 +619,7 @@ function collectInlineSiblingRun(
   );
 
   if (processedHosts.length < 2) return null;
-  if (rule.transOnly && nodes.some(isInteractiveRunNode)) return null;
+  if (nodes.some(isInteractiveRunNode)) return null;
   const isListRun = parent instanceof HTMLUListElement || parent instanceof HTMLOListElement;
   return {
     host: parent,
@@ -600,7 +652,10 @@ function canJoinInlineRun(node: ChildNode, rule: ResolvedFullPageRule): boolean 
 }
 
 function isInteractiveRunNode(node: ChildNode): boolean {
-  return node instanceof HTMLElement && isInsideInteractiveHost(node);
+  return (
+    node instanceof HTMLElement &&
+    (isInsideInteractiveHost(node) || !!node.querySelector(INTERACTIVE_HOST_SELECTOR))
+  );
 }
 
 function isInlineFlowElement(el: HTMLElement): boolean {
@@ -726,8 +781,7 @@ function createLoadingWrapper(
   inner.setAttribute("aria-busy", "true");
   inner.lang = rule.target;
 
-  applyTranslationInnerModeStyles(inner, transOnly, host, hideMode);
-  appendInlineStyle(inner, rule.textExtStyle);
+  applyTranslationInnerStyles(inner, transOnly, host, hideMode, rule);
 
   ensureLoadingStyles();
   appendLoadingLines(inner, original, false);
@@ -751,6 +805,18 @@ function shouldStartTranslationOnNewLine(host: HTMLElement, original: string): b
 
 function supportsHtmlFormat(engine: FullPageEngineId): boolean {
   return engine === "google2" || engine === "microsoft";
+}
+
+function applyTranslationInnerStyles(
+  inner: HTMLElement,
+  transOnly: boolean,
+  host: HTMLElement,
+  hideMode: OriginalHideMode | undefined,
+  rule: ResolvedFullPageRule,
+): void {
+  inner.removeAttribute("style");
+  applyTranslationInnerModeStyles(inner, transOnly, host, hideMode);
+  appendInlineStyle(inner, rule.textExtStyle);
 }
 
 function applyTranslationInnerModeStyles(
@@ -886,10 +952,12 @@ function switchAppliedMode(mode: PageTranslateMode): void {
   if (currentRule) {
     currentRule = { ...currentRule, transOnly: mode === "replace" };
   }
+  const rule = currentRule;
   if (currentEngine !== null && currentTarget !== null) {
     lastTranslateInput = { target: currentTarget, engine: currentEngine, mode };
   }
-  const transOnly = shouldUseTranslationOnly(mode, currentRule);
+  const transOnly = shouldUseTranslationOnly(mode, rule);
+  if (!rule) return;
 
   for (const host of Array.from(translatedHosts)) {
     if (!host.isConnected) continue;
@@ -915,7 +983,7 @@ function switchAppliedMode(mode: PageTranslateMode): void {
         // Adjust inner element styling
         const inner = wrapper.querySelector(`[${INNER_ATTR}]`) as HTMLElement | null;
         if (inner) {
-          applyTranslationInnerModeStyles(inner, transOnly, host, state.hideMode);
+          applyTranslationInnerStyles(inner, transOnly, host, state.hideMode, rule);
         }
       }
     });

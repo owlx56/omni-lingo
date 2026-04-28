@@ -74,6 +74,10 @@ h2 {
   margin-top: 12px;
 }
 
+.option-grid.compact {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
 .option-button {
   min-height: 64px;
   padding: 12px 14px;
@@ -111,6 +115,109 @@ h2 {
   color: #687180;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.style-panel {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid #dfe3e8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.style-row,
+.style-block {
+  display: grid;
+  gap: 10px;
+}
+
+.style-label {
+  font-size: 13px;
+  font-weight: 650;
+  color: #3a414b;
+}
+
+.toggle-button {
+  width: fit-content;
+  min-width: 88px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #d7dce2;
+  border-radius: 8px;
+  background: #fff;
+  color: #20242a;
+  cursor: pointer;
+}
+
+.toggle-button.active {
+  border-color: #2563eb;
+  background: #f2f6ff;
+  color: #1d4ed8;
+}
+
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.color-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d7dce2;
+  border-radius: 8px;
+  background: #fff;
+  color: #20242a;
+  cursor: pointer;
+}
+
+.color-button.active {
+  border-color: #2563eb;
+  background: #f2f6ff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
+}
+
+.color-swatch {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #c8d0da;
+  border-radius: 999px;
+  background-image:
+    linear-gradient(45deg, #fff 25%, transparent 25%),
+    linear-gradient(-45deg, #fff 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #fff 75%),
+    linear-gradient(-45deg, transparent 75%, #fff 75%);
+  background-size: 8px 8px;
+  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+}
+
+.color-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid #d7dce2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.color-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.style-preview {
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px dashed #c8d0da;
+  border-radius: 8px;
+  background: #fafbfc;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 @media (max-width: 560px) {

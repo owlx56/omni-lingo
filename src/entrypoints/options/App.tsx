@@ -5,6 +5,8 @@ import {
   type FullPageEngineId,
   type FullPageMode,
   type HoverGranularity,
+  type TranslationColor,
+  type TranslationFontFamily,
 } from "@/lib/storage/settings";
 
 const ENGINES: { value: FullPageEngineId; label: string; note: string }[] = [
@@ -28,6 +30,22 @@ const MODES: { value: FullPageMode; label: string; note: string }[] = [
   { value: "bilingual", label: "双语", note: "默认显示原文和译文" },
 ];
 
+const FONT_FAMILIES: { value: TranslationFontFamily; label: string; note: string }[] = [
+  { value: "inherit", label: "默认", note: "沿用网页或模式样式" },
+  { value: "serif", label: "衬线", note: "Georgia / Times" },
+  { value: "sans", label: "无衬线", note: "Segoe UI / system-ui" },
+  { value: "mono", label: "等宽", note: "Consolas / monospace" },
+];
+
+const COLORS: { value: TranslationColor; label: string; color?: string }[] = [
+  { value: "inherit", label: "默认" },
+  { value: "muted", label: "灰色", color: "#6b7280" },
+  { value: "blue", label: "蓝色", color: "#2563eb" },
+  { value: "green", label: "绿色", color: "#047857" },
+  { value: "red", label: "红色", color: "#dc2626" },
+  { value: "custom", label: "自定义" },
+];
+
 function OptionButton(props: {
   active: boolean;
   label: string;
@@ -43,6 +61,28 @@ function OptionButton(props: {
     >
       <span>{props.label}</span>
       {props.note ? <small>{props.note}</small> : null}
+    </button>
+  );
+}
+
+function ColorButton(props: {
+  active: boolean;
+  label: string;
+  color?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      class="color-button"
+      classList={{ active: props.active }}
+      onClick={props.onClick}
+      type="button"
+    >
+      <span
+        class="color-swatch"
+        style={{ "background-color": props.color ?? "transparent" }}
+      />
+      <span>{props.label}</span>
     </button>
   );
 }
@@ -63,6 +103,30 @@ function App() {
 
   const setFullPageEngine = (engine: FullPageEngineId): void => {
     void setSettings({ engines: { fullPage: engine } });
+  };
+
+  const setTranslationStyle = (
+    patch: Parameters<typeof setSettings>[0]["translationStyle"],
+  ): void => {
+    void setSettings({ translationStyle: patch });
+  };
+
+  const previewColor = (): string | undefined => {
+    const style = settings().translationStyle;
+    if (style.color === "muted") return "#6b7280";
+    if (style.color === "blue") return "#2563eb";
+    if (style.color === "green") return "#047857";
+    if (style.color === "red") return "#dc2626";
+    if (style.color === "custom") return style.customColor;
+    return undefined;
+  };
+
+  const previewFont = (): string | undefined => {
+    const font = settings().translationStyle.fontFamily;
+    if (font === "serif") return "Georgia, 'Times New Roman', serif";
+    if (font === "sans") return "system-ui, 'Segoe UI', sans-serif";
+    if (font === "mono") return "Consolas, 'SFMono-Regular', monospace";
+    return undefined;
   };
 
   return (
@@ -112,6 +176,83 @@ function App() {
           )}
         </For>
       </Section>
+
+      <section class="section">
+        <h2>译文样式</h2>
+        <div class="style-panel">
+          <div class="style-row">
+            <span class="style-label">下划线</span>
+            <button
+              class="toggle-button"
+              classList={{ active: settings().translationStyle.underline }}
+              onClick={() => setTranslationStyle({
+                underline: !settings().translationStyle.underline,
+              })}
+              type="button"
+            >
+              {settings().translationStyle.underline ? "开启" : "关闭"}
+            </button>
+          </div>
+
+          <div class="style-block">
+            <span class="style-label">字体</span>
+            <div class="option-grid compact">
+              <For each={FONT_FAMILIES}>
+                {(font) => (
+                  <OptionButton
+                    active={settings().translationStyle.fontFamily === font.value}
+                    label={font.label}
+                    note={font.note}
+                    onClick={() => setTranslationStyle({ fontFamily: font.value })}
+                  />
+                )}
+              </For>
+            </div>
+          </div>
+
+          <div class="style-block">
+            <span class="style-label">颜色</span>
+            <div class="color-grid">
+              <For each={COLORS}>
+                {(color) => (
+                  <ColorButton
+                    active={settings().translationStyle.color === color.value}
+                    color={color.value === "custom"
+                      ? settings().translationStyle.customColor
+                      : color.color}
+                    label={color.label}
+                    onClick={() => setTranslationStyle({ color: color.value })}
+                  />
+                )}
+              </For>
+              <input
+                aria-label="自定义译文颜色"
+                class="color-input"
+                disabled={settings().translationStyle.color !== "custom"}
+                onInput={(event) => setTranslationStyle({
+                  color: "custom",
+                  customColor: event.currentTarget.value,
+                })}
+                type="color"
+                value={settings().translationStyle.customColor}
+              />
+            </div>
+          </div>
+
+          <div
+            class="style-preview"
+            style={{
+              color: previewColor(),
+              "font-family": previewFont(),
+              "text-decoration": settings().translationStyle.underline
+                ? "underline"
+                : "none",
+            }}
+          >
+            译文预览 Translation preview
+          </div>
+        </div>
+      </section>
 
       <Section title="悬停粒度">
         <For each={GRANULARITIES}>
