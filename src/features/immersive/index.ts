@@ -13,9 +13,11 @@ import {
 import { getFullPageRules } from "@/lib/storage/full-page-rules";
 import {
   getSettings,
+  watchSettings,
   type FullPageEngineId,
-  type TranslationStyle,
+  type Settings,
 } from "@/lib/storage/settings";
+import { buildTranslationStyleCss } from "@/lib/translation-style";
 import { INNER_ATTR, WRAPPER_ATTR } from "./dom-attrs";
 import {
   appendTranslatedContent,
@@ -214,6 +216,7 @@ let rescanTimer: number | undefined;
 
 // Translation session
 let currentRule: ResolvedFullPageRule | null = null;
+let currentBaseTextExtStyle = "";
 let runSeq = 0;
 let lastCommandId = 0;
 let pendingCount = 0;
@@ -242,6 +245,7 @@ const observedNodes = new Set<HTMLElement>();
 const viewNodes = new Set<HTMLElement>();
 const rootNodes = new Set<ParentNode>();
 const translatedHosts = new Set<HTMLElement>();
+const wrapperHosts = new Set<HTMLElement>();
 const rescanQueue = new Set<Node>();
 // Per-session content cache: serialized text → translated text.
 // Keyed on content, not DOM nodes, so it survives virtual-DOM re-creation
@@ -256,6 +260,7 @@ const mutedMutationRoots = new Set<Node>();
 export function initFullPage(): void {
   installNavigationWatcher();
   ensureObservers();
+  void watchSettings(handleSettingsChanged);
 
   onMessage("runPageTranslate", async (input) => {
     pruneDisconnectedNodes();
@@ -350,6 +355,7 @@ function restoreOriginals(): void {
   batchQueues?.html.destroy();
   batchQueues = null;
   currentRule = null;
+  currentBaseTextExtStyle = "";
   removeSiteLayoutStyles();
 }
 
@@ -359,50 +365,46 @@ function updatePageTranslatePrefs(input: PageTranslatePrefs): void {
   if (input.target) preferredTarget = input.target;
 }
 
+function handleSettingsChanged(settings: Settings): void {
+  const rule = currentRule;
+  if (!rule) return;
+
+  const nextTextExtStyle = composeTranslationTextExtStyle(
+    currentBaseTextExtStyle,
+    settings,
+  );
+  if (nextTextExtStyle === rule.textExtStyle) return;
+
+  const nextRule = { ...rule, textExtStyle: nextTextExtStyle };
+  currentRule = nextRule;
+  reapplyTranslationInnerStyles(nextRule);
+}
+
 async function loadRule(input: PageTranslateCommand): Promise<ResolvedFullPageRule> {
   const [userRules, settings] = await Promise.all([
     getFullPageRules(),
     getSettings(),
   ]);
   const matched = matchFullPageRule(window.location.href, userRules);
-  const rule = resolveFullPageRule(matched, input);
+  const baseRule = resolveFullPageRule(matched, input);
+  currentBaseTextExtStyle = baseRule.textExtStyle;
   return {
-    ...rule,
-    textExtStyle: appendCssText(
-      rule.textExtStyle,
-      buildTranslationStyleCss(settings.translationStyle),
+    ...baseRule,
+    textExtStyle: composeTranslationTextExtStyle(
+      baseRule.textExtStyle,
+      settings,
     ),
   };
 }
 
-function buildTranslationStyleCss(style: TranslationStyle): string {
-  const css: string[] = [];
-
-  if (style.underline) css.push("text-decoration: underline;");
-
-  if (style.fontFamily === "serif") {
-    css.push('font-family: Georgia, "Times New Roman", serif;');
-  } else if (style.fontFamily === "sans") {
-    css.push('font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;');
-  } else if (style.fontFamily === "mono") {
-    css.push('font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;');
-  }
-
-  const color = resolveTranslationColor(style);
-  if (color) css.push(`color: ${color};`);
-
-  return css.join(" ");
-}
-
-function resolveTranslationColor(style: TranslationStyle): string {
-  if (style.color === "muted") return "#6b7280";
-  if (style.color === "blue") return "#2563eb";
-  if (style.color === "green") return "#047857";
-  if (style.color === "red") return "#dc2626";
-  if (style.color === "custom" && /^#[0-9a-f]{6}$/i.test(style.customColor)) {
-    return style.customColor;
-  }
-  return "";
+function composeTranslationTextExtStyle(
+  baseTextExtStyle: string,
+  settings: Settings,
+): string {
+  return appendCssText(
+    baseTextExtStyle,
+    buildTranslationStyleCss(settings.translationStyle),
+  );
 }
 
 function appendCssText(baseCss: string, patchCss: string): string {
@@ -848,6 +850,7 @@ function addHostWrapper(host: HTMLElement, wrapper: HTMLElement): void {
   let set = hostWrappers.get(host);
   if (!set) { set = new Set(); hostWrappers.set(host, set); }
   set.add(wrapper);
+  wrapperHosts.add(host);
 }
 
 function removeHostWrapper(host: HTMLElement, wrapper: HTMLElement): void {
@@ -953,11 +956,11 @@ function switchAppliedMode(mode: PageTranslateMode): void {
     currentRule = { ...currentRule, transOnly: mode === "replace" };
   }
   const rule = currentRule;
+  if (!rule) return;
   if (currentEngine !== null && currentTarget !== null) {
     lastTranslateInput = { target: currentTarget, engine: currentEngine, mode };
   }
   const transOnly = shouldUseTranslationOnly(mode, rule);
-  if (!rule) return;
 
   for (const host of Array.from(translatedHosts)) {
     if (!host.isConnected) continue;
@@ -990,13 +993,38 @@ function switchAppliedMode(mode: PageTranslateMode): void {
   }
 }
 
+function reapplyTranslationInnerStyles(rule: ResolvedFullPageRule): void {
+  const transOnly = shouldUseTranslationOnly(currentMode ?? "replace", rule);
+
+  for (const host of Array.from(wrapperHosts)) {
+    if (!host.isConnected) {
+      wrapperHosts.delete(host);
+      continue;
+    }
+
+    runWithMutedMutations(host, () => {
+      for (const wrapper of getHostWrappers(host)) {
+        if (!wrapper.isConnected) continue;
+        const state = wrapperState.get(wrapper);
+        if (!state) continue;
+
+        const inner = wrapper.querySelector(`[${INNER_ATTR}]`) as HTMLElement | null;
+        if (inner) {
+          applyTranslationInnerStyles(inner, transOnly, host, state.hideMode, rule);
+        }
+      }
+    });
+  }
+}
+
 // ── Cleanup ───────────────────────────────────────────────────────────────────
 
 // Mirrors kiss-translator's #cleanupAllNodes / #cleanupAllTranslations
 function cleanupAllTranslations(): void {
-  const hosts = new Set([...observedNodes, ...translatedHosts]);
+  const hosts = new Set([...observedNodes, ...translatedHosts, ...wrapperHosts]);
   for (const host of hosts) cleanupHostNode(host);
   translatedHosts.clear();
+  wrapperHosts.clear();
   localTranslationCache.clear();
 }
 
@@ -1014,6 +1042,7 @@ function cleanupHostNode(host: HTMLElement): void {
     restoreRuleStyles(host);
   });
   translatedHosts.delete(host);
+  wrapperHosts.delete(host);
 }
 
 function stopObservation(): void {
@@ -1224,6 +1253,7 @@ function handleSoftNavigation(): void {
   batchQueues?.html.destroy();
   batchQueues = null;
   currentRule = null;
+  currentBaseTextExtStyle = "";
   removeSiteLayoutStyles();
 
   if (navigationTimer !== undefined) window.clearTimeout(navigationTimer);

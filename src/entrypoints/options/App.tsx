@@ -1,5 +1,9 @@
 import { For } from "solid-js";
 import {
+  resolveTranslationStyleColor,
+  resolveTranslationStyleFontFamily,
+} from "@/lib/translation-style";
+import {
   setSettings,
   useSettings,
   type FullPageEngineId,
@@ -109,24 +113,6 @@ function App() {
     patch: Parameters<typeof setSettings>[0]["translationStyle"],
   ): void => {
     void setSettings({ translationStyle: patch });
-  };
-
-  const previewColor = (): string | undefined => {
-    const style = settings().translationStyle;
-    if (style.color === "muted") return "#6b7280";
-    if (style.color === "blue") return "#2563eb";
-    if (style.color === "green") return "#047857";
-    if (style.color === "red") return "#dc2626";
-    if (style.color === "custom") return style.customColor;
-    return undefined;
-  };
-
-  const previewFont = (): string | undefined => {
-    const font = settings().translationStyle.fontFamily;
-    if (font === "serif") return "Georgia, 'Times New Roman', serif";
-    if (font === "sans") return "system-ui, 'Segoe UI', sans-serif";
-    if (font === "mono") return "Consolas, 'SFMono-Regular', monospace";
-    return undefined;
   };
 
   return (
@@ -242,8 +228,10 @@ function App() {
           <div
             class="style-preview"
             style={{
-              color: previewColor(),
-              "font-family": previewFont(),
+              color: resolveTranslationStyleColor(settings().translationStyle),
+              "font-family": resolveTranslationStyleFontFamily(
+                settings().translationStyle.fontFamily,
+              ),
               "text-decoration": settings().translationStyle.underline
                 ? "underline"
                 : "none",
