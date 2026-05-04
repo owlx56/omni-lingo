@@ -16,39 +16,126 @@ export interface ScanContext {
 }
 
 const BLOCK_TAGS = new Set([
-  "ADDRESS", "ARTICLE", "ASIDE", "BLOCKQUOTE", "CANVAS", "DD", "DIV", "DL",
-  "DT", "FIELDSET", "FIGCAPTION", "FIGURE", "FOOTER", "FORM",
-  "H1", "H2", "H3", "H4", "H5", "H6", "HEADER", "HR", "LI", "MAIN",
-  "NAV", "NOSCRIPT", "OL", "P", "PRE", "SECTION", "TABLE", "TFOOT", "UL", "VIDEO",
+  "ADDRESS",
+  "ARTICLE",
+  "ASIDE",
+  "BLOCKQUOTE",
+  "CANVAS",
+  "DD",
+  "DIV",
+  "DL",
+  "DT",
+  "FIELDSET",
+  "FIGCAPTION",
+  "FIGURE",
+  "FOOTER",
+  "FORM",
+  "H1",
+  "H2",
+  "H3",
+  "H4",
+  "H5",
+  "H6",
+  "HEADER",
+  "HR",
+  "LI",
+  "MAIN",
+  "NAV",
+  "NOSCRIPT",
+  "OL",
+  "P",
+  "PRE",
+  "SECTION",
+  "TABLE",
+  "TFOOT",
+  "UL",
+  "VIDEO",
 ]);
 
 const INLINE_TAGS = new Set([
-  "ABBR", "ACRONYM", "B", "BDO", "BIG", "BR", "BUTTON", "CITE", "CODE", "DFN",
-  "DEL", "FONT", "EM", "I", "IMG", "INPUT", "INS", "KBD", "LABEL", "MAP", "MARK",
-  "OBJECT", "OUTPUT", "Q", "RUBY", "SAMP", "SCRIPT", "SELECT", "SMALL",
-  "STRONG", "SUB", "SUP", "TEXTAREA", "TIME", "TT", "U", "VAR",
+  "ABBR",
+  "ACRONYM",
+  "B",
+  "BDO",
+  "BIG",
+  "BR",
+  "BUTTON",
+  "CITE",
+  "CODE",
+  "DFN",
+  "DEL",
+  "FONT",
+  "EM",
+  "I",
+  "IMG",
+  "INPUT",
+  "INS",
+  "KBD",
+  "LABEL",
+  "MAP",
+  "MARK",
+  "OBJECT",
+  "OUTPUT",
+  "Q",
+  "RUBY",
+  "SAMP",
+  "SCRIPT",
+  "SELECT",
+  "SMALL",
+  "STRONG",
+  "SUB",
+  "SUP",
+  "TEXTAREA",
+  "TIME",
+  "TT",
+  "U",
+  "VAR",
 ]);
 
 const SKIP_ANCESTOR_SELECTOR = [
-  "pre", "code", "kbd", "samp", "var",
-  "svg", "math", "canvas", "iframe",
-  "input", "textarea", "select",
-  "[contenteditable='true']", "[translate='no']", "[aria-hidden='true']", "[hidden]",
-  ".notranslate", ".sr-only", ".visually-hidden",
+  "pre",
+  "code",
+  "kbd",
+  "samp",
+  "var",
+  "svg",
+  "math",
+  "canvas",
+  "iframe",
+  "input",
+  "textarea",
+  "select",
+  "[contenteditable='true']",
+  "[translate='no']",
+  "[aria-hidden='true']",
+  "[hidden]",
+  ".notranslate",
+  ".sr-only",
+  ".visually-hidden",
   `[${WRAPPER_ATTR}]`,
 ].join(",");
 
 const displayCache = new WeakMap<Element, boolean>();
-const selectStyleAttrs = new WeakMap<HTMLElement, { original: string | null; count: number }>();
-const parentStyleAttrs = new WeakMap<HTMLElement, { original: string | null; count: number }>();
-const grandStyleAttrs = new WeakMap<HTMLElement, { original: string | null; count: number }>();
+const selectStyleAttrs = new WeakMap<
+  HTMLElement,
+  { original: string | null; count: number }
+>();
+const parentStyleAttrs = new WeakMap<
+  HTMLElement,
+  { original: string | null; count: number }
+>();
+const grandStyleAttrs = new WeakMap<
+  HTMLElement,
+  { original: string | null; count: number }
+>();
 
 export function scanNode(
   rootNode: ParentNode,
   rule: ResolvedFullPageRule,
   ctx: ScanContext,
 ): void {
-  if (rootNode instanceof HTMLElement && shouldIgnoreNode(rootNode, rule)) return;
+  if (rootNode instanceof HTMLElement && shouldIgnoreNode(rootNode, rule))
+    return;
 
   if (!rule.autoScan) {
     queryNodes(rootNode, rule, ctx);
@@ -121,7 +208,8 @@ export function isBlockNode(node: Node): boolean {
   if (BLOCK_TAGS.has(node.tagName)) return true;
   if (displayCache.has(node)) return displayCache.get(node)!;
   const display = window.getComputedStyle(node).display;
-  const isBlock = !display.startsWith("inline") &&
+  const isBlock =
+    !display.startsWith("inline") &&
     /^(block|flex|grid|list-item|table)/.test(display);
   displayCache.set(node, isBlock);
   return isBlock;
@@ -167,25 +255,40 @@ export function isOurUiNode(el: Element): boolean {
   return (
     el.hasAttribute(WRAPPER_ATTR) ||
     el.hasAttribute(INNER_ATTR) ||
-    !!el.closest(`[data-onelingo-tooltip],[data-onelingo-host],[${WRAPPER_ATTR}]`)
+    !!el.closest(
+      `[data-onelingo-tooltip],[data-onelingo-host],[${WRAPPER_ATTR}]`,
+    )
   );
 }
 
 export function isVisible(el: HTMLElement): boolean {
   const style = window.getComputedStyle(el);
-  if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+  if (
+    style.display === "none" ||
+    style.visibility === "hidden" ||
+    style.opacity === "0"
+  ) {
     return false;
   }
   if (el.getClientRects().length > 0) return true;
   if (el.offsetParent !== null) return true;
-  return style.position === "fixed" || style.position === "sticky" || style.position === "absolute";
+  return (
+    style.position === "fixed" ||
+    style.position === "sticky" ||
+    style.position === "absolute"
+  );
 }
 
-export function applyRuleStyles(node: HTMLElement, rule: ResolvedFullPageRule): void {
+export function applyRuleStyles(
+  node: HTMLElement,
+  rule: ResolvedFullPageRule,
+): void {
   applyRuleStyle(node, rule.selectStyle, selectStyleAttrs);
   applyRuleStyle(node.parentElement, rule.parentStyle, parentStyleAttrs);
   applyRuleStyle(
-    node.parentElement?.parentElement ?? null, rule.grandStyle, grandStyleAttrs,
+    node.parentElement?.parentElement ?? null,
+    rule.grandStyle,
+    grandStyleAttrs,
   );
 }
 
@@ -202,7 +305,10 @@ function applyRuleStyle(
 ): void {
   if (!el || !cssText.trim()) return;
   const existing = cache.get(el);
-  if (existing) { existing.count++; return; }
+  if (existing) {
+    existing.count++;
+    return;
+  }
   cache.set(el, { original: el.getAttribute("style"), count: 1 });
   appendInlineStyle(el, cssText);
 }
@@ -227,5 +333,8 @@ export function appendInlineStyle(el: HTMLElement, cssText: string): void {
   const patch = cssText.trim();
   if (!patch) return;
   const base = el.getAttribute("style")?.trim();
-  el.setAttribute("style", base ? `${base}${base.endsWith(";") ? "" : ";"} ${patch}` : patch);
+  el.setAttribute(
+    "style",
+    base ? `${base}${base.endsWith(";") ? "" : ";"} ${patch}` : patch,
+  );
 }
