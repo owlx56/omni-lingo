@@ -60,6 +60,8 @@ const VIRTUAL_LAYOUT_REFRESH_DELAY_MS = 80;
 const LOADING_STYLE_ID = "onelingo-immersive-loading-style";
 const MAIN_PAGE_LAYOUT_STYLE_ID = "onelingo-wikipedia-main-page-layout-style";
 const HIDDEN_ORIGINAL_ATTR = "data-onelingo-hidden-original";
+const LOADING_BASE_VAR = "--onelingo-loading-base";
+const LOADING_FLOW_VAR = "--onelingo-loading-flow";
 const INLINE_RUN_SEPARATOR_RE = /^[\s,.;:|/\\()[\]{}·•●‧・\-–—←→]+$/u;
 const INLINE_RUN_TRANSLATION_SEPARATOR = " · ";
 const INTERACTIVE_HOST_SELECTOR = [
@@ -718,7 +720,7 @@ async function translateNodeGroup(
 
     if (!translated) {
       runWithMutedMutations(host, () => {
-        if (transOnly) restoreWrapperNodes(wrapper);
+        removeWrapperWithOriginalRestore(wrapper);
         wrapper.remove();
       });
       removeHostWrapper(host, wrapper);
@@ -732,8 +734,13 @@ async function translateNodeGroup(
       inner.removeAttribute("aria-busy");
       inner.textContent = "";
       appendTranslatedContent(inner, translated, placeholders, format);
+      const state = wrapperState.get(wrapper);
+      const liveRule = currentRule ?? rule;
+      if (state) {
+        applyWrapperMode(wrapper, host, state, currentMode ?? "replace", liveRule);
+      }
     });
-    if (transOnly) scheduleVirtualizedLayoutRefresh();
+    if (wrapperState.get(wrapper)?.isHide) scheduleVirtualizedLayoutRefresh();
     translatedHosts.add(host);
     localTranslationCache.set(serialized, translated);
   } catch (err) {
@@ -741,7 +748,7 @@ async function translateNodeGroup(
     if (isQueueDestroyedError(err)) return;
     if (seq === runSeq && wrapper.isConnected) {
       runWithMutedMutations(host, () => {
-        if (transOnly) restoreWrapperNodes(wrapper);
+        removeWrapperWithOriginalRestore(wrapper);
         wrapper.remove();
       });
       removeHostWrapper(host, wrapper);
@@ -816,9 +823,30 @@ function applyTranslationInnerStyles(
   hideMode: OriginalHideMode | undefined,
   rule: ResolvedFullPageRule,
 ): void {
+  const loadingVars = readLoadingCssVars(inner);
   inner.removeAttribute("style");
   applyTranslationInnerModeStyles(inner, transOnly, host, hideMode);
   appendInlineStyle(inner, rule.textExtStyle);
+  if (loadingVars) restoreLoadingCssVars(inner, loadingVars);
+}
+
+function readLoadingCssVars(
+  inner: HTMLElement,
+): { base: string; flow: string } | null {
+  if (inner.getAttribute("aria-busy") !== "true") return null;
+  const palette = getLoadingPalette();
+  return {
+    base: inner.style.getPropertyValue(LOADING_BASE_VAR) || palette.base,
+    flow: inner.style.getPropertyValue(LOADING_FLOW_VAR) || palette.flow,
+  };
+}
+
+function restoreLoadingCssVars(
+  inner: HTMLElement,
+  vars: { base: string; flow: string },
+): void {
+  inner.style.setProperty(LOADING_BASE_VAR, vars.base);
+  inner.style.setProperty(LOADING_FLOW_VAR, vars.flow);
 }
 
 function applyTranslationInnerModeStyles(
@@ -942,10 +970,11 @@ function restoreHiddenOriginalNodes(state: WrapperState, wrapper: HTMLElement): 
 
 function canSwitchMode(translationKey: string): boolean {
   return (
-    translatedHosts.size > 0 &&
+    currentRule !== null &&
     currentEngine !== null &&
     currentTarget !== null &&
-    translationKey === `${currentEngine}|${currentTarget}`
+    translationKey === `${currentEngine}|${currentTarget}` &&
+    (wrapperHosts.size > 0 || translatedHosts.size > 0 || pendingCount > 0)
   );
 }
 
@@ -960,37 +989,60 @@ function switchAppliedMode(mode: PageTranslateMode): void {
   if (currentEngine !== null && currentTarget !== null) {
     lastTranslateInput = { target: currentTarget, engine: currentEngine, mode };
   }
-  const transOnly = shouldUseTranslationOnly(mode, rule);
 
-  for (const host of Array.from(translatedHosts)) {
-    if (!host.isConnected) continue;
+  let layoutChanged = false;
+  for (const host of Array.from(wrapperHosts)) {
+    if (!host.isConnected) {
+      wrapperHosts.delete(host);
+      continue;
+    }
     runWithMutedMutations(host, () => {
       for (const wrapper of getHostWrappers(host)) {
         if (!wrapper.isConnected) continue;
         const state = wrapperState.get(wrapper);
         if (!state) continue;
 
-        // Toggle the line-break visibility
-        const br = wrapper.querySelector(":scope > br");
-        if (br instanceof HTMLElement) br.hidden = transOnly;
-
-        // Show/hide original nodes
-        if (transOnly && !state.isHide) {
-          state.hideMode = getOriginalHideMode(host);
-          state.hiddenOriginal = hideOriginalNodes(state.nodes, host, state.hideMode, wrapper);
-          state.isHide = true;
-        } else if (!transOnly && state.isHide) {
-          restoreWrapperNodes(wrapper);
-        }
-
-        // Adjust inner element styling
-        const inner = wrapper.querySelector(`[${INNER_ATTR}]`) as HTMLElement | null;
-        if (inner) {
-          applyTranslationInnerStyles(inner, transOnly, host, state.hideMode, rule);
-        }
+        layoutChanged = applyWrapperMode(wrapper, host, state, mode, rule) || layoutChanged;
       }
     });
   }
+  if (layoutChanged) scheduleVirtualizedLayoutRefresh();
+}
+
+function applyWrapperMode(
+  wrapper: HTMLElement,
+  host: HTMLElement,
+  state: WrapperState,
+  mode: PageTranslateMode,
+  rule: ResolvedFullPageRule,
+): boolean {
+  const transOnly = shouldUseTranslationOnly(mode, rule);
+  let layoutChanged = false;
+
+  const br = wrapper.querySelector(":scope > br");
+  if (br instanceof HTMLElement) br.hidden = transOnly;
+
+  if (transOnly && !state.isHide) {
+    state.hideMode = getOriginalHideMode(host);
+    state.hiddenOriginal = hideOriginalNodes(state.nodes, host, state.hideMode, wrapper);
+    state.isHide = true;
+    layoutChanged = true;
+  } else if (!transOnly && state.isHide) {
+    restoreWrapperNodes(wrapper);
+    layoutChanged = true;
+  }
+
+  const inner = wrapper.querySelector(`[${INNER_ATTR}]`) as HTMLElement | null;
+  if (inner) {
+    applyTranslationInnerStyles(inner, transOnly, host, state.hideMode, rule);
+  }
+
+  return layoutChanged;
+}
+
+function removeWrapperWithOriginalRestore(wrapper: HTMLElement): void {
+  const state = wrapperState.get(wrapper);
+  if (state?.isHide) restoreWrapperNodes(wrapper);
 }
 
 function reapplyTranslationInnerStyles(rule: ResolvedFullPageRule): void {
@@ -1281,8 +1333,9 @@ function appendLoadingLines(container: HTMLElement, original: string, inline: bo
     line.style.animationDuration = `${getLoadingAnimationDuration(seed, i)}s`;
     container.appendChild(line);
   }
-  container.style.setProperty("--onelingo-loading-base", getLoadingPalette().base);
-  container.style.setProperty("--onelingo-loading-flow", getLoadingPalette().flow);
+  const palette = getLoadingPalette();
+  container.style.setProperty(LOADING_BASE_VAR, palette.base);
+  container.style.setProperty(LOADING_FLOW_VAR, palette.flow);
 }
 
 function getLoadingLineCount(text: string): number {
