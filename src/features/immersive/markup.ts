@@ -261,24 +261,20 @@ function isImplicitRichHtmlInlineTag(el: HTMLElement): boolean {
 }
 
 function buildRichHtmlOpeningTag(el: HTMLElement): string {
-  if (el.tagName !== "A") {
-    const attrs: string[] = [];
-    const className = el.getAttribute("class");
-    const title = el.getAttribute("title");
-    const lang = el.getAttribute("lang");
-    const dir = el.getAttribute("dir");
-    if (className) attrs.push(`class="${escapeHtmlAttr(className)}"`);
-    if (title) attrs.push(`title="${escapeHtmlAttr(title)}"`);
-    if (lang) attrs.push(`lang="${escapeHtmlAttr(lang)}"`);
-    if (dir) attrs.push(`dir="${escapeHtmlAttr(dir)}"`);
-    return `<${el.localName}${attrs.length > 0 ? ` ${attrs.join(" ")}` : ""}>`;
-  }
-
   const attrs: string[] = [];
-  const href = el.getAttribute("href");
+  const className = el.getAttribute("class");
   const title = el.getAttribute("title");
-  if (href && isSafeLinkHref(href)) attrs.push(`href="${escapeHtmlAttr(href)}"`);
+  const lang = el.getAttribute("lang");
+  const dir = el.getAttribute("dir");
+  if (className) attrs.push(`class="${escapeHtmlAttr(className)}"`);
   if (title) attrs.push(`title="${escapeHtmlAttr(title)}"`);
+  if (lang) attrs.push(`lang="${escapeHtmlAttr(lang)}"`);
+  if (dir) attrs.push(`dir="${escapeHtmlAttr(dir)}"`);
+
+  const href = el.getAttribute("href");
+  if (el.tagName === "A" && href && isSafeLinkHref(href)) {
+    attrs.push(`href="${escapeHtmlAttr(href)}"`);
+  }
 
   return `<${el.localName}${attrs.length > 0 ? ` ${attrs.join(" ")}` : ""}>`;
 }
