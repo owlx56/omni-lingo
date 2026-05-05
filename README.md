@@ -96,14 +96,14 @@ docs/
 
 `src/features/immersive/` 当前按职责拆分：
 
-| 文件 | 职责 |
-| --- | --- |
-| `index.ts` | 会话状态、命令处理、observer 创建、rescan 队列、翻译 batching、wrapper 状态、恢复流程 |
-| `scan.ts` | DOM 发现、`ScanContext`、忽略判断、block / visibility 分类、扫描期规则样式 |
-| `markup.ts` | 序列化、占位符、rich HTML 恢复、译文 markup 插入 |
-| `rules.ts` | 默认 / 站点规则、规则匹配、规则解析 |
-| `selectors.ts` | 安全 selector helper |
-| `dom-attrs.ts` | 共享 `data-onelingo-*` wrapper 属性名 |
+| 文件           | 职责                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------- |
+| `index.ts`     | 会话状态、命令处理、observer 创建、rescan 队列、翻译 batching、wrapper 状态、恢复流程 |
+| `scan.ts`      | DOM 发现、`ScanContext`、忽略判断、block / visibility 分类、扫描期规则样式            |
+| `markup.ts`    | 序列化、占位符、rich HTML 恢复、译文 markup 插入                                      |
+| `rules.ts`     | 默认 / 站点规则、规则匹配、规则解析                                                   |
+| `selectors.ts` | 安全 selector helper                                                                  |
+| `dom-attrs.ts` | 共享 `data-onelingo-*` wrapper 属性名                                                 |
 
 改这个模块前建议先读 [docs/architecture.md#全文翻译-immersive](docs/architecture.md#全文翻译-immersive)。
 修全文翻译 bug 时先按 [docs/immersive-debugging.md](docs/immersive-debugging.md) 分层定位。

@@ -4,23 +4,67 @@ import { closestSelectorSafe, matchesSelectorSafe } from "./selectors";
 
 // Tags whose outerHTML is replaced entirely by a placeholder {n}.
 const RICH_TEXT_REPLACE_TAGS = new Set([
-  "ABBR", "BR", "CODE", "DFN", "IMG", "KBD", "OUTPUT", "RP", "RT",
-  "SAMP", "SUB", "SUP", "SVG", "TIME", "VAR", "WBR",
+  "ABBR",
+  "BR",
+  "CODE",
+  "DFN",
+  "IMG",
+  "KBD",
+  "OUTPUT",
+  "RP",
+  "RT",
+  "SAMP",
+  "SUB",
+  "SUP",
+  "SVG",
+  "TIME",
+  "VAR",
+  "WBR",
 ]);
 
 // Tags wrapped in <i n>...</i n> placeholder (content translated, tag restored).
 const RICH_TEXT_WRAP_TAGS = new Set([
-  "A", "B", "BDO", "BDI", "BIG", "CITE", "DEL", "EM", "FONT", "I", "INS",
-  "MARK", "Q", "RUBY", "S", "SMALL", "SPAN", "STRONG", "U",
+  "A",
+  "B",
+  "BDO",
+  "BDI",
+  "BIG",
+  "CITE",
+  "DEL",
+  "EM",
+  "FONT",
+  "I",
+  "INS",
+  "MARK",
+  "Q",
+  "RUBY",
+  "S",
+  "SMALL",
+  "SPAN",
+  "STRONG",
+  "U",
 ]);
 
 const RICH_HTML_INLINE_TAGS = new Set([
-  "A", "B", "CITE", "EM", "I", "SMALL", "SPAN", "STRONG", "SUB", "SUP",
+  "A",
+  "B",
+  "CITE",
+  "EM",
+  "I",
+  "SMALL",
+  "SPAN",
+  "STRONG",
+  "SUB",
+  "SUP",
 ]);
 
 const OPAQUE_PRESERVE_SELECTOR = [
-  "code", "kbd", "samp", "var",
-  "math", ".math",
+  "code",
+  "kbd",
+  "samp",
+  "var",
+  "math",
+  ".math",
   "a:has(code)",
   "sup.reference",
 ].join(", ");
@@ -28,25 +72,71 @@ const OPAQUE_PRESERVE_SELECTOR = [
 // Tags that should never be translated, nor their descendants scanned.
 // TABLE/TR/TD/TH are intentionally not here so table-contained article text is scanned.
 export const HARD_SKIP_TAGS = new Set([
-  "SCRIPT", "STYLE", "NOSCRIPT", "HEAD", "META", "LINK", "TEMPLATE",
-  "SVG", "MATH", "IMG", "VIDEO", "AUDIO", "CANVAS", "IFRAME",
-  "INPUT", "TEXTAREA", "SELECT",
-  "PRE", "CODE", "KBD", "SAMP", "VAR",
+  "SCRIPT",
+  "STYLE",
+  "NOSCRIPT",
+  "HEAD",
+  "META",
+  "LINK",
+  "TEMPLATE",
+  "SVG",
+  "MATH",
+  "IMG",
+  "VIDEO",
+  "AUDIO",
+  "CANVAS",
+  "IFRAME",
+  "INPUT",
+  "TEXTAREA",
+  "SELECT",
+  "PRE",
+  "CODE",
+  "KBD",
+  "SAMP",
+  "VAR",
 ]);
 
 // Sub-trees excluded from serialisation (noise text).
 const EXCLUDE_TEXT_SELECTOR = [
   ".mw-editsection",
-  ".sr-only", ".visually-hidden", "[hidden]", "[aria-hidden='true']",
+  ".sr-only",
+  ".visually-hidden",
+  "[hidden]",
+  "[aria-hidden='true']",
 ].join(",");
 
 // kiss-translator's BUILTIN_IGNORE_SELECTOR.
 export const BUILTIN_IGNORE_SELECTOR = [
-  "address", "area", "audio", "br", "canvas", "data", "datalist", "embed",
-  "head", "iframe", "input", "noscript", "map", "object", "option", "param",
-  "picture", "progress", "select", "script", "style", "svg", "track",
-  "textarea", "template", "video", "wbr",
-  ".notranslate", "[contenteditable='true']", "[translate='no']",
+  "address",
+  "area",
+  "audio",
+  "br",
+  "canvas",
+  "data",
+  "datalist",
+  "embed",
+  "head",
+  "iframe",
+  "input",
+  "noscript",
+  "map",
+  "object",
+  "option",
+  "param",
+  "picture",
+  "progress",
+  "select",
+  "script",
+  "style",
+  "svg",
+  "track",
+  "textarea",
+  "template",
+  "video",
+  "wbr",
+  ".notranslate",
+  "[contenteditable='true']",
+  "[translate='no']",
 ].join(", ");
 
 // Single-brace placeholders match kiss-translator's default "{ }" delimiter format.
@@ -177,7 +267,9 @@ export function serializeNodes(
     }
 
     let innerContent = "";
-    el.childNodes.forEach((child) => { innerContent += traverse(child); });
+    el.childNodes.forEach((child) => {
+      innerContent += traverse(child);
+    });
 
     if (rule.hasRichText && RICH_TEXT_WRAP_TAGS.has(el.tagName)) {
       return pushWrappedTag(el, innerContent);
@@ -189,7 +281,10 @@ export function serializeNodes(
   const separator = options.separator ? escapeHtml(options.separator) : "";
   const chunks = Array.from(nodes).map(traverse);
   const raw = separator
-    ? chunks.map((chunk) => chunk.trim()).filter(Boolean).join(separator)
+    ? chunks
+        .map((chunk) => chunk.trim())
+        .filter(Boolean)
+        .join(separator)
     : chunks.join("");
   const html = isHtml ? normalizeInlineText(raw) : raw.trim();
   if (isHtml) placeholders.set("__html__", "");
@@ -316,7 +411,8 @@ function restoreFromTranslation(
   const restoreAttr = "data-onelingo-restore";
   const openTokenPrefix = "\uE000onelingo-open-";
   const closeToken = "\uE000onelingo-close\uE000";
-  let textToParse = format === "text" ? decodeHtmlEntities(translatedText) : translatedText;
+  let textToParse =
+    format === "text" ? decodeHtmlEntities(translatedText) : translatedText;
   let result = translatedText;
 
   try {
@@ -349,13 +445,17 @@ function restoreFromTranslation(
       node.outerHTML = `${value.openTag}${node.innerHTML}${value.closeTag}`;
     });
 
-    Array.from(doc.querySelectorAll(`[${PRESERVE_HTML_ATTR}]`)).reverse().forEach((node) => {
-      const index = normalizeRestoreIndex(node.getAttribute(PRESERVE_HTML_ATTR));
-      if (!index) return;
-      const value = placeholders.get(`HTML_${index}`);
-      if (typeof value !== "string") return;
-      node.outerHTML = value;
-    });
+    Array.from(doc.querySelectorAll(`[${PRESERVE_HTML_ATTR}]`))
+      .reverse()
+      .forEach((node) => {
+        const index = normalizeRestoreIndex(
+          node.getAttribute(PRESERVE_HTML_ATTR),
+        );
+        if (!index) return;
+        const value = placeholders.get(`HTML_${index}`);
+        if (typeof value !== "string") return;
+        node.outerHTML = value;
+      });
 
     result = doc.body.innerHTML;
   } catch {
@@ -392,7 +492,9 @@ const MARKER_JUNK_RE =
   /<\/?\s*(?:a|b|i)\b[^>]{0,80}>|(?:data-|#)i\s*=?\s*["'""''`]{0,2}\d+["'""''`]{0,2}>?|\{\d+\}/gi;
 
 function cleanMarkerJunk(text: string): string {
-  return decodeHtmlEntities(text).replace(MARKER_JUNK_RE, "").replace(/\s{2,}/g, " ");
+  return decodeHtmlEntities(text)
+    .replace(MARKER_JUNK_RE, "")
+    .replace(/\s{2,}/g, " ");
 }
 
 let entityDecoder: HTMLTextAreaElement | null = null;

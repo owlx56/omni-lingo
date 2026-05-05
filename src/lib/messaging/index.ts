@@ -149,10 +149,9 @@ export async function sendTabMessage<K extends keyof ProtocolMap>(
   if (!browser.tabs?.sendMessage) {
     throw new Error("Extension context invalidated");
   }
-  return browser.tabs.sendMessage(
-    tabId,
-    makeEnvelope(type, input),
-  ) as Promise<ProtocolMap[K]["output"]>;
+  return browser.tabs.sendMessage(tabId, makeEnvelope(type, input)) as Promise<
+    ProtocolMap[K]["output"]
+  >;
 }
 
 export function onMessage<K extends keyof ProtocolMap>(

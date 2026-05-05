@@ -2,7 +2,11 @@
 
 import type { TranslateRequest, TranslateResponse } from "@/engines/types";
 import { LRU } from "./lru";
-import { readTranslateCache, readTranslateCacheBulk, writeTranslateCache } from "./translate-db";
+import {
+  readTranslateCache,
+  readTranslateCacheBulk,
+  writeTranslateCache,
+} from "./translate-db";
 
 const CAP = 10_000;
 
@@ -58,7 +62,9 @@ export async function translateCachedBatch(
   if (reqs.length === 0) return [];
 
   const keys = reqs.map((r) => cacheKey(engine, r));
-  const results: (string | undefined)[] = new Array(reqs.length).fill(undefined);
+  const results: (string | undefined)[] = new Array(reqs.length).fill(
+    undefined,
+  );
 
   // Phase 1: LRU memory cache (sync)
   const needIdb: number[] = [];

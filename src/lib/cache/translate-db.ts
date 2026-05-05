@@ -23,7 +23,9 @@ export async function readTranslateCacheBulk(
   const db = await openDb();
   const tx = db.transaction(STORE, "readonly");
   const store = tx.objectStore(STORE);
-  const results = await Promise.all(keys.map((k) => requestResult<unknown>(store.get(k))));
+  const results = await Promise.all(
+    keys.map((k) => requestResult<unknown>(store.get(k))),
+  );
   return results.map((v) => (isRecord(v) ? v.value : undefined));
 }
 

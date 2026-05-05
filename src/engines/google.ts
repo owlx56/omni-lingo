@@ -29,7 +29,8 @@ export const google: Engine = {
 
     return {
       text,
-      detectedSource: typeof detectedSource === "string" ? detectedSource : undefined,
+      detectedSource:
+        typeof detectedSource === "string" ? detectedSource : undefined,
       engine: "google",
     };
   },

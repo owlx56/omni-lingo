@@ -42,24 +42,30 @@ export const microsoft: Engine = {
   },
 };
 
-function parseTranslateResponse(data: unknown, expectedCount: number): TranslateResponse[] {
+function parseTranslateResponse(
+  data: unknown,
+  expectedCount: number,
+): TranslateResponse[] {
   if (!Array.isArray(data)) throw new Error("microsoft: bad shape");
 
   return Array.from({ length: expectedCount }, (_, index) => {
     const first = data[index];
-    if (!first || typeof first !== "object") throw new Error("microsoft: bad shape");
+    if (!first || typeof first !== "object")
+      throw new Error("microsoft: bad shape");
 
     const translations = (first as { translations?: unknown }).translations;
     const translated = Array.isArray(translations) ? translations[0] : null;
-    const text = translated && typeof translated === "object"
-      ? String((translated as { text?: unknown }).text ?? "")
-      : "";
+    const text =
+      translated && typeof translated === "object"
+        ? String((translated as { text?: unknown }).text ?? "")
+        : "";
     if (!text) throw new Error("microsoft: empty translation");
 
     const detectedLang =
-      typeof (first as { detectedLanguage?: { language?: unknown } }).detectedLanguage?.language ===
-      "string"
-        ? (first as { detectedLanguage: { language: string } }).detectedLanguage.language
+      typeof (first as { detectedLanguage?: { language?: unknown } })
+        .detectedLanguage?.language === "string"
+        ? (first as { detectedLanguage: { language: string } }).detectedLanguage
+            .language
         : undefined;
 
     return {
@@ -122,7 +128,8 @@ function parseJwtExpiryMs(token: string): number | null {
 
   try {
     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = base64.length % 4 === 0 ? "" : "=".repeat(4 - (base64.length % 4));
+    const pad =
+      base64.length % 4 === 0 ? "" : "=".repeat(4 - (base64.length % 4));
     const json = atob(base64 + pad);
     const obj = JSON.parse(json) as { exp?: unknown };
     if (typeof obj.exp !== "number") return null;

@@ -13,19 +13,15 @@ import { sendMessage } from "@/lib/messaging";
 import { getSettings, watchSettings } from "@/lib/storage/settings";
 import { getHost, getShadowRoot } from "@/ui/shadow-root";
 import { mountCard } from "./SelectionCard";
-import {
-  setSelText,
-  setSelTarget,
-  setSelResult,
-} from "./card-store";
+import { setSelText, setSelTarget, setSelResult } from "./card-store";
 
 const LOGO_ATTR = "data-onelingo-logo";
 const CARD_ATTR = "data-onelingo-selcard";
 const LOGO_SIZE = 30; // 与 Saladict SaladBowl 保持一致
 const LOGO_OFFSET_X = 6;
 const LOGO_OFFSET_Y = -(LOGO_SIZE + 4);
-const HOVER_CONFIRM_MS = 500;  // mouseenter → 弹卡片延迟
-const LEAVE_CONFIRM_MS = 100;  // mouseleave → 取消延迟（防鼠标划过抖动）
+const HOVER_CONFIRM_MS = 500; // mouseenter → 弹卡片延迟
+const LEAVE_CONFIRM_MS = 100; // mouseleave → 取消延迟（防鼠标划过抖动）
 
 interface State {
   target: string;
@@ -278,8 +274,8 @@ function showLogo(s: State, mouseX: number, mouseY: number): void {
 
 function onLogoEnter(s: State): void {
   if (s.cardVisible) return;
-  clearLeaveTimer(s);        // 取消正在倒计的离开确认
-  clearEnterTimer(s);        // 重新从 0 开始计入场延迟
+  clearLeaveTimer(s); // 取消正在倒计的离开确认
+  clearEnterTimer(s); // 重新从 0 开始计入场延迟
   s.enterTimer = window.setTimeout(() => {
     s.enterTimer = null;
     openCard(s);

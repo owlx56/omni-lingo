@@ -12,14 +12,14 @@
 
 ## 分层定位
 
-| 层 | 常见症状 | 优先检查 |
-| --- | --- | --- |
-| 扫描层 `scan.ts` | 该翻译的节点没进队列，或扫到不该翻译的区域 | selector、ignore、block/inline 判断、visible 判断 |
-| 执行层 `index.ts` | 原文译文交错、重复翻译、恢复失败、动态页面重扫异常 | `collectNodeGroups`、`translateNodeGroup`、wrapper 状态、rescan queue |
-| 序列化层 `markup.ts` | `<i12>` / `{1}` 乱码、链接丢失、HTML 被翻译成文本 | format、placeholder、preserve/restore、semantic label |
-| 引擎层 `src/engines/` | 某个引擎独有乱码、HTML mode 不生效、批量返回错位 | request format、batch parse、text/html 参数 |
-| 规则层 `rules.ts` | 某站点区域多翻/漏翻、rich HTML 开关不合适 | selector、rootsSelector、ignoreSelector、richHtmlSelector |
-| 样式层 | 译文挤压、横向过长、列表/表格排版坏掉 | rule styles、wrapper tag、host display |
+| 层                    | 常见症状                                           | 优先检查                                                              |
+| --------------------- | -------------------------------------------------- | --------------------------------------------------------------------- |
+| 扫描层 `scan.ts`      | 该翻译的节点没进队列，或扫到不该翻译的区域         | selector、ignore、block/inline 判断、visible 判断                     |
+| 执行层 `index.ts`     | 原文译文交错、重复翻译、恢复失败、动态页面重扫异常 | `collectNodeGroups`、`translateNodeGroup`、wrapper 状态、rescan queue |
+| 序列化层 `markup.ts`  | `<i12>` / `{1}` 乱码、链接丢失、HTML 被翻译成文本  | format、placeholder、preserve/restore、semantic label                 |
+| 引擎层 `src/engines/` | 某个引擎独有乱码、HTML mode 不生效、批量返回错位   | request format、batch parse、text/html 参数                           |
+| 规则层 `rules.ts`     | 某站点区域多翻/漏翻、rich HTML 开关不合适          | selector、rootsSelector、ignoreSelector、richHtmlSelector             |
+| 样式层                | 译文挤压、横向过长、列表/表格排版坏掉              | rule styles、wrapper tag、host display                                |
 
 ## 判断是否是通用问题
 

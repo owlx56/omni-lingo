@@ -53,11 +53,11 @@ background / content / options / popup 的消息全部走 `src/lib/messaging/`�
 
 遵守当前存储边界：
 
-| 数据 | 存储 |
-| --- | --- |
-| 跨设备配置 | `storage.sync` |
-| 本机配置 | `storage.local` |
-| 翻译缓存 | 内存 LRU + IndexedDB |
+| 数据                         | 存储                           |
+| ---------------------------- | ------------------------------ |
+| 跨设备配置                   | `storage.sync`                 |
+| 本机配置                     | `storage.local`                |
+| 翻译缓存                     | 内存 LRU + IndexedDB           |
 | 生词本、术语、PDF / 文件结果 | 通过 background 访问 IndexedDB |
 
 background 是 MV3 service worker，随时可能被杀。持久状态必须可恢复。
@@ -86,12 +86,12 @@ background 是 MV3 service worker，随时可能被杀。持久状态必须可�
 
 ## 目录边界
 
-| 目录 | 负责 | 不负责 |
-| --- | --- | --- |
-| `src/features/` | 业务行为 | UI 挂载 / Shadow DOM 容器 |
-| `src/ui/` | Solid 组件和 Shadow DOM 挂载 | 业务规则 |
-| `src/engines/` | 引擎请求和响应归一化 | 缓存 / 去重 |
-| `src/lib/` | 基础设施 | 产品功能策略 |
+| 目录            | 负责                         | 不负责                    |
+| --------------- | ---------------------------- | ------------------------- |
+| `src/features/` | 业务行为                     | UI 挂载 / Shadow DOM 容器 |
+| `src/ui/`       | Solid 组件和 Shadow DOM 挂载 | 业务规则                  |
+| `src/engines/`  | 引擎请求和响应归一化         | 缓存 / 去重               |
+| `src/lib/`      | 基础设施                     | 产品功能策略              |
 
 ## 协作
 

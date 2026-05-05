@@ -21,7 +21,10 @@ const DEFAULT_FULL_PAGE_MODE: FullPageMode = "replace";
 const DEFAULT_FULL_PAGE_ENGINE: FullPageEngineId = "google2";
 const DEFAULT_TARGET = "zh";
 
-function Row(props: { label: string; children: import("solid-js").JSX.Element }) {
+function Row(props: {
+  label: string;
+  children: import("solid-js").JSX.Element;
+}) {
   return (
     <div
       style={{
@@ -38,7 +41,11 @@ function Row(props: { label: string; children: import("solid-js").JSX.Element })
   );
 }
 
-function SegBtn(props: { active: boolean; onClick: () => void; children: import("solid-js").JSX.Element }) {
+function SegBtn(props: {
+  active: boolean;
+  onClick: () => void;
+  children: import("solid-js").JSX.Element;
+}) {
   return (
     <button
       onClick={props.onClick}
@@ -59,11 +66,17 @@ function SegBtn(props: { active: boolean; onClick: () => void; children: import(
 }
 
 function App() {
-  const [action, setAction] = createSignal<"idle" | "starting" | "restoring" | "retranslating">("idle");
+  const [action, setAction] = createSignal<
+    "idle" | "starting" | "restoring" | "retranslating"
+  >("idle");
   const [status, setStatus] = createSignal("");
   const [immersiveActive, setImmersiveActive] = createSignal(false);
-  const [pageMode, setPageMode] = createSignal<FullPageMode>(DEFAULT_FULL_PAGE_MODE);
-  const [pageEngine, setPageEngine] = createSignal<FullPageEngineId>(DEFAULT_FULL_PAGE_ENGINE);
+  const [pageMode, setPageMode] = createSignal<FullPageMode>(
+    DEFAULT_FULL_PAGE_MODE,
+  );
+  const [pageEngine, setPageEngine] = createSignal<FullPageEngineId>(
+    DEFAULT_FULL_PAGE_ENGINE,
+  );
   const [pageTarget, setPageTarget] = createSignal(DEFAULT_TARGET);
   let actionSeq = 0;
   let lastCommandId = 0;
@@ -265,19 +278,30 @@ function App() {
       setPageEngine(engine);
       setPageTarget(target);
       setImmersiveActive(res.active || res.translating);
-    })()
-      .catch(() => {
-        void getSettings().then((defaults) => {
-          setPageMode(defaults.fullPageMode);
-          setPageEngine(defaults.engines.fullPage);
-          setPageTarget(defaults.targetLang);
-        });
+    })().catch(() => {
+      void getSettings().then((defaults) => {
+        setPageMode(defaults.fullPageMode);
+        setPageEngine(defaults.engines.fullPage);
+        setPageTarget(defaults.targetLang);
       });
+    });
   });
 
   return (
-    <div style={{ padding: "12px", "font-family": "system-ui,sans-serif", width: "300px" }}>
-      <h1 style={{ "font-size": "14px", "font-weight": "600", margin: "0 0 12px" }}>
+    <div
+      style={{
+        padding: "12px",
+        "font-family": "system-ui,sans-serif",
+        width: "300px",
+      }}
+    >
+      <h1
+        style={{
+          "font-size": "14px",
+          "font-weight": "600",
+          margin: "0 0 12px",
+        }}
+      >
         OneLingo
       </h1>
 
@@ -309,7 +333,13 @@ function App() {
       </Row>
 
       {/* 沉浸翻译 */}
-      <div style={{ "border-top": "1px solid #eee", "padding-top": "10px", "margin-top": "4px" }}>
+      <div
+        style={{
+          "border-top": "1px solid #eee",
+          "padding-top": "10px",
+          "margin-top": "4px",
+        }}
+      >
         <Row label="显示模式">
           <SegBtn active={immersiveActive()} onClick={toggleFullPageMode}>
             {modeLabel(pageMode())}，点击切换
@@ -327,7 +357,11 @@ function App() {
             "font-size": "12px",
             "border-radius": "6px",
             border: "1px solid #d0d0d0",
-            background: immersiveActive() ? "#222" : action() === "starting" ? "#f2f2f2" : "#fff",
+            background: immersiveActive()
+              ? "#222"
+              : action() === "starting"
+                ? "#f2f2f2"
+                : "#fff",
             color: immersiveActive() ? "#fff" : "#222",
             cursor: action() === "restoring" ? "default" : "pointer",
           }}

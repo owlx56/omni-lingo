@@ -13,19 +13,25 @@ export default defineBackground(() => {
     return translateCached(id, req, () => e.translate(req));
   });
 
-  onMessage("translateBatch", async ({ engine, source, target, texts, format }) => {
-    const id = engine ?? DEFAULT_ENGINE_ID;
-    const e = getEngine(id);
-    return translateCachedBatch(
-      id,
-      texts.map((text) => ({ text, target, source, format })),
-      (req) => e.translate(req),
-      e.translateBatch?.bind(e),
-    );
-  });
+  onMessage(
+    "translateBatch",
+    async ({ engine, source, target, texts, format }) => {
+      const id = engine ?? DEFAULT_ENGINE_ID;
+      const e = getEngine(id);
+      return translateCachedBatch(
+        id,
+        texts.map((text) => ({ text, target, source, format })),
+        (req) => e.translate(req),
+        e.translateBatch?.bind(e),
+      );
+    },
+  );
 
   onMessage("translatePage", async (input) => {
-    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    const [tab] = await browser.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
     if (typeof tab?.id !== "number") {
       throw new Error("当前没有可翻译的活动标签页");
     }
@@ -33,7 +39,10 @@ export default defineBackground(() => {
   });
 
   onMessage("restorePage", async (input) => {
-    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    const [tab] = await browser.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
     if (typeof tab?.id !== "number") {
       throw new Error("当前没有可还原的活动标签页");
     }
@@ -41,7 +50,10 @@ export default defineBackground(() => {
   });
 
   onMessage("getPageTranslateStatus", async () => {
-    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    const [tab] = await browser.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
     if (typeof tab?.id !== "number") {
       throw new Error("当前没有活动标签页");
     }
@@ -49,7 +61,10 @@ export default defineBackground(() => {
   });
 
   onMessage("setPageTranslatePrefs", async (input) => {
-    const [tab] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    const [tab] = await browser.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
     if (typeof tab?.id !== "number") {
       throw new Error("当前没有活动标签页");
     }

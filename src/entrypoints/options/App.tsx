@@ -23,7 +23,11 @@ const LANGS = [
   { value: "en", label: "English" },
 ] as const;
 
-const GRANULARITIES: { value: HoverGranularity; label: string; note: string }[] = [
+const GRANULARITIES: {
+  value: HoverGranularity;
+  label: string;
+  note: string;
+}[] = [
   { value: "word", label: "词", note: "命中单词后翻译单词" },
   { value: "sentence", label: "句子", note: "命中单词后翻译所在句子" },
   { value: "paragraph", label: "段落", note: "命中单词后翻译最近段落" },
@@ -34,7 +38,11 @@ const MODES: { value: FullPageMode; label: string; note: string }[] = [
   { value: "bilingual", label: "双语", note: "默认显示原文和译文" },
 ];
 
-const FONT_FAMILIES: { value: TranslationFontFamily; label: string; note: string }[] = [
+const FONT_FAMILIES: {
+  value: TranslationFontFamily;
+  label: string;
+  note: string;
+}[] = [
   { value: "inherit", label: "默认", note: "沿用网页或模式样式" },
   { value: "serif", label: "衬线", note: "Georgia / Times" },
   { value: "sans", label: "无衬线", note: "Segoe UI / system-ui" },
@@ -91,7 +99,10 @@ function ColorButton(props: {
   );
 }
 
-function Section(props: { title: string; children: import("solid-js").JSX.Element }) {
+function Section(props: {
+  title: string;
+  children: import("solid-js").JSX.Element;
+}) {
   return (
     <section class="section">
       <h2>{props.title}</h2>
@@ -171,9 +182,11 @@ function App() {
             <button
               class="toggle-button"
               classList={{ active: settings().translationStyle.underline }}
-              onClick={() => setTranslationStyle({
-                underline: !settings().translationStyle.underline,
-              })}
+              onClick={() =>
+                setTranslationStyle({
+                  underline: !settings().translationStyle.underline,
+                })
+              }
               type="button"
             >
               {settings().translationStyle.underline ? "开启" : "关闭"}
@@ -186,10 +199,14 @@ function App() {
               <For each={FONT_FAMILIES}>
                 {(font) => (
                   <OptionButton
-                    active={settings().translationStyle.fontFamily === font.value}
+                    active={
+                      settings().translationStyle.fontFamily === font.value
+                    }
                     label={font.label}
                     note={font.note}
-                    onClick={() => setTranslationStyle({ fontFamily: font.value })}
+                    onClick={() =>
+                      setTranslationStyle({ fontFamily: font.value })
+                    }
                   />
                 )}
               </For>
@@ -203,9 +220,11 @@ function App() {
                 {(color) => (
                   <ColorButton
                     active={settings().translationStyle.color === color.value}
-                    color={color.value === "custom"
-                      ? settings().translationStyle.customColor
-                      : color.color}
+                    color={
+                      color.value === "custom"
+                        ? settings().translationStyle.customColor
+                        : color.color
+                    }
                     label={color.label}
                     onClick={() => setTranslationStyle({ color: color.value })}
                   />
@@ -215,10 +234,12 @@ function App() {
                 aria-label="自定义译文颜色"
                 class="color-input"
                 disabled={settings().translationStyle.color !== "custom"}
-                onInput={(event) => setTranslationStyle({
-                  color: "custom",
-                  customColor: event.currentTarget.value,
-                })}
+                onInput={(event) =>
+                  setTranslationStyle({
+                    color: "custom",
+                    customColor: event.currentTarget.value,
+                  })
+                }
                 type="color"
                 value={settings().translationStyle.customColor}
               />

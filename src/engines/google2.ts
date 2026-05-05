@@ -16,7 +16,9 @@ export const google2: Engine = {
   },
 };
 
-async function translateGoogle2Batch(reqs: TranslateRequest[]): Promise<TranslateResponse[]> {
+async function translateGoogle2Batch(
+  reqs: TranslateRequest[],
+): Promise<TranslateResponse[]> {
   if (reqs.length === 0) return [];
   const first = reqs[0]!;
   const params = new URLSearchParams({

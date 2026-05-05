@@ -70,7 +70,8 @@ const DEFAULT_SELECTOR =
 const DEFAULT_IGNORE_SELECTOR =
   "button, footer, pre, mark, nav, svg, img[src*='.svg'], [class*='logo'] svg, [id*='logo'] svg";
 const DEFAULT_KEEP_SELECTOR = "code, cite, math, .math, a:has(code)";
-const DEFAULT_SELECT_STYLE = "-webkit-line-clamp: unset; max-height: none; height: auto;";
+const DEFAULT_SELECT_STYLE =
+  "-webkit-line-clamp: unset; max-height: none; height: auto;";
 
 const WIKIPEDIA_CHROME_SELECTOR = [
   "#p-associated-pages .mw-list-item > a > span",
@@ -238,7 +239,8 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     splitParagraph: GLOBAL_RULE_KEY,
     splitLength: 0,
     textExtStyle: "overflow-wrap: anywhere; word-break: break-word;",
-    selectStyle: "max-width: 100%; overflow-wrap: anywhere; word-break: break-word;",
+    selectStyle:
+      "max-width: 100%; overflow-wrap: anywhere; word-break: break-word;",
     parentStyle: "min-width: 0; max-width: 100%; overflow-wrap: anywhere;",
     grandStyle: "min-width: 0; max-width: 100%; overflow-wrap: anywhere;",
   },
@@ -248,7 +250,8 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
       "p, .titleline, .commtext, .hn-item-title, .hn-comment-text, .hn-story-title",
     keepSelector: "code, img, svg, pre, .sitebit",
     rootsSelector: "",
-    ignoreSelector: "button, code, footer, form, header, mark, nav, pre, .reply",
+    ignoreSelector:
+      "button, code, footer, form, header, mark, nav, pre, .reply",
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -272,7 +275,8 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
       "[data-testid='tweetText'], [data-testid='twitter-article-title'], [data-testid='UserDescription'], .public-DraftStyleDefault-block, span.text-body, div.css-175oi2r.r-3pj75a div.css-175oi2r>span, div.css-175oi2r.r-3pj75a li>span, div.r-1s2bzr4>div.r-16dba41, div.r-16y2uox>div.r-1jeg54m",
     keepSelector: "img, svg, a, span:has(a), div:has(a)",
     rootsSelector: "",
-    ignoreSelector: "[data-testid='videoPlayer'], [data-testid^='tweetTextarea']",
+    ignoreSelector:
+      "[data-testid='videoPlayer'], [data-testid^='tweetTextarea']",
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
@@ -390,7 +394,8 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     selector:
       "h1, h2, h3, h4, h5, h6, dt, dd:not(.series), p, blockquote, li:not(:has(> span.series)), .userstuff p, .summary blockquote, .meta dt, .meta dd, dd.series > span.series, #series li > span.series",
     keepSelector: "a:has(code), code, pre, .divider",
-    richHtmlExcludeSelector: "dd.series > span.series, #series li > span.series",
+    richHtmlExcludeSelector:
+      "dd.series > span.series, #series li > span.series",
     rootsSelector: "#main, .wrapper",
     ignoreSelector:
       "button, nav, header, footer, .landmark, .actions, .navigation, .share, .download",
@@ -473,7 +478,8 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
     grandStyle: "",
   },
   {
-    pattern: "ziggit.dev/t/, users.rust-lang.org/t/, internals.rust-lang.org/t/",
+    pattern:
+      "ziggit.dev/t/, users.rust-lang.org/t/, internals.rust-lang.org/t/",
     selector: DISCOURSE_TOPIC_SELECTOR,
     keepSelector: GLOBAL_RULE_KEY,
     rootsSelector: "body",
@@ -512,8 +518,13 @@ export function normalizeFullPageRules(raw: unknown): FullPageRule[] {
   return rules;
 }
 
-export function matchFullPageRule(url: string, rules: FullPageRule[]): FullPageRule {
-  const userGlobal = rules.find((rule) => rule.pattern.trim() === GLOBAL_RULE_KEY);
+export function matchFullPageRule(
+  url: string,
+  rules: FullPageRule[],
+): FullPageRule {
+  const userGlobal = rules.find(
+    (rule) => rule.pattern.trim() === GLOBAL_RULE_KEY,
+  );
   const matchedBuiltins = findMatchingRules(BUILTIN_FULL_PAGE_RULES, url);
   const matchedUsers = findMatchingRules(
     rules.filter((rule) => rule.pattern.trim() !== GLOBAL_RULE_KEY),
@@ -534,13 +545,17 @@ export function resolveFullPageRule(
   const target = input.target || normalizeLangValue(rule.toLang) || "zh";
   const engine = input.engine;
   const mode = input.mode ?? "replace";
-  const transOnly = mode === "replace" ? true : toggleValue(rule.transOnly, false);
+  const transOnly =
+    mode === "replace" ? true : toggleValue(rule.transOnly, false);
   return {
     pattern: rule.pattern,
     selector: rule.selector.trim() || DEFAULT_FULL_PAGE_RULE.selector,
-    keepSelector: rule.keepSelector.trim() || DEFAULT_FULL_PAGE_RULE.keepSelector,
-    rootsSelector: rule.rootsSelector.trim() || DEFAULT_FULL_PAGE_RULE.rootsSelector,
-    ignoreSelector: rule.ignoreSelector.trim() || DEFAULT_FULL_PAGE_RULE.ignoreSelector,
+    keepSelector:
+      rule.keepSelector.trim() || DEFAULT_FULL_PAGE_RULE.keepSelector,
+    rootsSelector:
+      rule.rootsSelector.trim() || DEFAULT_FULL_PAGE_RULE.rootsSelector,
+    ignoreSelector:
+      rule.ignoreSelector.trim() || DEFAULT_FULL_PAGE_RULE.ignoreSelector,
     richHtmlSelector: rule.richHtmlSelector?.trim() ?? "",
     richHtmlExcludeSelector: rule.richHtmlExcludeSelector?.trim() ?? "",
     engine,
@@ -590,7 +605,8 @@ function normalizeFullPageRule(raw: unknown): FullPageRule | null {
 }
 
 function findMatchingRules(rules: FullPageRule[], url: string): FullPageRule[] {
-  const matches: Array<{ rule: FullPageRule; score: number; index: number }> = [];
+  const matches: Array<{ rule: FullPageRule; score: number; index: number }> =
+    [];
   rules.forEach((rule, index) => {
     const pattern = rule.pattern.trim();
     if (!pattern || pattern === GLOBAL_RULE_KEY) return;
@@ -598,7 +614,11 @@ function findMatchingRules(rules: FullPageRule[], url: string): FullPageRule[] {
       .split(/\n|,/)
       .map((item) => item.trim())
       .filter(Boolean)
-      .reduce((max, item) => wildcardIncludes(url, item) ? Math.max(max, item.length) : max, 0);
+      .reduce(
+        (max, item) =>
+          wildcardIncludes(url, item) ? Math.max(max, item.length) : max,
+        0,
+      );
     if (score > 0) matches.push({ rule, score, index });
   });
   return matches
@@ -606,14 +626,26 @@ function findMatchingRules(rules: FullPageRule[], url: string): FullPageRule[] {
     .map((match) => match.rule);
 }
 
-function mergeRules(baseRule: FullPageRule, overrideRule: FullPageRule | undefined): FullPageRule {
+function mergeRules(
+  baseRule: FullPageRule,
+  overrideRule: FullPageRule | undefined,
+): FullPageRule {
   if (!overrideRule) return { ...baseRule };
   const merged = { ...baseRule };
 
   merged.selector = mergeSelectors(baseRule.selector, overrideRule.selector);
-  merged.keepSelector = mergeSelectors(baseRule.keepSelector, overrideRule.keepSelector);
-  merged.rootsSelector = mergeSelectors(baseRule.rootsSelector, overrideRule.rootsSelector);
-  merged.ignoreSelector = mergeSelectors(baseRule.ignoreSelector, overrideRule.ignoreSelector);
+  merged.keepSelector = mergeSelectors(
+    baseRule.keepSelector,
+    overrideRule.keepSelector,
+  );
+  merged.rootsSelector = mergeSelectors(
+    baseRule.rootsSelector,
+    overrideRule.rootsSelector,
+  );
+  merged.ignoreSelector = mergeSelectors(
+    baseRule.ignoreSelector,
+    overrideRule.ignoreSelector,
+  );
   merged.richHtmlSelector = mergeSelectors(
     baseRule.richHtmlSelector ?? "",
     overrideRule.richHtmlSelector ?? "",
@@ -623,27 +655,41 @@ function mergeRules(baseRule: FullPageRule, overrideRule: FullPageRule | undefin
     overrideRule.richHtmlExcludeSelector ?? "",
   );
 
-  if (overrideRule.fromLang !== GLOBAL_RULE_KEY) merged.fromLang = overrideRule.fromLang;
-  if (overrideRule.toLang !== GLOBAL_RULE_KEY) merged.toLang = overrideRule.toLang;
-  if (overrideRule.transOpen !== GLOBAL_RULE_KEY) merged.transOpen = overrideRule.transOpen;
-  if (overrideRule.transOnly !== GLOBAL_RULE_KEY) merged.transOnly = overrideRule.transOnly;
-  if (overrideRule.autoScan !== GLOBAL_RULE_KEY) merged.autoScan = overrideRule.autoScan;
-  if (overrideRule.hasRichText !== GLOBAL_RULE_KEY) merged.hasRichText = overrideRule.hasRichText;
+  if (overrideRule.fromLang !== GLOBAL_RULE_KEY)
+    merged.fromLang = overrideRule.fromLang;
+  if (overrideRule.toLang !== GLOBAL_RULE_KEY)
+    merged.toLang = overrideRule.toLang;
+  if (overrideRule.transOpen !== GLOBAL_RULE_KEY)
+    merged.transOpen = overrideRule.transOpen;
+  if (overrideRule.transOnly !== GLOBAL_RULE_KEY)
+    merged.transOnly = overrideRule.transOnly;
+  if (overrideRule.autoScan !== GLOBAL_RULE_KEY)
+    merged.autoScan = overrideRule.autoScan;
+  if (overrideRule.hasRichText !== GLOBAL_RULE_KEY)
+    merged.hasRichText = overrideRule.hasRichText;
   if (overrideRule.hasShadowroot !== GLOBAL_RULE_KEY) {
     merged.hasShadowroot = overrideRule.hasShadowroot;
   }
-  if (overrideRule.scanAll !== GLOBAL_RULE_KEY) merged.scanAll = overrideRule.scanAll;
-  if (overrideRule.transTag !== GLOBAL_RULE_KEY) merged.transTag = overrideRule.transTag;
-  if (overrideRule.transTitle !== GLOBAL_RULE_KEY) merged.transTitle = overrideRule.transTitle;
+  if (overrideRule.scanAll !== GLOBAL_RULE_KEY)
+    merged.scanAll = overrideRule.scanAll;
+  if (overrideRule.transTag !== GLOBAL_RULE_KEY)
+    merged.transTag = overrideRule.transTag;
+  if (overrideRule.transTitle !== GLOBAL_RULE_KEY)
+    merged.transTitle = overrideRule.transTitle;
   if (overrideRule.splitParagraph !== GLOBAL_RULE_KEY) {
     merged.splitParagraph = overrideRule.splitParagraph;
   }
-  if (overrideRule.splitLength > 0) merged.splitLength = overrideRule.splitLength;
+  if (overrideRule.splitLength > 0)
+    merged.splitLength = overrideRule.splitLength;
 
-  if (overrideRule.textExtStyle.trim()) merged.textExtStyle = overrideRule.textExtStyle.trim();
-  if (overrideRule.selectStyle.trim()) merged.selectStyle = overrideRule.selectStyle.trim();
-  if (overrideRule.parentStyle.trim()) merged.parentStyle = overrideRule.parentStyle.trim();
-  if (overrideRule.grandStyle.trim()) merged.grandStyle = overrideRule.grandStyle.trim();
+  if (overrideRule.textExtStyle.trim())
+    merged.textExtStyle = overrideRule.textExtStyle.trim();
+  if (overrideRule.selectStyle.trim())
+    merged.selectStyle = overrideRule.selectStyle.trim();
+  if (overrideRule.parentStyle.trim())
+    merged.parentStyle = overrideRule.parentStyle.trim();
+  if (overrideRule.grandStyle.trim())
+    merged.grandStyle = overrideRule.grandStyle.trim();
   if (overrideRule.pattern.trim()) merged.pattern = overrideRule.pattern.trim();
 
   return merged;
@@ -655,7 +701,9 @@ function mergeSelectors(defaultValue: string, overrideValue: string): string {
 
   const base = splitSelectorList(defaultValue);
   const patch = splitSelectorList(override);
-  const patchMode = patch.some((item) => item.startsWith("+") || item.startsWith("-"));
+  const patchMode = patch.some(
+    (item) => item.startsWith("+") || item.startsWith("-"),
+  );
   if (!patchMode) {
     return Array.from(new Set(patch)).join(", ");
   }

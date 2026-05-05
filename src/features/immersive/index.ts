@@ -29,10 +29,7 @@ import {
   resolveFullPageRule,
   type ResolvedFullPageRule,
 } from "./rules";
-import {
-  matchesSelectorSafe,
-  querySelectorAllSafe,
-} from "./selectors";
+import { matchesSelectorSafe, querySelectorAllSafe } from "./selectors";
 import {
   appendInlineStyle,
   applyRuleStyles,
@@ -47,12 +44,12 @@ import {
 } from "./scan";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const BATCH_INTERVAL = 400;          // ms debounce before sending batch
-const BATCH_SIZE = 10;               // max texts per API call
-const BATCH_MAX_LENGTH = 10_000;     // max chars per API call
-const TRANS_MIN_LENGTH = 2;          // kiss-translator default
+const BATCH_INTERVAL = 400; // ms debounce before sending batch
+const BATCH_SIZE = 10; // max texts per API call
+const BATCH_MAX_LENGTH = 10_000; // max chars per API call
+const TRANS_MIN_LENGTH = 2; // kiss-translator default
 const TRANS_MAX_LENGTH = 100_000;
-const NEWLINE_LENGTH = 20;           // add <br> separator if text > 20 chars
+const NEWLINE_LENGTH = 20; // add <br> separator if text > 20 chars
 const NAVIGATION_CHECK_MS = 500;
 const NAVIGATION_RETRANSLATE_DELAY_MS = 800;
 const VIRTUAL_LAYOUT_REFRESH_DELAY_MS = 80;
@@ -174,7 +171,8 @@ class TranslateBatchQueue {
       if (
         batch.length >= BATCH_SIZE ||
         (batch.length > 0 && totalLen + task.text.length > BATCH_MAX_LENGTH)
-      ) break;
+      )
+        break;
       totalLen += task.text.length;
       batch.push(task);
     }
@@ -302,7 +300,9 @@ function applyCommandId(id: number | undefined): void {
   if (id !== undefined && id > lastCommandId) lastCommandId = id;
 }
 
-async function startPageTranslate(input: PageTranslateCommand): Promise<PageTranslateAck> {
+async function startPageTranslate(
+  input: PageTranslateCommand,
+): Promise<PageTranslateAck> {
   if (navigationTimer !== undefined) {
     window.clearTimeout(navigationTimer);
     navigationTimer = undefined;
@@ -317,7 +317,11 @@ async function startPageTranslate(input: PageTranslateCommand): Promise<PageTran
   preferredMode = mode;
   preferredEngine = currentEngine;
   preferredTarget = currentTarget;
-  lastTranslateInput = { target: currentRule.target, engine: currentRule.engine, mode };
+  lastTranslateInput = {
+    target: currentRule.target,
+    engine: currentRule.engine,
+    mode,
+  };
   ensureSiteLayoutStyles();
 
   const seq = ++runSeq;
@@ -382,7 +386,9 @@ function handleSettingsChanged(settings: Settings): void {
   reapplyTranslationInnerStyles(nextRule);
 }
 
-async function loadRule(input: PageTranslateCommand): Promise<ResolvedFullPageRule> {
+async function loadRule(
+  input: PageTranslateCommand,
+): Promise<ResolvedFullPageRule> {
   const [userRules, settings] = await Promise.all([
     getFullPageRules(),
     getSettings(),
@@ -421,8 +427,18 @@ function createBatchQueues(
   rule: ResolvedFullPageRule,
 ): Record<TranslateFormat, TranslateBatchQueue> {
   return {
-    text: new TranslateBatchQueue(rule.engine, rule.target, rule.source, "text"),
-    html: new TranslateBatchQueue(rule.engine, rule.target, rule.source, "html"),
+    text: new TranslateBatchQueue(
+      rule.engine,
+      rule.target,
+      rule.source,
+      "text",
+    ),
+    html: new TranslateBatchQueue(
+      rule.engine,
+      rule.target,
+      rule.source,
+      "html",
+    ),
   };
 }
 
@@ -468,7 +484,10 @@ function ensureObservers(): void {
         let hasText = false;
         for (const added of mutation.addedNodes) {
           if (shouldIgnoreMutationNode(added)) continue;
-          if (added.nodeType === Node.TEXT_NODE) { hasText = true; continue; }
+          if (added.nodeType === Node.TEXT_NODE) {
+            hasText = true;
+            continue;
+          }
           if (!(added instanceof Element)) continue;
           const shadow = getOpenOrClosedShadowRoot(added);
           if (shadow) startObserveShadowRoot(shadow);
@@ -486,9 +505,13 @@ function startObserveRoots(): void {
   if (!currentRule) return;
   ensureObservers();
   const selector = currentRule.rootsSelector || "body";
-  const roots = querySelectorAllSafe(document, selector)
-    .filter((r): r is HTMLElement => r instanceof HTMLElement);
-  const targets = roots.length > 0 ? roots : [document.body].filter(Boolean) as HTMLElement[];
+  const roots = querySelectorAllSafe(document, selector).filter(
+    (r): r is HTMLElement => r instanceof HTMLElement,
+  );
+  const targets =
+    roots.length > 0
+      ? roots
+      : ([document.body].filter(Boolean) as HTMLElement[]);
   targets.forEach(startObserveRoot);
   if (currentRule.scanAll || currentRule.hasShadowroot) {
     findAndObserveShadowRoots(document.body);
@@ -503,7 +526,10 @@ function startObserveRoot(root: ParentNode): void {
   if (rootNodes.has(root) || !mutationObserver) return;
   rootNodes.add(root);
   mutationObserver.observe(root, {
-    childList: true, subtree: true, characterData: true, characterDataOldValue: true,
+    childList: true,
+    subtree: true,
+    characterData: true,
+    characterDataOldValue: true,
   });
   if (rule.hasShadowroot && root instanceof Element) {
     findAndObserveShadowRoots(root);
@@ -528,7 +554,10 @@ function makeScanCtx(): ScanContext | null {
 
 // ── Core processing (kiss-translator #processNode / #translateNodeGroup) ───────
 
-async function scheduleProcessNode(node: HTMLElement, seq: number): Promise<void> {
+async function scheduleProcessNode(
+  node: HTMLElement,
+  seq: number,
+): Promise<void> {
   if (seq !== runSeq || !currentRule || !batchQueues) return;
   const rule = currentRule;
   if (!node.isConnected || shouldIgnoreNode(node, rule)) return;
@@ -574,7 +603,10 @@ function collectNodeGroups(
     if (shouldGroup && !shouldBreakGroup(node, rule)) {
       current.push(node);
     } else {
-      if (current.length > 0) { groups.push(current); current = []; }
+      if (current.length > 0) {
+        groups.push(current);
+        current = [];
+      }
     }
   }
   if (current.length > 0) groups.push(current);
@@ -582,13 +614,20 @@ function collectNodeGroups(
 }
 
 // Mirrors kiss-translator's #shouldBreak
-function shouldBreakGroup(node: ChildNode, rule: ResolvedFullPageRule): boolean {
+function shouldBreakGroup(
+  node: ChildNode,
+  rule: ResolvedFullPageRule,
+): boolean {
   if (!(node instanceof Element)) return false;
   if (matchesSelectorSafe(node, rule.keepSelector)) return false;
   if (!(node instanceof HTMLElement)) {
     return BREAK_LINE_TAGS.has((node as Element).tagName);
   }
-  if (BREAK_LINE_TAGS.has(node.tagName) || shouldIgnoreNode(node, rule) || isOurWrapper(node)) {
+  if (
+    BREAK_LINE_TAGS.has(node.tagName) ||
+    shouldIgnoreNode(node, rule) ||
+    isOurWrapper(node)
+  ) {
     return true;
   }
   if (rule.autoScan && isBlockNode(node)) return true;
@@ -614,7 +653,11 @@ function collectInlineSiblingRun(
   while (start > 0 && canJoinInlineRun(siblings[start - 1]!, rule)) start--;
 
   let end = nodeIndex;
-  while (end < siblings.length - 1 && canJoinInlineRun(siblings[end + 1]!, rule)) end++;
+  while (
+    end < siblings.length - 1 &&
+    canJoinInlineRun(siblings[end + 1]!, rule)
+  )
+    end++;
 
   const nodes = siblings.slice(start, end + 1);
   const processedHosts = nodes.filter(
@@ -624,7 +667,8 @@ function collectInlineSiblingRun(
 
   if (processedHosts.length < 2) return null;
   if (nodes.some(isInteractiveRunNode)) return null;
-  const isListRun = parent instanceof HTMLUListElement || parent instanceof HTMLOListElement;
+  const isListRun =
+    parent instanceof HTMLUListElement || parent instanceof HTMLOListElement;
   return {
     host: parent,
     nodes,
@@ -634,7 +678,10 @@ function collectInlineSiblingRun(
   };
 }
 
-function isInlineRunCandidate(el: HTMLElement, rule: ResolvedFullPageRule): boolean {
+function isInlineRunCandidate(
+  el: HTMLElement,
+  rule: ResolvedFullPageRule,
+): boolean {
   return (
     !!rule.selector &&
     matchesSelectorSafe(el, rule.selector) &&
@@ -644,7 +691,10 @@ function isInlineRunCandidate(el: HTMLElement, rule: ResolvedFullPageRule): bool
   );
 }
 
-function canJoinInlineRun(node: ChildNode, rule: ResolvedFullPageRule): boolean {
+function canJoinInlineRun(
+  node: ChildNode,
+  rule: ResolvedFullPageRule,
+): boolean {
   if (node.nodeType === Node.TEXT_NODE) {
     const text = node.nodeValue ?? "";
     return text === "" || INLINE_RUN_SEPARATOR_RE.test(text);
@@ -658,13 +708,16 @@ function canJoinInlineRun(node: ChildNode, rule: ResolvedFullPageRule): boolean 
 function isInteractiveRunNode(node: ChildNode): boolean {
   return (
     node instanceof HTMLElement &&
-    (isInsideInteractiveHost(node) || !!node.querySelector(INTERACTIVE_HOST_SELECTOR))
+    (isInsideInteractiveHost(node) ||
+      !!node.querySelector(INTERACTIVE_HOST_SELECTOR))
   );
 }
 
 function isInlineFlowElement(el: HTMLElement): boolean {
   const display = window.getComputedStyle(el).display;
-  return display === "contents" || display === "ruby" || display.startsWith("inline");
+  return (
+    display === "contents" || display === "ruby" || display.startsWith("inline")
+  );
 }
 
 function getNodesText(nodes: Iterable<Node>): string {
@@ -684,16 +737,27 @@ async function translateNodeGroup(
 
   const rule = currentRule;
   const format = options.format ?? pickSerializeFormat(host, nodes, rule);
-  const { html: serialized, placeholders } = serializeNodes(nodes, format, rule, {
-    separator: options.separator,
-  });
+  const { html: serialized, placeholders } = serializeNodes(
+    nodes,
+    format,
+    rule,
+    {
+      separator: options.separator,
+    },
+  );
   if (!serialized || isInvalidText(serialized)) return;
 
   const transOnly = shouldUseTranslationOnly(currentMode ?? "replace", rule);
   const hideMode = transOnly ? getOriginalHideMode(host) : undefined;
 
   // Create wrapper and insert after last original node (kiss-translator pattern)
-  const wrapper = createLoadingWrapper(serialized, transOnly, rule, host, hideMode);
+  const wrapper = createLoadingWrapper(
+    serialized,
+    transOnly,
+    rule,
+    host,
+    hideMode,
+  );
   let hiddenOriginal: HTMLElement | undefined;
   runWithMutedMutations(host, () => {
     const last = nodes[nodes.length - 1]!;
@@ -708,12 +772,19 @@ async function translateNodeGroup(
   });
   if (transOnly) scheduleVirtualizedLayoutRefresh();
   addHostWrapper(host, wrapper);
-  wrapperState.set(wrapper, { nodes, isHide: transOnly, host, hideMode, hiddenOriginal });
+  wrapperState.set(wrapper, {
+    nodes,
+    isHide: transOnly,
+    host,
+    hideMode,
+    hiddenOriginal,
+  });
   pendingCount++;
 
   try {
-    const translated = localTranslationCache.get(serialized)
-      ?? await batchQueues[format].addTask(serialized);
+    const translated =
+      localTranslationCache.get(serialized) ??
+      (await batchQueues[format].addTask(serialized));
     pendingCount = Math.max(0, pendingCount - 1);
 
     if (seq !== runSeq || !host.isConnected || !wrapper.isConnected) return;
@@ -729,7 +800,9 @@ async function translateNodeGroup(
 
     // Replace skeleton with actual translation
     runWithMutedMutations(host, () => {
-      const inner = wrapper.querySelector(`[${INNER_ATTR}]`) as HTMLElement | null;
+      const inner = wrapper.querySelector(
+        `[${INNER_ATTR}]`,
+      ) as HTMLElement | null;
       if (!inner) return;
       inner.removeAttribute("aria-busy");
       inner.textContent = "";
@@ -737,7 +810,13 @@ async function translateNodeGroup(
       const state = wrapperState.get(wrapper);
       const liveRule = currentRule ?? rule;
       if (state) {
-        applyWrapperMode(wrapper, host, state, currentMode ?? "replace", liveRule);
+        applyWrapperMode(
+          wrapper,
+          host,
+          state,
+          currentMode ?? "replace",
+          liveRule,
+        );
       }
     });
     if (wrapperState.get(wrapper)?.isHide) scheduleVirtualizedLayoutRefresh();
@@ -779,7 +858,10 @@ function createLoadingWrapper(
   }
 
   // Optional line-break before translation (hidden in transOnly, visible in bilingual)
-  if (wrapperTag === "span" && shouldStartTranslationOnNewLine(host, original)) {
+  if (
+    wrapperTag === "span" &&
+    shouldStartTranslationOnNewLine(host, original)
+  ) {
     const br = document.createElement("br");
     br.hidden = transOnly;
     wrapper.appendChild(br);
@@ -808,7 +890,10 @@ function isInsideInteractiveHost(host: HTMLElement): boolean {
   return !!host.closest(INTERACTIVE_HOST_SELECTOR);
 }
 
-function shouldStartTranslationOnNewLine(host: HTMLElement, original: string): boolean {
+function shouldStartTranslationOnNewLine(
+  host: HTMLElement,
+  original: string,
+): boolean {
   return original.length > NEWLINE_LENGTH || !isInlineFlowElement(host);
 }
 
@@ -876,7 +961,10 @@ function applyTranslationInnerModeStyles(
 
 function addHostWrapper(host: HTMLElement, wrapper: HTMLElement): void {
   let set = hostWrappers.get(host);
-  if (!set) { set = new Set(); hostWrappers.set(host, set); }
+  if (!set) {
+    set = new Set();
+    hostWrappers.set(host, set);
+  }
   set.add(wrapper);
   wrapperHosts.add(host);
 }
@@ -953,7 +1041,10 @@ function restoreWrapperNodes(wrapper: HTMLElement): void {
   state.isHide = false;
 }
 
-function restoreHiddenOriginalNodes(state: WrapperState, wrapper: HTMLElement): void {
+function restoreHiddenOriginalNodes(
+  state: WrapperState,
+  wrapper: HTMLElement,
+): void {
   const hidden = state.hiddenOriginal;
   const frag = document.createDocumentFragment();
   state.nodes.forEach((n) => frag.appendChild(n));
@@ -1002,7 +1093,8 @@ function switchAppliedMode(mode: PageTranslateMode): void {
         const state = wrapperState.get(wrapper);
         if (!state) continue;
 
-        layoutChanged = applyWrapperMode(wrapper, host, state, mode, rule) || layoutChanged;
+        layoutChanged =
+          applyWrapperMode(wrapper, host, state, mode, rule) || layoutChanged;
       }
     });
   }
@@ -1024,7 +1116,12 @@ function applyWrapperMode(
 
   if (transOnly && !state.isHide) {
     state.hideMode = getOriginalHideMode(host);
-    state.hiddenOriginal = hideOriginalNodes(state.nodes, host, state.hideMode, wrapper);
+    state.hiddenOriginal = hideOriginalNodes(
+      state.nodes,
+      host,
+      state.hideMode,
+      wrapper,
+    );
     state.isHide = true;
     layoutChanged = true;
   } else if (!transOnly && state.isHide) {
@@ -1060,9 +1157,17 @@ function reapplyTranslationInnerStyles(rule: ResolvedFullPageRule): void {
         const state = wrapperState.get(wrapper);
         if (!state) continue;
 
-        const inner = wrapper.querySelector(`[${INNER_ATTR}]`) as HTMLElement | null;
+        const inner = wrapper.querySelector(
+          `[${INNER_ATTR}]`,
+        ) as HTMLElement | null;
         if (inner) {
-          applyTranslationInnerStyles(inner, transOnly, host, state.hideMode, rule);
+          applyTranslationInnerStyles(
+            inner,
+            transOnly,
+            host,
+            state.hideMode,
+            rule,
+          );
         }
       }
     });
@@ -1073,7 +1178,11 @@ function reapplyTranslationInnerStyles(rule: ResolvedFullPageRule): void {
 
 // Mirrors kiss-translator's #cleanupAllNodes / #cleanupAllTranslations
 function cleanupAllTranslations(): void {
-  const hosts = new Set([...observedNodes, ...translatedHosts, ...wrapperHosts]);
+  const hosts = new Set([
+    ...observedNodes,
+    ...translatedHosts,
+    ...wrapperHosts,
+  ]);
   for (const host of hosts) cleanupHostNode(host);
   translatedHosts.clear();
   wrapperHosts.clear();
@@ -1098,7 +1207,10 @@ function cleanupHostNode(host: HTMLElement): void {
 }
 
 function stopObservation(): void {
-  if (rescanTimer !== undefined) { window.clearTimeout(rescanTimer); rescanTimer = undefined; }
+  if (rescanTimer !== undefined) {
+    window.clearTimeout(rescanTimer);
+    rescanTimer = undefined;
+  }
   if (virtualLayoutRefreshTimer !== undefined) {
     window.clearTimeout(virtualLayoutRefreshTimer);
     virtualLayoutRefreshTimer = undefined;
@@ -1147,7 +1259,10 @@ function rescanContainer(changedNode: Node): void {
 function findChangeContainer(startNode: Node): HTMLElement | null {
   let current: Node | null = startNode;
   while (current && current !== document.body) {
-    if (current instanceof HTMLElement && (observedNodes.has(current) || isBlockNode(current))) {
+    if (
+      current instanceof HTMLElement &&
+      (observedNodes.has(current) || isBlockNode(current))
+    ) {
       for (const root of rootNodes) {
         if (root instanceof Node && root.contains(current)) return current;
       }
@@ -1163,11 +1278,11 @@ function hasActiveTranslation(host: HTMLElement): boolean {
 }
 
 function findActiveTranslationHost(startNode: Node): HTMLElement | null {
-  let current: Element | null = startNode instanceof Element
-    ? startNode
-    : startNode.parentElement;
+  let current: Element | null =
+    startNode instanceof Element ? startNode : startNode.parentElement;
   while (current && current !== document.body) {
-    if (current instanceof HTMLElement && hasActiveTranslation(current)) return current;
+    if (current instanceof HTMLElement && hasActiveTranslation(current))
+      return current;
     current = current.parentElement;
   }
   return null;
@@ -1178,7 +1293,8 @@ function findActiveTranslationHost(startNode: Node): HTMLElement | null {
 function getStatus(): PageTranslateStatus {
   checkLocationChange();
   pruneDisconnectedNodes();
-  const blocks = observedNodes.size > 0 ? observedNodes.size : translatedHosts.size;
+  const blocks =
+    observedNodes.size > 0 ? observedNodes.size : translatedHosts.size;
   return {
     active: translatedHosts.size > 0 || pendingCount > 0,
     translating: pendingCount > 0,
@@ -1268,8 +1384,13 @@ function getCanonicalPathname(): string {
 
 function isDiscourseTopicPage(): boolean {
   if (!/^\/t\/.+\/\d+(?:\/\d+)?$/u.test(window.location.pathname)) return false;
-  const generator = document.querySelector('meta[name="generator"]')?.getAttribute("content") ?? "";
-  return /discourse/i.test(generator) || !!document.querySelector("#data-discourse-setup");
+  const generator =
+    document.querySelector('meta[name="generator"]')?.getAttribute("content") ??
+    "";
+  return (
+    /discourse/i.test(generator) ||
+    !!document.querySelector("#data-discourse-setup")
+  );
 }
 
 function scheduleVirtualizedLayoutRefresh(): void {
@@ -1320,7 +1441,11 @@ function handleSoftNavigation(): void {
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
-function appendLoadingLines(container: HTMLElement, original: string, inline: boolean): void {
+function appendLoadingLines(
+  container: HTMLElement,
+  original: string,
+  inline: boolean,
+): void {
   const lineCount = inline ? 1 : getLoadingLineCount(original);
   const seed = getLoadingAnimationSeed(original);
   for (let i = 0; i < lineCount; i++) {
@@ -1346,9 +1471,14 @@ function getLoadingLineCount(text: string): number {
   return 4;
 }
 
-function getBlockLoadingWidth(text: string, index: number, total: number): string {
+function getBlockLoadingWidth(
+  text: string,
+  index: number,
+  total: number,
+): string {
   if (total === 1) return `${Math.min(Math.max(text.length * 1.7, 18), 72)}%`;
-  if (index === total - 1) return `${Math.min(Math.max(38 + (text.length % 28), 34), 72)}%`;
+  if (index === total - 1)
+    return `${Math.min(Math.max(38 + (text.length % 28), 34), 72)}%`;
   return index % 2 === 0 ? "100%" : "94%";
 }
 
@@ -1360,21 +1490,22 @@ function getLoadingAnimationSeed(text: string): number {
   let hash = 0;
   const sample = text.slice(0, 96);
   for (let i = 0; i < sample.length; i++) {
-    hash = ((hash * 33) + sample.charCodeAt(i)) >>> 0;
+    hash = (hash * 33 + sample.charCodeAt(i)) >>> 0;
   }
   return hash;
 }
 
 function getLoadingAnimationDelay(seed: number, index: number): string {
-  return (-0.12 - ((seed + (index * 17)) % 9) * 0.11 - index * 0.09).toFixed(2);
+  return (-0.12 - ((seed + index * 17) % 9) * 0.11 - index * 0.09).toFixed(2);
 }
 
 function getLoadingAnimationDuration(seed: number, index: number): string {
-  return (1.6 + ((seed + (index * 13)) % 5) * 0.12).toFixed(2);
+  return (1.6 + ((seed + index * 13) % 5) * 0.12).toFixed(2);
 }
 
 function getLoadingPalette(): { base: string; flow: string } {
-  const bg = getSurfaceColor(document.body) ?? getSurfaceColor(document.documentElement);
+  const bg =
+    getSurfaceColor(document.body) ?? getSurfaceColor(document.documentElement);
   if (bg) {
     const luminance = (0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2]) / 255;
     if (luminance < 0.45) {
@@ -1384,11 +1515,15 @@ function getLoadingPalette(): { base: string; flow: string } {
   return { base: "rgba(0,0,0,0.055)", flow: "rgba(0,0,0,0.11)" };
 }
 
-function getSurfaceColor(el: HTMLElement | null): [number, number, number] | null {
+function getSurfaceColor(
+  el: HTMLElement | null,
+): [number, number, number] | null {
   if (!el) return null;
-  const match = window.getComputedStyle(el).backgroundColor.match(
-    /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([0-9.]+))?\)/,
-  );
+  const match = window
+    .getComputedStyle(el)
+    .backgroundColor.match(
+      /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([0-9.]+))?\)/,
+    );
   if (!match) return null;
   const alpha = match[4] ? parseFloat(match[4]) : 1;
   if (alpha === 0) return null;
@@ -1472,8 +1607,10 @@ function removeSiteLayoutStyles(): void {
 }
 
 function isWikipediaMainPage(): boolean {
-  return window.location.hostname === "en.wikipedia.org" &&
-    window.location.pathname === "/wiki/Main_Page";
+  return (
+    window.location.hostname === "en.wikipedia.org" &&
+    window.location.pathname === "/wiki/Main_Page"
+  );
 }
 
 // ── DOM utilities (mirrors kiss-translator static helpers) ────────────────────
@@ -1488,9 +1625,11 @@ function shouldUseTranslationOnly(
 // Kiss-translator's #isInvalidText
 function isInvalidText(text: string): boolean {
   const trimmed = text.trim();
-  if (trimmed.length < TRANS_MIN_LENGTH || trimmed.length > TRANS_MAX_LENGTH) return true;
+  if (trimmed.length < TRANS_MIN_LENGTH || trimmed.length > TRANS_MAX_LENGTH)
+    return true;
   if (trimmed.length === 1 && !/[a-zA-Z]/.test(trimmed)) return true;
-  if (!Number.isNaN(parseFloat(trimmed)) && Number.isFinite(Number(trimmed))) return true;
+  if (!Number.isNaN(parseFloat(trimmed)) && Number.isFinite(Number(trimmed)))
+    return true;
   return COMBINED_SKIP_RE.test(trimmed);
 }
 
@@ -1509,7 +1648,9 @@ function isQueueDestroyedError(err: unknown): boolean {
 
 function runWithMutedMutations(root: Node, run: () => void): void {
   mutedMutationRoots.add(root);
-  try { run(); } finally {
+  try {
+    run();
+  } finally {
     window.setTimeout(() => mutedMutationRoots.delete(root), 0);
   }
 }
@@ -1518,13 +1659,18 @@ function runWithMutedMutations(root: Node, run: () => void): void {
 
 function getOpenOrClosedShadowRoot(element: Element): ShadowRoot | null {
   if (element.shadowRoot) return element.shadowRoot;
-  const ff = (element as Element & { openOrClosedShadowRoot?: ShadowRoot | null })
-    .openOrClosedShadowRoot;
+  const ff = (
+    element as Element & { openOrClosedShadowRoot?: ShadowRoot | null }
+  ).openOrClosedShadowRoot;
   if (ff) return ff;
   if (!(element instanceof HTMLElement)) return null;
   const chromeFn = (
     globalThis as typeof globalThis & {
-      chrome?: { dom?: { openOrClosedShadowRoot?: (el: HTMLElement) => ShadowRoot | null } };
+      chrome?: {
+        dom?: {
+          openOrClosedShadowRoot?: (el: HTMLElement) => ShadowRoot | null;
+        };
+      };
     }
   ).chrome?.dom?.openOrClosedShadowRoot;
   if (!chromeFn) return null;
@@ -1543,4 +1689,3 @@ function findAndObserveShadowRoots(root: ParentNode): void {
     findAndObserveShadowRoots(shadow);
   }
 }
-

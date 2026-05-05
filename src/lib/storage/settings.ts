@@ -14,7 +14,13 @@ export interface EngineMap {
 export type HoverGranularity = "word" | "sentence" | "paragraph";
 export type FullPageMode = "replace" | "bilingual";
 export type TranslationFontFamily = "inherit" | "serif" | "sans" | "mono";
-export type TranslationColor = "inherit" | "muted" | "blue" | "green" | "red" | "custom";
+export type TranslationColor =
+  | "inherit"
+  | "muted"
+  | "blue"
+  | "green"
+  | "red"
+  | "custom";
 
 export interface TranslationStyle {
   underline: boolean;
@@ -31,7 +37,10 @@ export interface Settings {
   translationStyle: TranslationStyle;
 }
 
-export type SettingsPatch = Omit<Partial<Settings>, "engines" | "translationStyle"> & {
+export type SettingsPatch = Omit<
+  Partial<Settings>,
+  "engines" | "translationStyle"
+> & {
   engines?: Partial<EngineMap>;
   translationStyle?: Partial<TranslationStyle>;
 };

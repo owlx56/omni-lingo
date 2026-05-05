@@ -62,14 +62,14 @@ src/ui/          -> Solid UI 和 Shadow DOM 挂载辅助
 
 `src/features/immersive/` 按职责拆分：
 
-| 文件 | 负责 |
-| --- | --- |
-| `index.ts` | 会话状态、命令处理、observer 创建、rescan 队列、翻译 batching、wrapper 状态、恢复流程 |
-| `scan.ts` | DOM 发现、`ScanContext`、忽略判断、block / visibility 分类、扫描期规则样式 |
-| `markup.ts` | 序列化、占位符、rich HTML 恢复、译文 markup 插入 |
-| `rules.ts` | 默认 / 站点规则、规则匹配、规则解析 |
-| `selectors.ts` | 安全 selector helper |
-| `dom-attrs.ts` | 共享 `data-onelingo-*` wrapper 属性名 |
+| 文件           | 负责                                                                                  |
+| -------------- | ------------------------------------------------------------------------------------- |
+| `index.ts`     | 会话状态、命令处理、observer 创建、rescan 队列、翻译 batching、wrapper 状态、恢复流程 |
+| `scan.ts`      | DOM 发现、`ScanContext`、忽略判断、block / visibility 分类、扫描期规则样式            |
+| `markup.ts`    | 序列化、占位符、rich HTML 恢复、译文 markup 插入                                      |
+| `rules.ts`     | 默认 / 站点规则、规则匹配、规则解析                                                   |
+| `selectors.ts` | 安全 selector helper                                                                  |
+| `dom-attrs.ts` | 共享 `data-onelingo-*` wrapper 属性名                                                 |
 
 ### Immersive 流程
 

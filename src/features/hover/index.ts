@@ -8,7 +8,11 @@
 // 缓存共用：key = engine|src|tgt|text，全文翻译按相同粒度拆句即可命中。
 
 import { sendMessage } from "@/lib/messaging";
-import { getSettings, watchSettings, type HoverGranularity } from "@/lib/storage/settings";
+import {
+  getSettings,
+  watchSettings,
+  type HoverGranularity,
+} from "@/lib/storage/settings";
 
 const DWELL_MS = 1;
 const TOOLTIP_ATTR = "data-onelingo-tooltip";
@@ -23,13 +27,16 @@ type CaretDoc = Document & {
 };
 
 type HighlightCtor = new (range: Range) => unknown;
-type HighlightRegistry = { set(name: string, h: unknown): void; delete(name: string): void };
+type HighlightRegistry = {
+  set(name: string, h: unknown): void;
+  delete(name: string): void;
+};
 type CSSWithHighlights = typeof CSS & { highlights?: HighlightRegistry };
 
 interface TextHit {
-  text: string;   // 翻译单元（句子 or 段落）
-  rect: DOMRect;  // 词位置（tooltip 锚点）
-  range: Range;   // 高亮范围
+  text: string; // 翻译单元（句子 or 段落）
+  rect: DOMRect; // 词位置（tooltip 锚点）
+  range: Range; // 高亮范围
 }
 
 interface State {
@@ -37,7 +44,7 @@ interface State {
   engine: string;
   granularity: HoverGranularity;
   dwellTimer: number | null;
-  lastText: string | null;  // 上次翻译的文本（去重）
+  lastText: string | null; // 上次翻译的文本（去重）
   pendingX: number;
   pendingY: number;
   tooltip: HTMLDivElement | null;
@@ -58,7 +65,9 @@ export function initHover(): void {
     tooltip: null,
     seq: 0,
     wordSegmenter: new Intl.Segmenter(undefined, { granularity: "word" }),
-    sentenceSegmenter: new Intl.Segmenter(undefined, { granularity: "sentence" }),
+    sentenceSegmenter: new Intl.Segmenter(undefined, {
+      granularity: "sentence",
+    }),
   };
 
   void getSettings().then((s) => {
@@ -72,7 +81,9 @@ export function initHover(): void {
     state.granularity = s.hoverGranularity;
   });
 
-  document.addEventListener("mousemove", (e) => onMove(e, state), { passive: true });
+  document.addEventListener("mousemove", (e) => onMove(e, state), {
+    passive: true,
+  });
   document.addEventListener("mouseleave", () => dismiss(state));
   document.addEventListener("scroll", () => dismiss(state), { passive: true });
 }
@@ -90,7 +101,13 @@ function onMove(e: MouseEvent, s: State): void {
 
 function fire(s: State): void {
   s.dwellTimer = null;
-  const hit = hitAt(s.pendingX, s.pendingY, s.wordSegmenter, s.sentenceSegmenter, s.granularity);
+  const hit = hitAt(
+    s.pendingX,
+    s.pendingY,
+    s.wordSegmenter,
+    s.sentenceSegmenter,
+    s.granularity,
+  );
   if (!hit) {
     dismiss(s);
     return;
@@ -102,7 +119,11 @@ function fire(s: State): void {
   setHighlight(hit.range);
   const anchor = hit.rect;
 
-  sendMessage("translate", { text: hit.text, target: s.target, engine: s.engine })
+  sendMessage("translate", {
+    text: hit.text,
+    target: s.target,
+    engine: s.engine,
+  })
     .then((res) => {
       if (mySeq !== s.seq) return;
       show(s, res.text, anchor);
@@ -128,10 +149,16 @@ function hitAt(
   let offset = 0;
   if (doc.caretPositionFromPoint) {
     const p = doc.caretPositionFromPoint(x, y);
-    if (p) { node = p.offsetNode; offset = p.offset; }
+    if (p) {
+      node = p.offsetNode;
+      offset = p.offset;
+    }
   } else if (doc.caretRangeFromPoint) {
     const r = doc.caretRangeFromPoint(x, y);
-    if (r) { node = r.startContainer; offset = r.startOffset; }
+    if (r) {
+      node = r.startContainer;
+      offset = r.startOffset;
+    }
   }
   if (!node || node.nodeType !== Node.TEXT_NODE) return null;
   const textNode = node as Text;
@@ -195,7 +222,8 @@ function hitAt(
 }
 
 // block-level display 值判断（不含 inline-*）
-const BLOCK_RE = /^(block|flex|grid|list-item|table(?!-cell\b|-row\b)|table-cell|table-row)$/;
+const BLOCK_RE =
+  /^(block|flex|grid|list-item|table(?!-cell\b|-row\b)|table-cell|table-row)$/;
 
 function paragraphHit(textNode: Text, hitRect: DOMRect): TextHit | null {
   let el: Element | null = textNode.parentElement;
@@ -204,7 +232,8 @@ function paragraphHit(textNode: Text, hitRect: DOMRect): TextHit | null {
     if (BLOCK_RE.test(display)) break;
     el = el.parentElement;
   }
-  if (!el || el === document.documentElement || el === document.body) return null;
+  if (!el || el === document.documentElement || el === document.body)
+    return null;
 
   const paraText = (el as HTMLElement).innerText?.trim();
   if (!paraText) return null;

@@ -12,6 +12,8 @@ export async function setFullPageRules(rules: FullPageRule[]): Promise<void> {
   await storage.setItem<FullPageRule[]>(KEY, normalizeFullPageRules(rules));
 }
 
-export function watchFullPageRules(cb: (rules: FullPageRule[]) => void): () => void {
+export function watchFullPageRules(
+  cb: (rules: FullPageRule[]) => void,
+): () => void {
   return storage.watch<unknown>(KEY, (raw) => cb(normalizeFullPageRules(raw)));
 }
