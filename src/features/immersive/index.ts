@@ -970,7 +970,6 @@ function applyTranslationInnerModeStyles(
 ): void {
   inner.style.visibility = "visible";
   if (!transOnly) {
-    inner.style.color = "#6b7280";
     inner.style.fontSize = "0.95em";
     inner.style.lineHeight = "1.55";
     return;
