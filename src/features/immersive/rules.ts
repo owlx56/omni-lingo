@@ -398,7 +398,7 @@ export const BUILTIN_FULL_PAGE_RULES: FullPageRule[] = [
       "dd.series > span.series, #series li > span.series",
     rootsSelector: "#main, .wrapper",
     ignoreSelector:
-      "button, nav, header, footer, .landmark, .actions, .navigation, .share, .download",
+      "button, nav, header, footer, .landmark, .actions, .navigation, .share, .download, .resp-sharing-button__link, .resp-sharing-button",
     fromLang: GLOBAL_RULE_KEY,
     toLang: GLOBAL_RULE_KEY,
     transOpen: GLOBAL_RULE_KEY,
