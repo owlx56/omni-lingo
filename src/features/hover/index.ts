@@ -57,7 +57,7 @@ export function initHover(): void {
   const state: State = {
     target: "zh",
     engine: "google",
-    granularity: "sentence",
+    granularity: "word",
     dwellTimer: null,
     lastText: null,
     pendingX: 0,

@@ -48,7 +48,7 @@ export type SettingsPatch = Omit<
 const DEFAULTS: Settings = {
   targetLang: "zh",
   engines: { hover: "google", selection: "google", fullPage: "google2" },
-  hoverGranularity: "sentence",
+  hoverGranularity: "word",
   fullPageMode: "replace",
   translationStyle: {
     underline: false,
