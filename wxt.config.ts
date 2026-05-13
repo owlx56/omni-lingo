@@ -1,7 +1,13 @@
 import { defineConfig } from "wxt";
 
-function ensureScriptSrcOrigin(csp: string | undefined, origin: string): string {
-  const parts = (csp ?? "").split(";").map((part) => part.trim()).filter(Boolean);
+function ensureScriptSrcOrigin(
+  csp: string | undefined,
+  origin: string,
+): string {
+  const parts = (csp ?? "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
   let foundScriptSrc = false;
 
   for (let i = 0; i < parts.length; i++) {
@@ -57,10 +63,7 @@ export default defineConfig({
         csp.extension_pages,
         "http://localhost:3000",
       );
-      csp.sandbox = ensureScriptSrcOrigin(
-        csp.sandbox,
-        "http://localhost:3000",
-      );
+      csp.sandbox = ensureScriptSrcOrigin(csp.sandbox, "http://localhost:3000");
     },
   },
   webExt: {
