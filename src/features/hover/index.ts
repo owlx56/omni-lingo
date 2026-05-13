@@ -8,13 +8,14 @@
 // 缓存共用：key = engine|src|tgt|text，全文翻译按相同粒度拆句即可命中。
 
 import { sendMessage } from "@/lib/messaging";
+import type { TranslateResponse } from "@/engines/types";
 import {
   getSettings,
   watchSettings,
   type HoverGranularity,
 } from "@/lib/storage/settings";
 
-const DWELL_MS = 1;
+const TRANSLATE_DELAY_MS = 10;
 const TOOLTIP_ATTR = "data-onelingo-tooltip";
 const HIGHLIGHT_NAME = "onelingo-hover";
 
@@ -43,14 +44,18 @@ interface State {
   target: string;
   engine: string;
   granularity: HoverGranularity;
-  dwellTimer: number | null;
+  translateTimer: number | null;
   lastText: string | null; // 上次翻译的文本（去重）
-  pendingX: number;
-  pendingY: number;
   tooltip: HTMLDivElement | null;
   seq: number;
   wordSegmenter: Intl.Segmenter;
   sentenceSegmenter: Intl.Segmenter;
+}
+
+interface HoverTranslateRequest {
+  text: string;
+  target: string;
+  engine: string;
 }
 
 export function initHover(): void {
@@ -58,10 +63,8 @@ export function initHover(): void {
     target: "zh",
     engine: "google",
     granularity: "word",
-    dwellTimer: null,
+    translateTimer: null,
     lastText: null,
-    pendingX: 0,
-    pendingY: 0,
     tooltip: null,
     seq: 0,
     wordSegmenter: new Intl.Segmenter(undefined, { granularity: "word" }),
@@ -93,17 +96,9 @@ function onMove(e: MouseEvent, s: State): void {
     dismiss(s);
     return;
   }
-  s.pendingX = e.clientX;
-  s.pendingY = e.clientY;
-  clearTimer(s);
-  s.dwellTimer = window.setTimeout(() => fire(s), DWELL_MS);
-}
-
-function fire(s: State): void {
-  s.dwellTimer = null;
   const hit = hitAt(
-    s.pendingX,
-    s.pendingY,
+    e.clientX,
+    e.clientY,
     s.wordSegmenter,
     s.sentenceSegmenter,
     s.granularity,
@@ -113,24 +108,45 @@ function fire(s: State): void {
     return;
   }
   if (hit.text === s.lastText) return; // 同一翻译单元内移动不重发
+  clearTimer(s);
   s.lastText = hit.text;
   const mySeq = ++s.seq;
 
   setHighlight(hit.range);
-  const anchor = hit.rect;
-
-  sendMessage("translate", {
+  const req = {
     text: hit.text,
     target: s.target,
     engine: s.engine,
-  })
+  };
+  const cached = sendMessage("peekTranslateMemoryCache", req).catch(() => null);
+  s.translateTimer = window.setTimeout(() => {
+    s.translateTimer = null;
+    void finishTranslate(s, mySeq, req, hit.rect, cached);
+  }, TRANSLATE_DELAY_MS);
+}
+
+async function finishTranslate(
+  s: State,
+  seq: number,
+  req: HoverTranslateRequest,
+  anchor: DOMRect,
+  cached: Promise<TranslateResponse | null>,
+): Promise<void> {
+  if (seq !== s.seq) return;
+  const hit = await cached;
+  if (seq !== s.seq) return;
+  if (hit) {
+    show(s, hit.text, anchor);
+    return;
+  }
+  sendMessage("translate", req)
     .then((res) => {
-      if (mySeq !== s.seq) return;
+      if (seq !== s.seq) return;
       show(s, res.text, anchor);
     })
     .catch((e: unknown) => {
       console.warn("[OneLingo] hover translate failed:", e);
-      if (mySeq === s.seq) dismiss(s);
+      if (seq === s.seq) dismiss(s);
     });
 }
 
@@ -297,9 +313,9 @@ function dismiss(s: State): void {
 }
 
 function clearTimer(s: State): void {
-  if (s.dwellTimer !== null) {
-    clearTimeout(s.dwellTimer);
-    s.dwellTimer = null;
+  if (s.translateTimer !== null) {
+    clearTimeout(s.translateTimer);
+    s.translateTimer = null;
   }
 }
 

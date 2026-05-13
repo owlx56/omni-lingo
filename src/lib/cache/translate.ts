@@ -17,6 +17,13 @@ export function cacheKey(engine: string, req: TranslateRequest): string {
   return `${engine}|${req.format ?? "text"}|${req.source ?? "auto"}|${req.target}|${req.text}`;
 }
 
+export function peekTranslateMemoryCache(
+  engine: string,
+  req: TranslateRequest,
+): TranslateResponse | undefined {
+  return cache.get(cacheKey(engine, req));
+}
+
 export async function translateCached(
   engine: string,
   req: TranslateRequest,

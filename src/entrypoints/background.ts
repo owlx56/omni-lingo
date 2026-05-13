@@ -1,6 +1,10 @@
 import { onMessage, sendTabMessage } from "@/lib/messaging";
 import { DEFAULT_ENGINE_ID, getEngine } from "@/engines/registry";
-import { translateCached, translateCachedBatch } from "@/lib/cache/translate";
+import {
+  peekTranslateMemoryCache,
+  translateCached,
+  translateCachedBatch,
+} from "@/lib/cache/translate";
 
 export default defineBackground(() => {
   console.log("[OneLingo] background ready");
@@ -11,6 +15,11 @@ export default defineBackground(() => {
     const id = engine ?? DEFAULT_ENGINE_ID;
     const e = getEngine(id);
     return translateCached(id, req, () => e.translate(req));
+  });
+
+  onMessage("peekTranslateMemoryCache", ({ engine, ...req }) => {
+    const id = engine ?? DEFAULT_ENGINE_ID;
+    return peekTranslateMemoryCache(id, req) ?? null;
   });
 
   onMessage(

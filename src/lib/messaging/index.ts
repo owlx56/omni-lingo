@@ -51,6 +51,10 @@ export interface ProtocolMap {
     input: TranslateRequest & { engine?: string };
     output: TranslateResponse;
   };
+  peekTranslateMemoryCache: {
+    input: TranslateRequest & { engine?: string };
+    output: TranslateResponse | null;
+  };
   translatePage: {
     input: PageTranslateCommand;
     output: PageTranslateAck;
