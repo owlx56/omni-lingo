@@ -46,6 +46,7 @@ import {
 // ── Constants ─────────────────────────────────────────────────────────────────
 const BATCH_INTERVAL = 400; // ms debounce before sending batch
 const BATCH_SIZE = 10; // max texts per API call
+const BATCH_CONCURRENCY = 3;
 const BATCH_MAX_LENGTH = 10_000; // max chars per API call
 const TRANS_MIN_LENGTH = 2; // kiss-translator default
 const TRANS_MAX_LENGTH = 100_000;
@@ -129,7 +130,7 @@ interface BatchTask {
 class TranslateBatchQueue {
   private readonly queue: BatchTask[] = [];
   private timer: number | undefined;
-  private processing = false;
+  private activeCount = 0;
 
   constructor(
     readonly engine: string,
@@ -142,7 +143,7 @@ class TranslateBatchQueue {
     return new Promise((resolve, reject) => {
       this.queue.push({ text, resolve, reject });
       if (this.queue.length >= BATCH_SIZE) {
-        void this.flush();
+        this.drain(false);
       } else {
         this.schedule();
       }
@@ -150,20 +151,42 @@ class TranslateBatchQueue {
   }
 
   private schedule(): void {
-    if (!this.processing && this.timer === undefined && this.queue.length > 0) {
-      this.timer = window.setTimeout(() => void this.flush(), BATCH_INTERVAL);
+    if (this.timer === undefined && this.queue.length > 0) {
+      this.timer = window.setTimeout(() => {
+        this.timer = undefined;
+        this.drain(true);
+      }, BATCH_INTERVAL);
     }
   }
 
-  private async flush(): Promise<void> {
-    if (this.timer !== undefined) {
+  private drain(force: boolean): void {
+    if (this.queue.length === 0 || this.activeCount >= BATCH_CONCURRENCY) {
+      return;
+    }
+
+    if (
+      this.timer !== undefined &&
+      (force || this.queue.length >= BATCH_SIZE)
+    ) {
       window.clearTimeout(this.timer);
       this.timer = undefined;
     }
-    if (this.queue.length === 0 || this.processing) return;
 
-    this.processing = true;
+    while (this.activeCount < BATCH_CONCURRENCY && this.queue.length > 0) {
+      if (!force && this.queue.length < BATCH_SIZE) break;
 
+      const batch = this.takeBatch();
+      if (batch.length === 0) break;
+
+      this.activeCount++;
+      void this.flush(batch);
+      if (this.queue.length < BATCH_SIZE) force = false;
+    }
+
+    if (this.queue.length > 0) this.schedule();
+  }
+
+  private takeBatch(): BatchTask[] {
     // Collect batch respecting size + length limits
     const batch: BatchTask[] = [];
     let totalLen = 0;
@@ -177,7 +200,10 @@ class TranslateBatchQueue {
       batch.push(task);
     }
     this.queue.splice(0, batch.length);
+    return batch;
+  }
 
+  private async flush(batch: BatchTask[]): Promise<void> {
     try {
       const results = await sendMessage("translateBatch", {
         texts: batch.map((t) => t.text),
@@ -190,9 +216,9 @@ class TranslateBatchQueue {
     } catch (err) {
       batch.forEach((task) => task.reject(err));
     } finally {
-      this.processing = false;
+      this.activeCount = Math.max(0, this.activeCount - 1);
       if (this.queue.length >= BATCH_SIZE) {
-        void this.flush();
+        this.drain(false);
       } else if (this.queue.length > 0) {
         this.schedule();
       }
@@ -583,10 +609,12 @@ async function scheduleProcessNode(
   const childList = Array.from(node.childNodes).filter((c) => !isOurWrapper(c));
   const groups = collectNodeGroups(childList, rule);
 
+  const tasks: Promise<void>[] = [];
   for (const group of groups) {
     if (seq !== runSeq || !node.isConnected) return;
-    await translateNodeGroup(group, node, seq);
+    tasks.push(translateNodeGroup(group, node, seq));
   }
+  await Promise.all(tasks);
 }
 
 // Mirrors kiss-translator's inline node grouping in #processNode
