@@ -693,10 +693,10 @@ function collectInlineSiblingRun(
       child instanceof HTMLElement && isInlineRunCandidate(child, rule),
   );
 
-  if (processedHosts.length < 2) return null;
-  if (nodes.some(isInteractiveRunNode)) return null;
   const isListRun =
     parent instanceof HTMLUListElement || parent instanceof HTMLOListElement;
+  if (processedHosts.length < 2) return null;
+  if (!isListRun && nodes.some(isInteractiveRunNode)) return null;
   return {
     host: parent,
     nodes,
@@ -1566,6 +1566,13 @@ function ensureLoadingStyles(): void {
   contain: content;
   pointer-events: none;
   user-select: none;
+}
+[${WRAPPER_ATTR}] [${INNER_ATTR}] a {
+  color: inherit !important;
+}
+[${WRAPPER_ATTR}]::before,
+[${WRAPPER_ATTR}]::after {
+  content: none !important;
 }
 [${WRAPPER_ATTR}] [${INNER_ATTR}][aria-busy="true"] .onelingo-immersive-loading-line {
   display: block;
