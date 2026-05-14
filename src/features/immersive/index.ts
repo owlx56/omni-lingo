@@ -58,6 +58,8 @@ const VIRTUAL_LAYOUT_REFRESH_DELAY_MS = 80;
 const LOADING_STYLE_ID = "onelingo-immersive-loading-style";
 const MAIN_PAGE_LAYOUT_STYLE_ID = "onelingo-wikipedia-main-page-layout-style";
 const HIDDEN_ORIGINAL_ATTR = "data-onelingo-hidden-original";
+const SINGLE_MODE_TOGGLE_ATTR = "data-onelingo-single-mode-toggle";
+const ORIGINAL_PEEK_ATTR = "data-onelingo-original-peek";
 const LOADING_BASE_VAR = "--onelingo-loading-base";
 const LOADING_FLOW_VAR = "--onelingo-loading-flow";
 const INLINE_RUN_SEPARATOR_RE = /^[\s,.;:|/\\()[\]{}·•●‧・\-–—←→]+$/u;
@@ -72,6 +74,16 @@ const INTERACTIVE_HOST_SELECTOR = [
   "[role='menuitem']",
   "[role='tab']",
   "[onclick]",
+].join(", ");
+const SINGLE_MODE_TOGGLE_IGNORE_SELECTOR = [
+  INTERACTIVE_HOST_SELECTOR,
+  "input",
+  "textarea",
+  "select",
+  "option",
+  "audio",
+  "video",
+  "[contenteditable]:not([contenteditable='false'])",
 ].join(", ");
 
 // ── Skip patterns (from kiss-translator BUILTIN_SKIP_PATTERNS) ────────────────
@@ -101,6 +113,7 @@ const BREAK_LINE_TAGS = new Set(["BR", "WBR"]);
 // ── Types ─────────────────────────────────────────────────────────────────────
 type PageTranslateMode = NonNullable<PageTranslateCommand["mode"]>;
 type OriginalHideMode = "detached" | "collapsed";
+type SingleModeView = "translation" | "original";
 
 interface WrapperState {
   nodes: ChildNode[];
@@ -108,6 +121,7 @@ interface WrapperState {
   host: HTMLElement;
   hideMode?: OriginalHideMode;
   hiddenOriginal?: HTMLElement;
+  singleModeView?: SingleModeView;
 }
 
 interface InlineSiblingRun {
@@ -265,6 +279,7 @@ let virtualLayoutRefreshTimer: number | undefined;
 const processedNodes = new WeakMap<HTMLElement, ResolvedFullPageRule>();
 const hostWrappers = new WeakMap<HTMLElement, Set<HTMLElement>>();
 const wrapperState = new WeakMap<HTMLElement, WrapperState>();
+const originalPeekWrappers = new WeakMap<HTMLElement, HTMLElement>();
 
 // Live node sets
 const observedNodes = new Set<HTMLElement>();
@@ -280,11 +295,13 @@ const localTranslationCache = new Map<string, string>();
 
 // Mutation guard
 const mutedMutationRoots = new Set<Node>();
+let singleModeToggleListenerInstalled = false;
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export function initFullPage(): void {
   installNavigationWatcher();
+  installSingleModeToggleListener();
   ensureObservers();
   void watchSettings(handleSettingsChanged);
 
@@ -806,6 +823,7 @@ async function translateNodeGroup(
     host,
     hideMode,
     hiddenOriginal,
+    singleModeView: "translation",
   });
   pendingCount++;
 
@@ -1054,9 +1072,11 @@ function moveNodesToFragment(nodes: ChildNode[]): void {
 function restoreWrapperNodes(wrapper: HTMLElement): void {
   const state = wrapperState.get(wrapper);
   if (!state || !state.isHide) return;
-  if (state.hideMode === "collapsed") {
+  wrapper.hidden = false;
+  if (state.hiddenOriginal) {
     restoreHiddenOriginalNodes(state, wrapper);
     state.isHide = false;
+    state.singleModeView = "translation";
     return;
   }
   const parent = wrapper.parentElement;
@@ -1066,6 +1086,7 @@ function restoreWrapperNodes(wrapper: HTMLElement): void {
     parent.insertBefore(frag, wrapper);
   }
   state.isHide = false;
+  state.singleModeView = "translation";
 }
 
 function restoreHiddenOriginalNodes(
@@ -1077,11 +1098,187 @@ function restoreHiddenOriginalNodes(
   state.nodes.forEach((n) => frag.appendChild(n));
   if (hidden?.parentNode) {
     hidden.parentNode.insertBefore(frag, hidden);
+    originalPeekWrappers.delete(hidden);
     hidden.remove();
   } else {
     wrapper.parentNode?.insertBefore(frag, wrapper);
   }
   state.hiddenOriginal = undefined;
+}
+
+function installSingleModeToggleListener(): void {
+  if (singleModeToggleListenerInstalled) return;
+  document.addEventListener("click", handleSingleModeToggleClick, true);
+  singleModeToggleListenerInstalled = true;
+}
+
+function handleSingleModeToggleClick(event: MouseEvent): void {
+  if (currentMode !== "replace") return;
+  const target = event.target;
+  if (!(target instanceof Node)) return;
+  if (shouldIgnoreSingleModeToggleTarget(target)) return;
+
+  const element =
+    target instanceof Element ? target : target.parentElement;
+  if (!element) return;
+
+  const original = element.closest(`[${ORIGINAL_PEEK_ATTR}="true"]`);
+  if (original instanceof HTMLElement) {
+    const wrapper = originalPeekWrappers.get(original);
+    const state = wrapper ? wrapperState.get(wrapper) : undefined;
+    if (wrapper && state && showTranslationForSingleMode(wrapper, state)) {
+      event.preventDefault();
+      event.stopPropagation();
+      scheduleVirtualizedLayoutRefresh();
+    }
+    return;
+  }
+
+  const wrapper = element.closest(
+    `[${WRAPPER_ATTR}="true"][${SINGLE_MODE_TOGGLE_ATTR}="true"]`,
+  );
+  if (!(wrapper instanceof HTMLElement)) return;
+  const state = wrapperState.get(wrapper);
+  if (!state || !showOriginalForSingleMode(wrapper, state)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  scheduleVirtualizedLayoutRefresh();
+}
+
+function shouldIgnoreSingleModeToggleTarget(target: Node): boolean {
+  const element = target instanceof Element ? target : target.parentElement;
+  return !!element?.closest(SINGLE_MODE_TOGGLE_IGNORE_SELECTOR);
+}
+
+function updateSingleModeToggleState(
+  wrapper: HTMLElement,
+  state: WrapperState,
+): void {
+  if (canUseSingleModeToggle(wrapper, state)) {
+    wrapper.setAttribute(SINGLE_MODE_TOGGLE_ATTR, "true");
+  } else {
+    wrapper.removeAttribute(SINGLE_MODE_TOGGLE_ATTR);
+  }
+}
+
+function canUseSingleModeToggle(
+  wrapper: HTMLElement,
+  state: WrapperState,
+): boolean {
+  if (
+    currentMode !== "replace" ||
+    !state.isHide ||
+    state.singleModeView === "original" ||
+    !wrapper.isConnected ||
+    !isTranslatedWrapperReady(wrapper)
+  ) {
+    return false;
+  }
+  if (state.hideMode === "collapsed") return !!state.hiddenOriginal;
+  return canCreateOriginalPeekContainer(state.host);
+}
+
+function isTranslatedWrapperReady(wrapper: HTMLElement): boolean {
+  const inner = wrapper.querySelector(`[${INNER_ATTR}]`);
+  return (
+    inner instanceof HTMLElement && inner.getAttribute("aria-busy") !== "true"
+  );
+}
+
+function canCreateOriginalPeekContainer(host: HTMLElement): boolean {
+  return !(host instanceof HTMLUListElement || host instanceof HTMLOListElement);
+}
+
+function showOriginalForSingleMode(
+  wrapper: HTMLElement,
+  state: WrapperState,
+): boolean {
+  if (!canUseSingleModeToggle(wrapper, state)) return false;
+  runWithMutedMutations(state.host, () => {
+    const original =
+      state.hideMode === "collapsed"
+        ? state.hiddenOriginal
+        : createDetachedOriginalPeek(wrapper, state);
+    if (!original) return;
+    original.hidden = false;
+    original.style.removeProperty("display");
+    original.setAttribute(ORIGINAL_PEEK_ATTR, "true");
+    originalPeekWrappers.set(original, wrapper);
+    wrapper.hidden = true;
+    wrapper.removeAttribute(SINGLE_MODE_TOGGLE_ATTR);
+    state.singleModeView = "original";
+  });
+  return state.singleModeView === "original";
+}
+
+function showTranslationForSingleMode(
+  wrapper: HTMLElement,
+  state: WrapperState,
+): boolean {
+  if (
+    currentMode !== "replace" ||
+    !state.isHide ||
+    state.singleModeView !== "original"
+  ) {
+    return false;
+  }
+  let changed = false;
+  runWithMutedMutations(state.host, () => {
+    hideOriginalForSingleMode(wrapper, state);
+    updateSingleModeToggleState(wrapper, state);
+    changed = true;
+  });
+  return changed;
+}
+
+function resetSingleModeToggle(
+  wrapper: HTMLElement,
+  state: WrapperState,
+): boolean {
+  const wasOriginal = state.singleModeView === "original";
+  if (wasOriginal) hideOriginalForSingleMode(wrapper, state);
+  wrapper.removeAttribute(SINGLE_MODE_TOGGLE_ATTR);
+  if (state.hiddenOriginal && state.hideMode === "collapsed") {
+    state.hiddenOriginal.removeAttribute(ORIGINAL_PEEK_ATTR);
+    originalPeekWrappers.delete(state.hiddenOriginal);
+  }
+  state.singleModeView = "translation";
+  return wasOriginal;
+}
+
+function createDetachedOriginalPeek(
+  wrapper: HTMLElement,
+  state: WrapperState,
+): HTMLElement | undefined {
+  if (state.hiddenOriginal) return state.hiddenOriginal;
+  const parent = wrapper.parentNode;
+  if (!parent) return undefined;
+  const original = document.createElement("span");
+  parent.insertBefore(original, wrapper);
+  state.nodes.forEach((node) => original.appendChild(node));
+  state.hiddenOriginal = original;
+  return original;
+}
+
+function hideOriginalForSingleMode(
+  wrapper: HTMLElement,
+  state: WrapperState,
+): void {
+  const original = state.hiddenOriginal;
+  if (original) {
+    original.removeAttribute(ORIGINAL_PEEK_ATTR);
+    originalPeekWrappers.delete(original);
+    if (state.hideMode === "collapsed") {
+      original.hidden = true;
+      original.style.display = "none";
+    } else {
+      moveNodesToFragment(state.nodes);
+      original.remove();
+      state.hiddenOriginal = undefined;
+    }
+  }
+  wrapper.hidden = false;
+  state.singleModeView = "translation";
 }
 
 // ── Mode switching ────────────────────────────────────────────────────────────
@@ -1136,7 +1333,7 @@ function applyWrapperMode(
   rule: ResolvedFullPageRule,
 ): boolean {
   const transOnly = shouldUseTranslationOnly(mode, rule);
-  let layoutChanged = false;
+  let layoutChanged = resetSingleModeToggle(wrapper, state);
 
   const br = wrapper.querySelector(":scope > br");
   if (br instanceof HTMLElement) br.hidden = transOnly;
@@ -1161,6 +1358,7 @@ function applyWrapperMode(
     applyTranslationInnerStyles(inner, transOnly, host, state.hideMode, rule);
   }
 
+  updateSingleModeToggleState(wrapper, state);
   return layoutChanged;
 }
 
