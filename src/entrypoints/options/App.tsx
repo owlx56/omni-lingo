@@ -2,6 +2,7 @@ import { For } from "solid-js";
 import {
   resolveTranslationStyleColor,
   resolveTranslationStyleFontFamily,
+  resolveTranslationStyleTextDecoration,
 } from "@/lib/translation-style";
 import {
   setSettings,
@@ -11,6 +12,7 @@ import {
   type HoverGranularity,
   type TranslationColor,
   type TranslationFontFamily,
+  type TranslationUnderlineStyle,
 } from "@/lib/storage/settings";
 
 const ENGINES: { value: FullPageEngineId; label: string; note: string }[] = [
@@ -56,6 +58,17 @@ const COLORS: { value: TranslationColor; label: string; color?: string }[] = [
   { value: "green", label: "绿色", color: "#047857" },
   { value: "red", label: "红色", color: "#dc2626" },
   { value: "custom", label: "自定义" },
+];
+
+const UNDERLINE_STYLES: {
+  value: TranslationUnderlineStyle;
+  label: string;
+  note: string;
+}[] = [
+  { value: "none", label: "无样式", note: "默认不添加下划线" },
+  { value: "solid", label: "实线", note: "普通下划线" },
+  { value: "dotted", label: "点线", note: "点状下划线" },
+  { value: "wavy", label: "波浪线", note: "波浪下划线" },
 ];
 
 function OptionButton(props: {
@@ -177,20 +190,24 @@ function App() {
       <section class="section">
         <h2>译文样式</h2>
         <div class="style-panel">
-          <div class="style-row">
+          <div class="style-block">
             <span class="style-label">下划线</span>
-            <button
-              class="toggle-button"
-              classList={{ active: settings().translationStyle.underline }}
-              onClick={() =>
-                setTranslationStyle({
-                  underline: !settings().translationStyle.underline,
-                })
-              }
-              type="button"
-            >
-              {settings().translationStyle.underline ? "开启" : "关闭"}
-            </button>
+            <div class="option-grid compact">
+              <For each={UNDERLINE_STYLES}>
+                {(item) => (
+                  <OptionButton
+                    active={
+                      settings().translationStyle.underlineStyle === item.value
+                    }
+                    label={item.label}
+                    note={item.note}
+                    onClick={() =>
+                      setTranslationStyle({ underlineStyle: item.value })
+                    }
+                  />
+                )}
+              </For>
+            </div>
           </div>
 
           <div class="style-block">
@@ -253,9 +270,9 @@ function App() {
               "font-family": resolveTranslationStyleFontFamily(
                 settings().translationStyle.fontFamily,
               ),
-              "text-decoration": settings().translationStyle.underline
-                ? "underline"
-                : "none",
+              "text-decoration": resolveTranslationStyleTextDecoration(
+                settings().translationStyle,
+              ),
             }}
           >
             译文预览 Translation preview

@@ -21,13 +21,22 @@ export type TranslationColor =
   | "green"
   | "red"
   | "custom";
+export type TranslationUnderlineStyle =
+  | "none"
+  | "solid"
+  | "dotted"
+  | "wavy";
 
 export interface TranslationStyle {
-  underline: boolean;
+  underlineStyle: TranslationUnderlineStyle;
   fontFamily: TranslationFontFamily;
   color: TranslationColor;
   customColor: string;
 }
+
+type LegacyTranslationStyle = Partial<TranslationStyle> & {
+  underline?: boolean;
+};
 
 export interface Settings {
   targetLang: "zh" | "en";
@@ -51,7 +60,7 @@ const DEFAULTS: Settings = {
   hoverGranularity: "word",
   fullPageMode: "replace",
   translationStyle: {
-    underline: false,
+    underlineStyle: "none",
     fontFamily: "inherit",
     color: "inherit",
     customColor: "#2563eb",
@@ -63,11 +72,33 @@ const KEY = "sync:settings" as const;
 function withDefaults(raw: Partial<Settings> | null): Settings {
   // 浅 merge 会丢 engines 内部字段，必须二级合并
   const engines = { ...DEFAULTS.engines, ...(raw?.engines ?? {}) };
-  const translationStyle = {
+  const { underline, ...rawTranslationStyle } =
+    ((raw?.translationStyle ?? {}) as LegacyTranslationStyle);
+  const underlineStyle =
+    normalizeUnderlineStyle(rawTranslationStyle.underlineStyle) ??
+    (underline === true ? "solid" : undefined) ??
+    (underline === false ? "none" : undefined) ??
+    DEFAULTS.translationStyle.underlineStyle;
+  const translationStyle: TranslationStyle = {
     ...DEFAULTS.translationStyle,
-    ...(raw?.translationStyle ?? {}),
+    ...rawTranslationStyle,
+    underlineStyle,
   };
   return { ...DEFAULTS, ...(raw ?? {}), engines, translationStyle };
+}
+
+function normalizeUnderlineStyle(
+  value: string | undefined,
+): TranslationUnderlineStyle | undefined {
+  if (
+    value === "none" ||
+    value === "solid" ||
+    value === "dotted" ||
+    value === "wavy"
+  ) {
+    return value;
+  }
+  return undefined;
 }
 
 export async function getSettings(): Promise<Settings> {

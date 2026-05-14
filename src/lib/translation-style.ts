@@ -29,10 +29,20 @@ export function resolveTranslationStyleFontFamily(
   return undefined;
 }
 
+export function resolveTranslationStyleTextDecoration(
+  style: TranslationStyle,
+): string {
+  if (style.underlineStyle === "none") return "none";
+  return `underline ${style.underlineStyle}`;
+}
+
 export function buildTranslationStyleCss(style: TranslationStyle): string {
   const css: string[] = [];
 
-  if (style.underline) css.push("text-decoration: underline;");
+  const textDecoration = resolveTranslationStyleTextDecoration(style);
+  if (textDecoration !== "none") {
+    css.push(`text-decoration: ${textDecoration};`);
+  }
 
   const fontFamily = resolveTranslationStyleFontFamily(style.fontFamily);
   if (fontFamily) css.push(`font-family: ${fontFamily};`);
