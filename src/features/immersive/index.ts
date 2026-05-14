@@ -60,6 +60,7 @@ const MAIN_PAGE_LAYOUT_STYLE_ID = "onelingo-wikipedia-main-page-layout-style";
 const HIDDEN_ORIGINAL_ATTR = "data-onelingo-hidden-original";
 const SINGLE_MODE_TOGGLE_ATTR = "data-onelingo-single-mode-toggle";
 const ORIGINAL_PEEK_ATTR = "data-onelingo-original-peek";
+const TRANSLATION_COLOR_ATTR = "data-onelingo-translation-color";
 const LOADING_BASE_VAR = "--onelingo-loading-base";
 const LOADING_FLOW_VAR = "--onelingo-loading-flow";
 const INLINE_RUN_SEPARATOR_RE = /^[\s,.;:|/\\()[\]{}·•●‧・\-–—←→]+$/u;
@@ -956,9 +957,19 @@ function applyTranslationInnerStyles(
 ): void {
   const loadingVars = readLoadingCssVars(inner);
   inner.removeAttribute("style");
+  inner.removeAttribute(TRANSLATION_COLOR_ATTR);
   applyTranslationInnerModeStyles(inner, transOnly, host, hideMode);
   appendInlineStyle(inner, rule.textExtStyle);
+  if (hasExplicitColorDeclaration(rule.textExtStyle)) {
+    inner.setAttribute(TRANSLATION_COLOR_ATTR, "true");
+  }
   if (loadingVars) restoreLoadingCssVars(inner, loadingVars);
+}
+
+function hasExplicitColorDeclaration(cssText: string): boolean {
+  const style = document.createElement("span").style;
+  style.cssText = cssText;
+  return !!style.color;
 }
 
 function readLoadingCssVars(
@@ -1765,7 +1776,7 @@ function ensureLoadingStyles(): void {
   pointer-events: none;
   user-select: none;
 }
-[${WRAPPER_ATTR}] [${INNER_ATTR}] a {
+[${WRAPPER_ATTR}] [${INNER_ATTR}][${TRANSLATION_COLOR_ATTR}="true"] a {
   color: inherit !important;
 }
 [${WRAPPER_ATTR}]::before,
