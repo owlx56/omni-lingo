@@ -257,6 +257,7 @@ let rescanTimer: number | undefined;
 // Translation session
 let currentRule: ResolvedFullPageRule | null = null;
 let currentBaseTextExtStyle = "";
+let clickToShowOriginalEnabled = true;
 let runSeq = 0;
 let lastCommandId = 0;
 let pendingCount = 0;
@@ -415,6 +416,8 @@ function updatePageTranslatePrefs(input: PageTranslatePrefs): void {
 }
 
 function handleSettingsChanged(settings: Settings): void {
+  updateClickToShowOriginalSetting(settings.fullPageClickToShowOriginal);
+
   const rule = currentRule;
   if (!rule) return;
 
@@ -439,6 +442,7 @@ async function loadRule(
   const matched = matchFullPageRule(window.location.href, userRules);
   const baseRule = resolveFullPageRule(matched, input);
   currentBaseTextExtStyle = baseRule.textExtStyle;
+  clickToShowOriginalEnabled = settings.fullPageClickToShowOriginal;
   return {
     ...baseRule,
     textExtStyle: composeTranslationTextExtStyle(
@@ -456,6 +460,12 @@ function composeTranslationTextExtStyle(
     baseTextExtStyle,
     buildTranslationStyleCss(settings.translationStyle),
   );
+}
+
+function updateClickToShowOriginalSetting(enabled: boolean): void {
+  if (clickToShowOriginalEnabled === enabled) return;
+  clickToShowOriginalEnabled = enabled;
+  if (reapplySingleModeToggleStates()) scheduleVirtualizedLayoutRefresh();
 }
 
 function appendCssText(baseCss: string, patchCss: string): string {
@@ -1113,7 +1123,7 @@ function installSingleModeToggleListener(): void {
 }
 
 function handleSingleModeToggleClick(event: MouseEvent): void {
-  if (currentMode !== "replace") return;
+  if (!clickToShowOriginalEnabled || currentMode !== "replace") return;
   const target = event.target;
   if (!(target instanceof Node)) return;
   if (shouldIgnoreSingleModeToggleTarget(target)) return;
@@ -1161,11 +1171,37 @@ function updateSingleModeToggleState(
   }
 }
 
+function reapplySingleModeToggleStates(): boolean {
+  let layoutChanged = false;
+  for (const host of Array.from(wrapperHosts)) {
+    if (!host.isConnected) {
+      wrapperHosts.delete(host);
+      continue;
+    }
+
+    runWithMutedMutations(host, () => {
+      for (const wrapper of getHostWrappers(host)) {
+        if (!wrapper.isConnected) continue;
+        const state = wrapperState.get(wrapper);
+        if (!state) continue;
+
+        if (!clickToShowOriginalEnabled && state.singleModeView === "original") {
+          hideOriginalForSingleMode(wrapper, state);
+          layoutChanged = true;
+        }
+        updateSingleModeToggleState(wrapper, state);
+      }
+    });
+  }
+  return layoutChanged;
+}
+
 function canUseSingleModeToggle(
   wrapper: HTMLElement,
   state: WrapperState,
 ): boolean {
   if (
+    !clickToShowOriginalEnabled ||
     currentMode !== "replace" ||
     !state.isHide ||
     state.singleModeView === "original" ||

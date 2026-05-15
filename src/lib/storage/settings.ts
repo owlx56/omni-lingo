@@ -43,6 +43,7 @@ export interface Settings {
   engines: EngineMap;
   hoverGranularity: HoverGranularity;
   fullPageMode: FullPageMode;
+  fullPageClickToShowOriginal: boolean;
   translationStyle: TranslationStyle;
 }
 
@@ -59,6 +60,7 @@ const DEFAULTS: Settings = {
   engines: { hover: "google", selection: "google", fullPage: "google2" },
   hoverGranularity: "word",
   fullPageMode: "replace",
+  fullPageClickToShowOriginal: true,
   translationStyle: {
     underlineStyle: "none",
     fontFamily: "inherit",

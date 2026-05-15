@@ -40,6 +40,11 @@ const MODES: { value: FullPageMode; label: string; note: string }[] = [
   { value: "bilingual", label: "双语", note: "默认显示原文和译文" },
 ];
 
+const CLICK_TO_SHOW_ORIGINAL_OPTIONS = [
+  { value: true, label: "开启", note: "点击译文临时查看原文" },
+  { value: false, label: "关闭", note: "点击译文不切换原文" },
+] as const;
+
 const FONT_FAMILIES: {
   value: TranslationFontFamily;
   label: string;
@@ -182,6 +187,23 @@ function App() {
               label={mode.label}
               note={mode.note}
               onClick={() => void setSettings({ fullPageMode: mode.value })}
+            />
+          )}
+        </For>
+      </Section>
+
+      <Section title="仅译文点击原文">
+        <For each={CLICK_TO_SHOW_ORIGINAL_OPTIONS}>
+          {(option) => (
+            <OptionButton
+              active={settings().fullPageClickToShowOriginal === option.value}
+              label={option.label}
+              note={option.note}
+              onClick={() =>
+                void setSettings({
+                  fullPageClickToShowOriginal: option.value,
+                })
+              }
             />
           )}
         </For>
