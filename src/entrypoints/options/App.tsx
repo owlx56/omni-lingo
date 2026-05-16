@@ -7,6 +7,8 @@ import {
 import {
   setSettings,
   useSettings,
+  HOVER_FONT_SIZE_MAX,
+  HOVER_FONT_SIZE_MIN,
   type FullPageEngineId,
   type FullPageMode,
   type HoverGranularity,
@@ -314,6 +316,30 @@ function App() {
           )}
         </For>
       </Section>
+
+      <section class="section">
+        <h2>悬停译文字号</h2>
+        <div class="range-row">
+          <input
+            aria-label="悬停译文字号"
+            aria-valuetext={`${settings().hoverFontSize} 像素`}
+            class="range-input"
+            max={HOVER_FONT_SIZE_MAX}
+            min={HOVER_FONT_SIZE_MIN}
+            onInput={(event) =>
+              void setSettings({
+                hoverFontSize: Number(event.currentTarget.value),
+              })
+            }
+            step={1}
+            type="range"
+            value={settings().hoverFontSize}
+          />
+          <span aria-hidden="true" class="range-value">
+            {settings().hoverFontSize}px
+          </span>
+        </div>
+      </section>
     </main>
   );
 }

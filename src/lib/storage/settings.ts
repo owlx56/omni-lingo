@@ -38,14 +38,21 @@ type LegacyTranslationStyle = Partial<TranslationStyle> & {
   underline?: boolean;
 };
 
+export const HOVER_FONT_SIZE_MIN = 13;
+export const HOVER_FONT_SIZE_MAX = 17;
+
 export interface Settings {
   targetLang: "zh" | "en";
   engines: EngineMap;
   hoverGranularity: HoverGranularity;
+  hoverFontSize: number; // px, [HOVER_FONT_SIZE_MIN, HOVER_FONT_SIZE_MAX]
   fullPageMode: FullPageMode;
   fullPageClickToShowOriginal: boolean;
   translationStyle: TranslationStyle;
 }
+
+// 老版本存储可能带 hoverLargeText：boolean -> 13/17 迁移入口。
+type LegacySettings = Partial<Settings> & { hoverLargeText?: unknown };
 
 export type SettingsPatch = Omit<
   Partial<Settings>,
@@ -59,6 +66,7 @@ const DEFAULTS: Settings = {
   targetLang: "zh",
   engines: { hover: "google", selection: "google", fullPage: "google2" },
   hoverGranularity: "word",
+  hoverFontSize: HOVER_FONT_SIZE_MIN,
   fullPageMode: "replace",
   fullPageClickToShowOriginal: true,
   translationStyle: {
@@ -86,7 +94,30 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     ...rawTranslationStyle,
     underlineStyle,
   };
-  return { ...DEFAULTS, ...(raw ?? {}), engines, translationStyle };
+  // hoverFontSize 优先读新字段；否则回退到 legacy hoverLargeText。
+  // 必须在 return 末尾显式覆盖，否则 raw 里的脏值会绕开 clampFontSize。
+  const legacy = raw as LegacySettings | null;
+  const hoverFontSize = clampFontSize(
+    legacy?.hoverFontSize ??
+      (legacy?.hoverLargeText === true ? HOVER_FONT_SIZE_MAX : undefined),
+  );
+  return {
+    ...DEFAULTS,
+    ...(raw ?? {}),
+    engines,
+    translationStyle,
+    hoverFontSize,
+  };
+}
+
+function clampFontSize(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULTS.hoverFontSize;
+  }
+  return Math.min(
+    HOVER_FONT_SIZE_MAX,
+    Math.max(HOVER_FONT_SIZE_MIN, Math.round(value)),
+  );
 }
 
 function normalizeUnderlineStyle(

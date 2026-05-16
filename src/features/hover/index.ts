@@ -44,8 +44,10 @@ interface State {
   target: string;
   engine: string;
   granularity: HoverGranularity;
+  fontSize: number; // px
   translateTimer: number | null;
   lastText: string | null; // 上次翻译的文本（去重）
+  lastAnchor: DOMRect | null; // 设置变更时重新定位用
   tooltip: HTMLDivElement | null;
   seq: number;
   wordSegmenter: Intl.Segmenter;
@@ -63,8 +65,10 @@ export function initHover(): void {
     target: "zh",
     engine: "google",
     granularity: "word",
+    fontSize: 13,
     translateTimer: null,
     lastText: null,
+    lastAnchor: null,
     tooltip: null,
     seq: 0,
     wordSegmenter: new Intl.Segmenter(undefined, { granularity: "word" }),
@@ -77,11 +81,15 @@ export function initHover(): void {
     state.target = s.targetLang;
     state.engine = s.engines.hover;
     state.granularity = s.hoverGranularity;
+    state.fontSize = s.hoverFontSize;
+    applyTooltipFontSize(state);
   });
   watchSettings((s) => {
     state.target = s.targetLang;
     state.engine = s.engines.hover;
     state.granularity = s.hoverGranularity;
+    state.fontSize = s.hoverFontSize;
+    applyTooltipFontSize(state);
   });
 
   document.addEventListener("mousemove", (e) => onMove(e, state), {
@@ -267,6 +275,7 @@ function show(s: State, translation: string, anchor: DOMRect): void {
   if (!el) {
     el = document.createElement("div");
     el.setAttribute(TOOLTIP_ATTR, "");
+    // 字号由 applyTooltipFontSize 单一来源控制，此处只设字体和行高。
     el.style.cssText = [
       "position:fixed",
       "z-index:2147483647",
@@ -274,7 +283,8 @@ function show(s: State, translation: string, anchor: DOMRect): void {
       "color:#fff",
       "padding:6px 8px",
       "border-radius:4px",
-      "font:12px/1.4 system-ui,sans-serif",
+      "font-family:system-ui,sans-serif",
+      "line-height:1.4",
       "max-width:360px",
       "white-space:pre-wrap",
       "word-break:break-word",
@@ -284,10 +294,17 @@ function show(s: State, translation: string, anchor: DOMRect): void {
     document.body.appendChild(el);
     s.tooltip = el;
   }
+  applyTooltipFontSize(s);
   el.textContent = translation;
+  s.lastAnchor = anchor;
 
   el.style.visibility = "hidden";
   el.style.display = "block";
+  positionTooltip(el, anchor);
+  el.style.visibility = "visible";
+}
+
+function positionTooltip(el: HTMLElement, anchor: DOMRect): void {
   const tw = el.offsetWidth;
   const th = el.offsetHeight;
   const vw = window.innerWidth;
@@ -301,12 +318,26 @@ function show(s: State, translation: string, anchor: DOMRect): void {
 
   el.style.left = left + "px";
   el.style.top = top + "px";
-  el.style.visibility = "visible";
+}
+
+function applyTooltipFontSize(s: State): void {
+  const el = s.tooltip;
+  if (!el) return;
+  el.style.fontSize = `${s.fontSize}px`;
+  // 设置实时生效：若 tooltip 当前可见，按新尺寸重新定位
+  if (
+    s.lastAnchor &&
+    el.style.display === "block" &&
+    el.style.visibility === "visible"
+  ) {
+    positionTooltip(el, s.lastAnchor);
+  }
 }
 
 function dismiss(s: State): void {
   clearTimer(s);
   s.lastText = null;
+  s.lastAnchor = null;
   s.seq++;
   clearHighlight();
   if (s.tooltip) s.tooltip.style.display = "none";

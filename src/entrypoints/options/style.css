@@ -220,6 +220,31 @@ h2 {
     line-height: 1.5;
 }
 
+.range-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 12px;
+    padding: 14px 16px;
+    border: 1px solid #d7dce2;
+    border-radius: 8px;
+    background: #fff;
+}
+
+.range-input {
+    flex: 1;
+    accent-color: #2563eb;
+}
+
+.range-value {
+    min-width: 48px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+    font-weight: 650;
+    color: #3a414b;
+}
+
 @media (max-width: 560px) {
     .page {
         width: min(100% - 24px, 840px);
