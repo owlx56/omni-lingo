@@ -13,6 +13,7 @@ export type MessageKey =
   | "sidebar.hover"
   | "sidebar.selection"
   | "sidebar.immersive"
+  | "sidebar.about"
   | "section.profile"
   | "profile.avatar"
   | "profile.displayName"
@@ -116,6 +117,7 @@ const ZH: Dict = {
   "sidebar.hover": "Hover",
   "sidebar.selection": "Selection",
   "sidebar.immersive": "Immersive",
+  "sidebar.about": "关于",
   "section.profile": "档案",
   "profile.avatar": "头像",
   "profile.displayName": "显示名",
@@ -220,6 +222,7 @@ const EN: Dict = {
   "sidebar.hover": "Hover",
   "sidebar.selection": "Selection",
   "sidebar.immersive": "Immersive",
+  "sidebar.about": "About",
   "section.profile": "Profile",
   "profile.avatar": "Avatar",
   "profile.displayName": "Display name",

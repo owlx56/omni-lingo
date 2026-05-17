@@ -23,17 +23,9 @@ function Row(props: {
   children: import("solid-js").JSX.Element;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        "align-items": "center",
-        gap: "8px",
-        "margin-bottom": "8px",
-        "font-size": "12px",
-      }}
-    >
-      <span style={{ color: "#666", "min-width": "52px" }}>{props.label}</span>
-      {props.children}
+    <div class="popup-row">
+      <span class="popup-label">{props.label}</span>
+      <div class="popup-controls">{props.children}</div>
     </div>
   );
 }
@@ -46,19 +38,10 @@ function SegBtn(props: {
 }) {
   return (
     <button
+      class="seg-button"
+      classList={{ active: props.active }}
       disabled={props.disabled}
       onClick={props.onClick}
-      style={{
-        padding: "2px 10px",
-        "border-radius": "4px",
-        border: "1px solid",
-        "border-color": props.active ? "#2a6df4" : "#d0d0d0",
-        background: props.active ? "#2a6df4" : "#fff",
-        color: props.active ? "#fff" : "#444",
-        "font-size": "12px",
-        cursor: props.disabled ? "default" : "pointer",
-        opacity: props.disabled ? 0.85 : 1,
-      }}
       type="button"
     >
       {props.children}
@@ -315,74 +298,43 @@ function App() {
   });
 
   return (
-    <div
-      style={{
-        padding: "12px",
-        "font-family": "system-ui,sans-serif",
-        width: "300px",
-      }}
-    >
-      <h1
-        style={{
-          "font-size": "14px",
-          "font-weight": "600",
-          margin: "0 0 12px",
-        }}
-      >
-        OneLingo
-      </h1>
+    <main class="popup">
+      <header class="popup-header">
+        <h1 class="popup-title">OneLingo</h1>
+        <span class="popup-scope">{t("sidebar.immersive")}</span>
+      </header>
 
-      <Row label={t("popup.label.lang")}>
-        <SegBtn active disabled>
-          {targetLabel()}
-        </SegBtn>
-      </Row>
+      <section class="popup-section">
+        <Row label={t("popup.label.lang")}>
+          <SegBtn active disabled>
+            {targetLabel()}
+          </SegBtn>
+        </Row>
 
-      <Row label={t("popup.label.engine")}>
-        <For each={ENGINES}>
-          {(e) => (
-            <SegBtn
-              active={pageEngine() === e.value}
-              onClick={() => setFullPageEngine(e.value)}
-            >
-              {e.label}
-            </SegBtn>
-          )}
-        </For>
-      </Row>
+        <Row label={t("popup.label.engine")}>
+          <For each={ENGINES}>
+            {(e) => (
+              <SegBtn
+                active={pageEngine() === e.value}
+                onClick={() => setFullPageEngine(e.value)}
+              >
+                {e.label}
+              </SegBtn>
+            )}
+          </For>
+        </Row>
 
-      <div
-        style={{
-          "border-top": "1px solid #eee",
-          "padding-top": "10px",
-          "margin-top": "4px",
-        }}
-      >
         <Row label={t("popup.label.mode")}>
           <SegBtn active={immersiveActive()} onClick={toggleFullPageMode}>
             {t("popup.modeToggle", { label: modeLabel(pageMode()) })}
           </SegBtn>
         </Row>
-        <p style={{ margin: "0 0 8px", "font-size": "12px", color: "#666" }}>
-          {pageStateText()}
-        </p>
+        <p class="status-card">{pageStateText()}</p>
         <button
+          class="primary-button"
+          classList={{ idle: !immersiveActive() }}
           onClick={run}
           disabled={action() === "restoring"}
-          style={{
-            width: "100%",
-            padding: "8px 10px",
-            "font-size": "12px",
-            "border-radius": "6px",
-            border: "1px solid #d0d0d0",
-            background: immersiveActive()
-              ? "#222"
-              : action() === "starting"
-                ? "#f2f2f2"
-                : "#fff",
-            color: immersiveActive() ? "#fff" : "#222",
-            cursor: action() === "restoring" ? "default" : "pointer",
-          }}
           type="button"
         >
           {action() === "restoring"
@@ -392,34 +344,20 @@ function App() {
               : t("popup.button.start")}
         </button>
         <p
-          style={{
-            margin: "8px 0 0",
-            "word-break": "break-word",
-            "font-size": "12px",
-            color: statusIsError() ? "#c0392b" : "#666",
-            "min-height": "1.5em",
-          }}
+          class="status-line"
+          classList={{ error: statusIsError() }}
         >
           {status()}
         </p>
         <button
+          class="secondary-button"
           onClick={openOptions}
-          style={{
-            width: "100%",
-            padding: "6px 10px",
-            "font-size": "12px",
-            "border-radius": "6px",
-            border: "1px solid #d0d0d0",
-            background: "#fff",
-            color: "#444",
-            cursor: "pointer",
-          }}
           type="button"
         >
           {t("popup.button.openOptions")}
         </button>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
 

@@ -23,6 +23,7 @@ import { useT, type MessageKey, type TFn } from "@/lib/i18n";
 import {
   IconHover,
   IconImmersive,
+  IconInfo,
   IconLogo,
   IconMoon,
   IconSelection,
@@ -31,7 +32,7 @@ import {
   IconUser,
 } from "./icons";
 
-type TabId = "account" | "hover" | "selection" | "immersive";
+type TabId = "account" | "hover" | "selection" | "immersive" | "about";
 type OptionIcon = (props: { size?: number }) => JSX.Element;
 
 const VERSION = "0.0.0";
@@ -45,6 +46,7 @@ const TABS: {
   { id: "hover", labelKey: "sidebar.hover", icon: IconHover },
   { id: "selection", labelKey: "sidebar.selection", icon: IconSelection },
   { id: "immersive", labelKey: "sidebar.immersive", icon: IconImmersive },
+  { id: "about", labelKey: "sidebar.about", icon: IconInfo },
 ];
 
 const UI_LANGS: { value: UiLang; labelKey: MessageKey }[] = [
@@ -365,15 +367,21 @@ function App() {
         </div>
       </section>
 
-      <section class="section">
-        <h2>{t("section.about")}</h2>
-        <div class="about-panel">
-          <strong>OneLingo</strong>
-          <span>{t("about.tagline")}</span>
-          <span>{t("about.version", { version: VERSION })}</span>
-        </div>
-      </section>
     </>
+  );
+
+  const renderAbout = (): JSX.Element => (
+    <section class="section">
+      <h2>{t("section.about")}</h2>
+      <div class="about-panel">
+        <div class="avatar" aria-hidden="true">
+          <IconLogo size={28} />
+        </div>
+        <strong>OneLingo</strong>
+        <span>{t("about.tagline")}</span>
+        <span>{t("about.version", { version: VERSION })}</span>
+      </div>
+    </section>
   );
 
   const renderHover = (): JSX.Element => (
@@ -631,6 +639,8 @@ function App() {
         return renderSelection();
       case "immersive":
         return renderImmersive();
+      case "about":
+        return renderAbout();
       case "account":
       default:
         return renderAccount();

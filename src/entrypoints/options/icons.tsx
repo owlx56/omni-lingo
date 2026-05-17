@@ -71,6 +71,17 @@ export function IconImmersive(props: IconProps): JSX.Element {
   );
 }
 
+export function IconInfo(props: IconProps): JSX.Element {
+  return svg(
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 10v6" />
+      <path d="M12 7.5h.01" />
+    </>,
+    props.size ?? 16,
+  );
+}
+
 export function IconSystem(props: IconProps): JSX.Element {
   return svg(
     <>
