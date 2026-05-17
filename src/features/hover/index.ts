@@ -393,7 +393,7 @@ function injectHighlightStyle(): void {
     `::highlight(${HIGHLIGHT_NAME}){` +
     `text-decoration:underline solid #aaa;` +
     `text-decoration-thickness:1px;` +
-    `text-underline-offset:6px}`;
+    `text-underline-offset:2px}`;
   (document.head ?? document.documentElement).appendChild(style);
   highlightStyleInjected = true;
 }
