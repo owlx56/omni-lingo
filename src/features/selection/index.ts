@@ -10,7 +10,11 @@
 // 翻译提前发出的好处：hover 确认时大概率命中缓存，卡片瞬间出，无需 spinner。
 
 import { sendMessage } from "@/lib/messaging";
-import { getSettings, watchSettings } from "@/lib/storage/settings";
+import {
+  getSettings,
+  resolveTargetLang,
+  watchSettings,
+} from "@/lib/storage/settings";
 import { getHost, getShadowRoot } from "@/ui/shadow-root";
 import { mountCard } from "./SelectionCard";
 import { setSelText, setSelTarget, setSelResult } from "./card-store";
@@ -57,14 +61,16 @@ export function initSelection(): void {
   };
 
   void getSettings().then((cfg) => {
-    s.target = cfg.targetLang;
+    const target = resolveTargetLang(cfg.selectionTargetLang, cfg.uiLang);
+    s.target = target;
     s.engine = cfg.engines.selection;
-    setSelTarget(cfg.targetLang);
+    setSelTarget(target);
   });
   watchSettings((cfg) => {
-    s.target = cfg.targetLang;
+    const target = resolveTargetLang(cfg.selectionTargetLang, cfg.uiLang);
+    s.target = target;
     s.engine = cfg.engines.selection;
-    setSelTarget(cfg.targetLang);
+    setSelTarget(target);
   });
 
   // ★ 关键修复：shadow DOM 内的 mouseup retarget 到 host，

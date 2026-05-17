@@ -11,6 +11,7 @@ import { sendMessage } from "@/lib/messaging";
 import type { TranslateResponse } from "@/engines/types";
 import {
   getSettings,
+  resolveTargetLang,
   watchSettings,
   type HoverGranularity,
 } from "@/lib/storage/settings";
@@ -78,14 +79,14 @@ export function initHover(): void {
   };
 
   void getSettings().then((s) => {
-    state.target = s.targetLang;
+    state.target = resolveTargetLang(s.hoverTargetLang, s.uiLang);
     state.engine = s.engines.hover;
     state.granularity = s.hoverGranularity;
     state.fontSize = s.hoverFontSize;
     applyTooltipFontSize(state);
   });
   watchSettings((s) => {
-    state.target = s.targetLang;
+    state.target = resolveTargetLang(s.hoverTargetLang, s.uiLang);
     state.engine = s.engines.hover;
     state.granularity = s.hoverGranularity;
     state.fontSize = s.hoverFontSize;

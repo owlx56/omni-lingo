@@ -1,4 +1,4 @@
-import { For } from "solid-js";
+import { For, createSignal, type JSX } from "solid-js";
 import {
   resolveTranslationStyleColor,
   resolveTranslationStyleFontFamily,
@@ -12,70 +12,163 @@ import {
   type FullPageEngineId,
   type FullPageMode,
   type HoverGranularity,
+  type TargetLang,
+  type ThemePreference,
   type TranslationColor,
   type TranslationFontFamily,
   type TranslationUnderlineStyle,
+  type UiLang,
 } from "@/lib/storage/settings";
+import { useT, type MessageKey, type TFn } from "@/lib/i18n";
+import {
+  IconHover,
+  IconImmersive,
+  IconLogo,
+  IconMoon,
+  IconSelection,
+  IconSun,
+  IconSystem,
+  IconUser,
+} from "./icons";
 
-const ENGINES: { value: FullPageEngineId; label: string; note: string }[] = [
-  { value: "google2", label: "Google 2", note: "translate_a/t HTML" },
-  { value: "microsoft", label: "Microsoft", note: "Edge Translator API" },
+type TabId = "account" | "hover" | "selection" | "immersive";
+type OptionIcon = (props: { size?: number }) => JSX.Element;
+
+const VERSION = "0.0.0";
+
+const TABS: {
+  id: TabId;
+  labelKey: MessageKey;
+  icon: OptionIcon;
+}[] = [
+  { id: "account", labelKey: "sidebar.account", icon: IconUser },
+  { id: "hover", labelKey: "sidebar.hover", icon: IconHover },
+  { id: "selection", labelKey: "sidebar.selection", icon: IconSelection },
+  { id: "immersive", labelKey: "sidebar.immersive", icon: IconImmersive },
 ];
 
-const LANGS = [
-  { value: "zh", label: "中文" },
-  { value: "en", label: "English" },
-] as const;
+const UI_LANGS: { value: UiLang; labelKey: MessageKey }[] = [
+  { value: "zh", labelKey: "common.chinese" },
+  { value: "en", labelKey: "common.english" },
+];
+
+const TARGET_LANGS: { value: TargetLang; labelKey: MessageKey }[] = [
+  { value: "inherit", labelKey: "common.followUiLang" },
+  { value: "zh", labelKey: "common.chinese" },
+  { value: "en", labelKey: "common.english" },
+];
+
+const HOVER_ENGINES: { value: string; label: string; noteKey: MessageKey }[] = [
+  { value: "google", label: "Google", noteKey: "engine.note.google" },
+  { value: "google2", label: "Google 2", noteKey: "engine.note.google2" },
+  { value: "microsoft", label: "Microsoft", noteKey: "engine.note.microsoft" },
+];
+
+const FULL_PAGE_ENGINES: {
+  value: FullPageEngineId;
+  label: string;
+  noteKey: MessageKey;
+}[] = [
+  { value: "google2", label: "Google 2", noteKey: "engine.note.google2" },
+  { value: "microsoft", label: "Microsoft", noteKey: "engine.note.microsoft" },
+];
 
 const GRANULARITIES: {
   value: HoverGranularity;
-  label: string;
-  note: string;
+  labelKey: MessageKey;
+  noteKey: MessageKey;
 }[] = [
-  { value: "word", label: "词", note: "命中单词后翻译单词" },
-  { value: "sentence", label: "句子", note: "命中单词后翻译所在句子" },
-  { value: "paragraph", label: "段落", note: "命中单词后翻译最近段落" },
+  {
+    value: "word",
+    labelKey: "granularity.word",
+    noteKey: "granularity.word.note",
+  },
+  {
+    value: "sentence",
+    labelKey: "granularity.sentence",
+    noteKey: "granularity.sentence.note",
+  },
+  {
+    value: "paragraph",
+    labelKey: "granularity.paragraph",
+    noteKey: "granularity.paragraph.note",
+  },
 ];
 
-const MODES: { value: FullPageMode; label: string; note: string }[] = [
-  { value: "replace", label: "译文", note: "默认替换原文" },
-  { value: "bilingual", label: "双语", note: "默认显示原文和译文" },
+const MODES: {
+  value: FullPageMode;
+  labelKey: MessageKey;
+  noteKey: MessageKey;
+}[] = [
+  { value: "replace", labelKey: "mode.replace", noteKey: "mode.replace.note" },
+  {
+    value: "bilingual",
+    labelKey: "mode.bilingual",
+    noteKey: "mode.bilingual.note",
+  },
 ];
 
 const CLICK_TO_SHOW_ORIGINAL_OPTIONS = [
-  { value: true, label: "开启", note: "点击译文临时查看原文" },
-  { value: false, label: "关闭", note: "点击译文不切换原文" },
+  { value: true, labelKey: "common.on", noteKey: "clickToShow.on.note" },
+  { value: false, labelKey: "common.off", noteKey: "clickToShow.off.note" },
 ] as const;
+
+const THEMES: {
+  value: ThemePreference;
+  labelKey: MessageKey;
+  icon: OptionIcon;
+}[] = [
+  { value: "system", labelKey: "appearance.system", icon: IconSystem },
+  { value: "light", labelKey: "appearance.light", icon: IconSun },
+  { value: "dark", labelKey: "appearance.dark", icon: IconMoon },
+];
 
 const FONT_FAMILIES: {
   value: TranslationFontFamily;
-  label: string;
-  note: string;
+  labelKey: MessageKey;
+  noteKey: MessageKey;
 }[] = [
-  { value: "inherit", label: "默认", note: "沿用网页或模式样式" },
-  { value: "serif", label: "衬线", note: "Georgia / Times" },
-  { value: "sans", label: "无衬线", note: "Segoe UI / system-ui" },
-  { value: "mono", label: "等宽", note: "Consolas / monospace" },
+  { value: "inherit", labelKey: "font.inherit", noteKey: "font.inherit.note" },
+  { value: "serif", labelKey: "font.serif", noteKey: "font.serif.note" },
+  { value: "sans", labelKey: "font.sans", noteKey: "font.sans.note" },
+  { value: "mono", labelKey: "font.mono", noteKey: "font.mono.note" },
 ];
 
-const COLORS: { value: TranslationColor; label: string; color?: string }[] = [
-  { value: "inherit", label: "默认" },
-  { value: "muted", label: "灰色", color: "#6b7280" },
-  { value: "blue", label: "蓝色", color: "#2563eb" },
-  { value: "green", label: "绿色", color: "#047857" },
-  { value: "red", label: "红色", color: "#dc2626" },
-  { value: "custom", label: "自定义" },
-];
+const COLORS: { value: TranslationColor; labelKey: MessageKey; color?: string }[] =
+  [
+    { value: "inherit", labelKey: "color.inherit" },
+    { value: "muted", labelKey: "color.muted", color: "#6b7280" },
+    { value: "blue", labelKey: "color.blue", color: "#2563eb" },
+    { value: "green", labelKey: "color.green", color: "#047857" },
+    { value: "red", labelKey: "color.red", color: "#dc2626" },
+    { value: "custom", labelKey: "color.custom" },
+  ];
 
 const UNDERLINE_STYLES: {
   value: TranslationUnderlineStyle;
-  label: string;
-  note: string;
+  labelKey: MessageKey;
+  noteKey: MessageKey;
 }[] = [
-  { value: "none", label: "无样式", note: "默认不添加下划线" },
-  { value: "solid", label: "实线", note: "普通下划线" },
-  { value: "dotted", label: "点线", note: "点状下划线" },
-  { value: "wavy", label: "波浪线", note: "波浪下划线" },
+  {
+    value: "none",
+    labelKey: "underline.none",
+    noteKey: "underline.none.note",
+  },
+  {
+    value: "solid",
+    labelKey: "underline.solid",
+    noteKey: "underline.solid.note",
+  },
+  {
+    value: "dotted",
+    labelKey: "underline.dotted",
+    noteKey: "underline.dotted.note",
+  },
+  {
+    value: "wavy",
+    labelKey: "underline.wavy",
+    noteKey: "underline.wavy.note",
+  },
 ];
 
 function OptionButton(props: {
@@ -121,24 +214,103 @@ function ColorButton(props: {
 
 function Section(props: {
   title: string;
-  children: import("solid-js").JSX.Element;
+  children: JSX.Element;
+  compact?: boolean;
 }) {
   return (
     <section class="section">
       <h2>{props.title}</h2>
-      <div class="option-grid">{props.children}</div>
+      <div class="option-grid" classList={{ compact: props.compact }}>
+        {props.children}
+      </div>
     </section>
+  );
+}
+
+function Field(props: { label: string; children: JSX.Element }) {
+  return (
+    <div class="field">
+      <span class="field-label">{props.label}</span>
+      <div class="field-control">{props.children}</div>
+    </div>
+  );
+}
+
+function Sidebar(props: {
+  activeTab: TabId;
+  onSelect: (tab: TabId) => void;
+  t: TFn;
+}) {
+  return (
+    <nav aria-label="Settings sections" class="sidebar">
+      <For each={TABS}>
+        {(tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              class="sidebar-item"
+              classList={{ active: props.activeTab === tab.id }}
+              onClick={() => props.onSelect(tab.id)}
+              type="button"
+            >
+              <Icon size={17} />
+              <span>{props.t(tab.labelKey)}</span>
+            </button>
+          );
+        }}
+      </For>
+    </nav>
+  );
+}
+
+function AppearanceSwitch(props: { value: ThemePreference; t: TFn }) {
+  return (
+    <div class="icon-segment" role="group">
+      <For each={THEMES}>
+        {(theme) => {
+          const Icon = theme.icon;
+          const label = props.t(theme.labelKey);
+          return (
+            <button
+              aria-label={label}
+              class="icon-option"
+              classList={{ active: props.value === theme.value }}
+              onClick={() => void setSettings({ theme: theme.value })}
+              title={label}
+              type="button"
+            >
+              <Icon size={18} />
+              <span>{label}</span>
+            </button>
+          );
+        }}
+      </For>
+    </div>
+  );
+}
+
+function TargetLanguageOptions(props: {
+  value: TargetLang;
+  onChange: (value: TargetLang) => void;
+  t: TFn;
+}) {
+  return (
+    <For each={TARGET_LANGS}>
+      {(lang) => (
+        <OptionButton
+          active={props.value === lang.value}
+          label={props.t(lang.labelKey)}
+          onClick={() => props.onChange(lang.value)}
+        />
+      )}
+    </For>
   );
 }
 
 function App() {
   const settings = useSettings();
-
-  const fullPageEngine = (): FullPageEngineId => settings().engines.fullPage;
-
-  const setFullPageEngine = (engine: FullPageEngineId): void => {
-    void setSettings({ engines: { fullPage: engine } });
-  };
+  const t = useT();
+  const [activeTab, setActiveTab] = createSignal<TabId>("account");
 
   const setTranslationStyle = (
     patch: Parameters<typeof setSettings>[0]["translationStyle"],
@@ -146,171 +318,94 @@ function App() {
     void setSettings({ translationStyle: patch });
   };
 
-  return (
-    <main class="page">
-      <header class="header">
-        <div>
-          <p class="eyebrow">OneLingo</p>
-          <h1>设置</h1>
-        </div>
-        <span class="scope">本地扩展页面</span>
-      </header>
+  const tabTitle = (): string => {
+    const tab = TABS.find((item) => item.id === activeTab());
+    return tab ? t(tab.labelKey) : t("sidebar.account");
+  };
 
-      <Section title="目标语言">
-        <For each={LANGS}>
-          {(lang) => (
-            <OptionButton
-              active={settings().targetLang === lang.value}
-              label={lang.label}
-              onClick={() => void setSettings({ targetLang: lang.value })}
-            />
-          )}
-        </For>
-      </Section>
-
-      <Section title="网页翻译引擎">
-        <For each={ENGINES}>
-          {(engine) => (
-            <OptionButton
-              active={fullPageEngine() === engine.value}
-              label={engine.label}
-              note={engine.note}
-              onClick={() => setFullPageEngine(engine.value)}
-            />
-          )}
-        </For>
-      </Section>
-
-      <Section title="全文显示模式">
-        <For each={MODES}>
-          {(mode) => (
-            <OptionButton
-              active={settings().fullPageMode === mode.value}
-              label={mode.label}
-              note={mode.note}
-              onClick={() => void setSettings({ fullPageMode: mode.value })}
-            />
-          )}
-        </For>
-      </Section>
-
-      <Section title="仅译文点击原文">
-        <For each={CLICK_TO_SHOW_ORIGINAL_OPTIONS}>
-          {(option) => (
-            <OptionButton
-              active={settings().fullPageClickToShowOriginal === option.value}
-              label={option.label}
-              note={option.note}
-              onClick={() =>
-                void setSettings({
-                  fullPageClickToShowOriginal: option.value,
-                })
-              }
-            />
-          )}
-        </For>
-      </Section>
-
+  const renderAccount = (): JSX.Element => (
+    <>
       <section class="section">
-        <h2>译文样式</h2>
-        <div class="style-panel">
-          <div class="style-block">
-            <span class="style-label">下划线</span>
-            <div class="option-grid compact">
-              <For each={UNDERLINE_STYLES}>
-                {(item) => (
-                  <OptionButton
-                    active={
-                      settings().translationStyle.underlineStyle === item.value
-                    }
-                    label={item.label}
-                    note={item.note}
-                    onClick={() =>
-                      setTranslationStyle({ underlineStyle: item.value })
-                    }
-                  />
-                )}
-              </For>
-            </div>
+        <h2>{t("section.profile")}</h2>
+        <div class="profile-panel">
+          <div class="avatar" aria-hidden="true">
+            <IconLogo size={28} />
           </div>
-
-          <div class="style-block">
-            <span class="style-label">字体</span>
-            <div class="option-grid compact">
-              <For each={FONT_FAMILIES}>
-                {(font) => (
-                  <OptionButton
-                    active={
-                      settings().translationStyle.fontFamily === font.value
-                    }
-                    label={font.label}
-                    note={font.note}
-                    onClick={() =>
-                      setTranslationStyle({ fontFamily: font.value })
-                    }
-                  />
-                )}
-              </For>
-            </div>
-          </div>
-
-          <div class="style-block">
-            <span class="style-label">颜色</span>
-            <div class="color-grid">
-              <For each={COLORS}>
-                {(color) => (
-                  <ColorButton
-                    active={settings().translationStyle.color === color.value}
-                    color={
-                      color.value === "custom"
-                        ? settings().translationStyle.customColor
-                        : color.color
-                    }
-                    label={color.label}
-                    onClick={() => setTranslationStyle({ color: color.value })}
-                  />
-                )}
-              </For>
-              <input
-                aria-label="自定义译文颜色"
-                class="color-input"
-                disabled={settings().translationStyle.color !== "custom"}
-                onInput={(event) =>
-                  setTranslationStyle({
-                    color: "custom",
-                    customColor: event.currentTarget.value,
-                  })
-                }
-                type="color"
-                value={settings().translationStyle.customColor}
-              />
-            </div>
-          </div>
-
-          <div
-            class="style-preview"
-            style={{
-              color: resolveTranslationStyleColor(settings().translationStyle),
-              "font-family": resolveTranslationStyleFontFamily(
-                settings().translationStyle.fontFamily,
-              ),
-              "text-decoration": resolveTranslationStyleTextDecoration(
-                settings().translationStyle,
-              ),
-            }}
-          >
-            译文预览 Translation preview
-          </div>
+          <Field label={t("profile.displayName")}>
+            <input
+              class="text-input"
+              disabled
+              type="text"
+              value={t("profile.placeholder")}
+            />
+          </Field>
+          <div class="notice">{t("profile.notice")}</div>
         </div>
       </section>
 
-      <Section title="悬停粒度">
+      <section class="section">
+        <h2>{t("section.preferences")}</h2>
+        <div class="field-stack">
+          <Field label={t("preferences.uiLang")}>
+            <div class="option-grid compact inline-grid">
+              <For each={UI_LANGS}>
+                {(lang) => (
+                  <OptionButton
+                    active={settings().uiLang === lang.value}
+                    label={t(lang.labelKey)}
+                    onClick={() => void setSettings({ uiLang: lang.value })}
+                  />
+                )}
+              </For>
+            </div>
+          </Field>
+          <Field label={t("preferences.appearance")}>
+            <AppearanceSwitch value={settings().theme} t={t} />
+          </Field>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>{t("section.about")}</h2>
+        <div class="about-panel">
+          <strong>OneLingo</strong>
+          <span>{t("about.tagline")}</span>
+          <span>{t("about.version", { version: VERSION })}</span>
+        </div>
+      </section>
+    </>
+  );
+
+  const renderHover = (): JSX.Element => (
+    <>
+      <Section title={t("section.targetLang")}>
+        <TargetLanguageOptions
+          value={settings().hoverTargetLang}
+          onChange={(hoverTargetLang) => void setSettings({ hoverTargetLang })}
+          t={t}
+        />
+      </Section>
+
+      <Section title={t("section.engine")}>
+        <For each={HOVER_ENGINES}>
+          {(engine) => (
+            <OptionButton
+              active={settings().engines.hover === engine.value}
+              label={engine.label}
+              note={t(engine.noteKey)}
+              onClick={() => void setSettings({ engines: { hover: engine.value } })}
+            />
+          )}
+        </For>
+      </Section>
+
+      <Section title={t("section.granularity")}>
         <For each={GRANULARITIES}>
           {(item) => (
             <OptionButton
               active={settings().hoverGranularity === item.value}
-              label={item.label}
-              note={item.note}
+              label={t(item.labelKey)}
+              note={t(item.noteKey)}
               onClick={() => void setSettings({ hoverGranularity: item.value })}
             />
           )}
@@ -318,11 +413,13 @@ function App() {
       </Section>
 
       <section class="section">
-        <h2>悬停译文字号</h2>
+        <h2>{t("section.fontSize")}</h2>
         <div class="range-row">
           <input
-            aria-label="悬停译文字号"
-            aria-valuetext={`${settings().hoverFontSize} 像素`}
+            aria-label={t("slider.fontSize.aria")}
+            aria-valuetext={t("slider.fontSize.valuetext", {
+              n: settings().hoverFontSize,
+            })}
             class="range-input"
             max={HOVER_FONT_SIZE_MAX}
             min={HOVER_FONT_SIZE_MIN}
@@ -340,6 +437,225 @@ function App() {
           </span>
         </div>
       </section>
+    </>
+  );
+
+  const renderSelection = (): JSX.Element => (
+    <>
+      <Section title={t("section.targetLang")}>
+        <TargetLanguageOptions
+          value={settings().selectionTargetLang}
+          onChange={(selectionTargetLang) =>
+            void setSettings({ selectionTargetLang })
+          }
+          t={t}
+        />
+      </Section>
+
+      <Section title={t("section.engine")}>
+        <For each={HOVER_ENGINES}>
+          {(engine) => (
+            <OptionButton
+              active={settings().engines.selection === engine.value}
+              label={engine.label}
+              note={t(engine.noteKey)}
+              onClick={() =>
+                void setSettings({ engines: { selection: engine.value } })
+              }
+            />
+          )}
+        </For>
+      </Section>
+
+      <p class="muted-note">{t("selection.note")}</p>
+    </>
+  );
+
+  const renderTranslationStyle = (): JSX.Element => (
+    <section class="section">
+      <h2>{t("section.translationStyle")}</h2>
+      <div class="style-panel">
+        <div class="style-block">
+          <span class="style-label">{t("style.label.underline")}</span>
+          <div class="option-grid compact">
+            <For each={UNDERLINE_STYLES}>
+              {(item) => (
+                <OptionButton
+                  active={
+                    settings().translationStyle.underlineStyle === item.value
+                  }
+                  label={t(item.labelKey)}
+                  note={t(item.noteKey)}
+                  onClick={() =>
+                    setTranslationStyle({ underlineStyle: item.value })
+                  }
+                />
+              )}
+            </For>
+          </div>
+        </div>
+
+        <div class="style-block">
+          <span class="style-label">{t("style.label.font")}</span>
+          <div class="option-grid compact">
+            <For each={FONT_FAMILIES}>
+              {(font) => (
+                <OptionButton
+                  active={settings().translationStyle.fontFamily === font.value}
+                  label={t(font.labelKey)}
+                  note={t(font.noteKey)}
+                  onClick={() => setTranslationStyle({ fontFamily: font.value })}
+                />
+              )}
+            </For>
+          </div>
+        </div>
+
+        <div class="style-block">
+          <span class="style-label">{t("style.label.color")}</span>
+          <div class="color-grid">
+            <For each={COLORS}>
+              {(color) => (
+                <ColorButton
+                  active={settings().translationStyle.color === color.value}
+                  color={
+                    color.value === "custom"
+                      ? settings().translationStyle.customColor
+                      : color.color
+                  }
+                  label={t(color.labelKey)}
+                  onClick={() => setTranslationStyle({ color: color.value })}
+                />
+              )}
+            </For>
+            <input
+              aria-label={t("color.custom.aria")}
+              class="color-input"
+              disabled={settings().translationStyle.color !== "custom"}
+              onInput={(event) =>
+                setTranslationStyle({
+                  color: "custom",
+                  customColor: event.currentTarget.value,
+                })
+              }
+              type="color"
+              value={settings().translationStyle.customColor}
+            />
+          </div>
+        </div>
+
+        <div
+          class="style-preview"
+          style={{
+            color: resolveTranslationStyleColor(settings().translationStyle),
+            "font-family": resolveTranslationStyleFontFamily(
+              settings().translationStyle.fontFamily,
+            ),
+            "text-decoration": resolveTranslationStyleTextDecoration(
+              settings().translationStyle,
+            ),
+          }}
+        >
+          {t("style.preview")}
+        </div>
+      </div>
+    </section>
+  );
+
+  const renderImmersive = (): JSX.Element => (
+    <>
+      <Section title={t("section.targetLang")}>
+        <TargetLanguageOptions
+          value={settings().immersiveTargetLang}
+          onChange={(immersiveTargetLang) =>
+            void setSettings({ immersiveTargetLang })
+          }
+          t={t}
+        />
+      </Section>
+
+      <Section title={t("section.engine")}>
+        <For each={FULL_PAGE_ENGINES}>
+          {(engine) => (
+            <OptionButton
+              active={settings().engines.fullPage === engine.value}
+              label={engine.label}
+              note={t(engine.noteKey)}
+              onClick={() =>
+                void setSettings({ engines: { fullPage: engine.value } })
+              }
+            />
+          )}
+        </For>
+      </Section>
+
+      <Section title={t("section.displayMode")}>
+        <For each={MODES}>
+          {(mode) => (
+            <OptionButton
+              active={settings().fullPageMode === mode.value}
+              label={t(mode.labelKey)}
+              note={t(mode.noteKey)}
+              onClick={() => void setSettings({ fullPageMode: mode.value })}
+            />
+          )}
+        </For>
+      </Section>
+
+      <Section title={t("section.clickToShowOriginal")}>
+        <For each={CLICK_TO_SHOW_ORIGINAL_OPTIONS}>
+          {(option) => (
+            <OptionButton
+              active={settings().fullPageClickToShowOriginal === option.value}
+              label={t(option.labelKey)}
+              note={t(option.noteKey)}
+              onClick={() =>
+                void setSettings({
+                  fullPageClickToShowOriginal: option.value,
+                })
+              }
+            />
+          )}
+        </For>
+      </Section>
+
+      {renderTranslationStyle()}
+    </>
+  );
+
+  const renderActiveTab = (): JSX.Element => {
+    switch (activeTab()) {
+      case "hover":
+        return renderHover();
+      case "selection":
+        return renderSelection();
+      case "immersive":
+        return renderImmersive();
+      case "account":
+      default:
+        return renderAccount();
+    }
+  };
+
+  return (
+    <main class="page">
+      <header class="header">
+        <div>
+          <p class="eyebrow">OneLingo</p>
+          <h1>{t("settings.title")}</h1>
+        </div>
+        <span class="scope">{t("settings.scope")}</span>
+      </header>
+
+      <div class="settings-shell">
+        <Sidebar activeTab={activeTab()} onSelect={setActiveTab} t={t} />
+        <section class="content-panel" aria-labelledby="tab-title">
+          <div class="tab-heading">
+            <h2 id="tab-title">{tabTitle()}</h2>
+          </div>
+          {renderActiveTab()}
+        </section>
+      </div>
     </main>
   );
 }

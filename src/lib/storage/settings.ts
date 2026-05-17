@@ -13,6 +13,9 @@ export interface EngineMap {
 
 export type HoverGranularity = "word" | "sentence" | "paragraph";
 export type FullPageMode = "replace" | "bilingual";
+export type UiLang = "zh" | "en";
+export type TargetLang = "inherit" | "zh" | "en";
+export type ThemePreference = "system" | "light" | "dark";
 export type TranslationFontFamily = "inherit" | "serif" | "sans" | "mono";
 export type TranslationColor =
   | "inherit"
@@ -42,7 +45,11 @@ export const HOVER_FONT_SIZE_MIN = 13;
 export const HOVER_FONT_SIZE_MAX = 17;
 
 export interface Settings {
-  targetLang: "zh" | "en";
+  uiLang: UiLang; // options/popup/未来悬浮球的 UI 语言，同时是三个功能 target 的 inherit 回退值
+  hoverTargetLang: TargetLang;
+  selectionTargetLang: TargetLang;
+  immersiveTargetLang: TargetLang;
+  theme: ThemePreference;
   engines: EngineMap;
   hoverGranularity: HoverGranularity;
   hoverFontSize: number; // px, [HOVER_FONT_SIZE_MIN, HOVER_FONT_SIZE_MAX]
@@ -51,8 +58,13 @@ export interface Settings {
   translationStyle: TranslationStyle;
 }
 
-// 老版本存储可能带 hoverLargeText：boolean -> 13/17 迁移入口。
-type LegacySettings = Partial<Settings> & { hoverLargeText?: unknown };
+// 老版本存储可能带的老字段：
+//  - hoverLargeText：boolean -> hoverFontSize 13/17 迁移
+//  - targetLang：老的全局语言 -> uiLang 迁移
+type LegacySettings = Partial<Settings> & {
+  hoverLargeText?: unknown;
+  targetLang?: unknown;
+};
 
 export type SettingsPatch = Omit<
   Partial<Settings>,
@@ -63,7 +75,11 @@ export type SettingsPatch = Omit<
 };
 
 const DEFAULTS: Settings = {
-  targetLang: "zh",
+  uiLang: "zh",
+  hoverTargetLang: "inherit",
+  selectionTargetLang: "inherit",
+  immersiveTargetLang: "inherit",
+  theme: "system",
   engines: { hover: "google", selection: "google", fullPage: "google2" },
   hoverGranularity: "word",
   hoverFontSize: HOVER_FONT_SIZE_MIN,
@@ -80,6 +96,8 @@ const DEFAULTS: Settings = {
 const KEY = "sync:settings" as const;
 
 function withDefaults(raw: Partial<Settings> | null): Settings {
+  const legacy = raw as LegacySettings | null;
+
   // 浅 merge 会丢 engines 内部字段，必须二级合并
   const engines = { ...DEFAULTS.engines, ...(raw?.engines ?? {}) };
   const { underline, ...rawTranslationStyle } =
@@ -95,19 +113,56 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     underlineStyle,
   };
   // hoverFontSize 优先读新字段；否则回退到 legacy hoverLargeText。
-  // 必须在 return 末尾显式覆盖，否则 raw 里的脏值会绕开 clampFontSize。
-  const legacy = raw as LegacySettings | null;
   const hoverFontSize = clampFontSize(
     legacy?.hoverFontSize ??
       (legacy?.hoverLargeText === true ? HOVER_FONT_SIZE_MAX : undefined),
   );
+  // uiLang 优先读新字段；否则回退到 legacy targetLang。
+  const uiLang = normalizeUiLang(legacy?.uiLang ?? legacy?.targetLang);
+  const hoverTargetLang = normalizeTargetLang(legacy?.hoverTargetLang);
+  const selectionTargetLang = normalizeTargetLang(legacy?.selectionTargetLang);
+  const immersiveTargetLang = normalizeTargetLang(legacy?.immersiveTargetLang);
+  const theme = normalizeTheme(legacy?.theme);
+  // 所有 normalize 过的字段必须在 return 末尾显式覆盖，否则 raw 里的脏值会绕开守门。
   return {
     ...DEFAULTS,
     ...(raw ?? {}),
     engines,
     translationStyle,
     hoverFontSize,
+    uiLang,
+    hoverTargetLang,
+    selectionTargetLang,
+    immersiveTargetLang,
+    theme,
   };
+}
+
+function normalizeUiLang(value: unknown): UiLang {
+  return value === "zh" || value === "en" ? value : DEFAULTS.uiLang;
+}
+
+function normalizeTargetLang(value: unknown): TargetLang {
+  return value === "inherit" || value === "zh" || value === "en"
+    ? value
+    : "inherit";
+}
+
+function normalizeTheme(value: unknown): ThemePreference {
+  return value === "system" || value === "light" || value === "dark"
+    ? value
+    : DEFAULTS.theme;
+}
+
+/**
+ * 将功能 target 语言 resolve 为实际语言码。
+ * "inherit" 表示跟随 Account 的 uiLang。
+ */
+export function resolveTargetLang(
+  target: TargetLang,
+  uiLang: UiLang,
+): UiLang {
+  return target === "inherit" ? uiLang : target;
 }
 
 function clampFontSize(value: unknown): number {

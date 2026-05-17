@@ -13,6 +13,7 @@ import {
 import { getFullPageRules } from "@/lib/storage/full-page-rules";
 import {
   getSettings,
+  resolveTargetLang,
   watchSettings,
   type FullPageEngineId,
   type Settings,
@@ -267,6 +268,7 @@ let currentTarget: string | null = null;
 let preferredMode: PageTranslateMode | null = null;
 let preferredEngine: FullPageEngineId | null = null;
 let preferredTarget: string | null = null;
+let settingsTarget: string | null = null;
 let originalTitle: string | null = null;
 let batchQueues: Record<TranslateFormat, TranslateBatchQueue> | null = null;
 
@@ -304,6 +306,7 @@ export function initFullPage(): void {
   installNavigationWatcher();
   installSingleModeToggleListener();
   ensureObservers();
+  void getSettings().then(handleSettingsChanged);
   void watchSettings(handleSettingsChanged);
 
   onMessage("runPageTranslate", async (input) => {
@@ -416,6 +419,10 @@ function updatePageTranslatePrefs(input: PageTranslatePrefs): void {
 }
 
 function handleSettingsChanged(settings: Settings): void {
+  settingsTarget = resolveTargetLang(
+    settings.immersiveTargetLang,
+    settings.uiLang,
+  );
   updateClickToShowOriginalSetting(settings.fullPageClickToShowOriginal);
 
   const rule = currentRule;
@@ -1562,7 +1569,7 @@ function getStatus(): PageTranslateStatus {
     blocks,
     mode: currentMode ?? preferredMode ?? undefined,
     engine: currentEngine ?? preferredEngine ?? undefined,
-    target: currentTarget ?? preferredTarget ?? undefined,
+    target: currentTarget ?? preferredTarget ?? settingsTarget ?? undefined,
   };
 }
 
