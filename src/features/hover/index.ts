@@ -9,6 +9,7 @@
 
 import { sendMessage } from "@/lib/messaging";
 import type { TranslateResponse } from "@/engines/types";
+import { isTargetSameAsText } from "@/lib/lang-detect";
 import {
   getSettings,
   resolveTargetLang,
@@ -113,6 +114,12 @@ function onMove(e: MouseEvent, s: State): void {
     s.granularity,
   );
   if (!hit) {
+    dismiss(s);
+    return;
+  }
+  // 文本主要语言已等同于目标语言 → 不高亮不翻译。
+  // 例：hoverTargetLang=zh 时 hover 中文不触发。
+  if (isTargetSameAsText(hit.text, s.target)) {
     dismiss(s);
     return;
   }
