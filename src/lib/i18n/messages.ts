@@ -114,10 +114,18 @@ export type MessageKey =
   | "popup.modeToggle"
   | "popup.state.translatedDetail"
   | "popup.state.untranslatedDetail"
+  | "popup.state.untranslated"
+  | "popup.state.translated"
   | "popup.button.start"
   | "popup.button.restore"
   | "popup.button.restoring"
   | "popup.button.openOptions"
+  | "popup.shortcut"
+  | "popup.section.page"
+  | "popup.section.features"
+  | "popup.row.hoverEnabled"
+  | "popup.row.selectionEnabled"
+  | "popup.openSettings"
   | "popup.status.startedBlocks"
   | "popup.status.noBlocks"
   | "popup.status.started"
@@ -243,10 +251,18 @@ const ZH: Dict = {
     "当前网页：已翻译（{engine} / {target} / {mode}）",
   "popup.state.untranslatedDetail":
     "当前网页：未翻译（待用 {engine} / {target} / {mode}）",
-  "popup.button.start": "沉浸翻译",
+  "popup.state.untranslated": "当前网页未翻译",
+  "popup.state.translated": "当前网页已翻译",
+  "popup.button.start": "翻译此页面",
   "popup.button.restore": "显示原文",
   "popup.button.restoring": "显示原文中…",
   "popup.button.openOptions": "打开设置",
+  "popup.shortcut": "Alt+Z",
+  "popup.section.page": "当前页面",
+  "popup.section.features": "其他功能",
+  "popup.row.hoverEnabled": "悬停翻译",
+  "popup.row.selectionEnabled": "划词翻译",
+  "popup.openSettings": "设置",
   "popup.status.startedBlocks": "已开始沉浸翻译，共 {n} 个段落",
   "popup.status.noBlocks": "当前网页没有可翻译的段落",
   "popup.status.started": "已开始沉浸翻译",
@@ -373,10 +389,18 @@ const EN: Dict = {
     "Page: translated ({engine} / {target} / {mode})",
   "popup.state.untranslatedDetail":
     "Page: not translated (will use {engine} / {target} / {mode})",
-  "popup.button.start": "Translate page",
+  "popup.state.untranslated": "Page is not translated",
+  "popup.state.translated": "Page is translated",
+  "popup.button.start": "Translate this page",
   "popup.button.restore": "Show original",
   "popup.button.restoring": "Restoring…",
   "popup.button.openOptions": "Open settings",
+  "popup.shortcut": "Alt+Z",
+  "popup.section.page": "Current page",
+  "popup.section.features": "Other features",
+  "popup.row.hoverEnabled": "Hover translation",
+  "popup.row.selectionEnabled": "Selection translation",
+  "popup.openSettings": "Settings",
   "popup.status.startedBlocks": "Translation started, {n} blocks",
   "popup.status.noBlocks": "No translatable blocks on this page",
   "popup.status.started": "Translation started",

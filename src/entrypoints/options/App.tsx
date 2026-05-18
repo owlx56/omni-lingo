@@ -36,13 +36,13 @@ import {
   IconHover,
   IconImmersive,
   IconInfo,
-  IconLogo,
   IconMoon,
   IconSelection,
   IconSun,
   IconSystem,
   IconUser,
 } from "./icons";
+import { IconLogo } from "@/lib/ui/icons";
 import {
   FullRow,
   IconSegment,
@@ -53,7 +53,7 @@ import {
   type IconSegmentOption,
   type SegmentOption,
   type SelectOption,
-} from "./components";
+} from "@/lib/ui/controls";
 
 
 type TabId = "account" | "hover" | "selection" | "immersive" | "about";

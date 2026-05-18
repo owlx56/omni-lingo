@@ -1,4 +1,5 @@
-// Options 页用到的 inline SVG 图标。
+// Options 页 sidebar / appearance 专用的 inline SVG 图标。
+// 跨 entrypoint 共享的图标（Logo / Chevron / Settings 等）在 src/lib/ui/icons.tsx。
 // 都用 currentColor，配合 CSS var --text / --text-muted 自然换色。
 
 import type { JSX } from "solid-js";
@@ -117,18 +118,3 @@ export function IconMoon(props: IconProps): JSX.Element {
   );
 }
 
-export function IconChevron(props: IconProps): JSX.Element {
-  return svg(<path d="M6 9l6 6 6-6" />, props.size ?? 14);
-}
-
-export function IconLogo(props: IconProps): JSX.Element {
-  // OneLingo 占位 logo：一个文字气泡 + 翻译箭头。
-  return svg(
-    <>
-      <path d="M4 5h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H10l-4 3v-3H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z" />
-      <path d="M7 9h6" />
-      <path d="M7 12h4" />
-    </>,
-    props.size ?? 22,
-  );
-}

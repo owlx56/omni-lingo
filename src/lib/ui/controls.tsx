@@ -1,4 +1,4 @@
-// Options 页 Claude.ai 风格的扁平 row primitives。
+// Claude.ai 风格扁平 row primitives，跨 entrypoint 共享。
 //
 // 设计：
 //   - Section 只有一个 bold 标题，下面是若干 row。
@@ -56,6 +56,7 @@ export function Switch(props: {
   checked: boolean;
   onChange: (next: boolean) => void;
   label?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
@@ -63,6 +64,7 @@ export function Switch(props: {
       aria-label={props.label}
       class="switch"
       classList={{ on: props.checked }}
+      disabled={props.disabled}
       onClick={() => props.onChange(!props.checked)}
       role="switch"
       type="button"

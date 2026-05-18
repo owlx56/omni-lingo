@@ -1,6 +1,7 @@
 import { render } from "solid-js/web";
 
-import "./style.css";
+import "@/lib/ui/controls.css";
+import "./popup.css";
 import App from "./App";
 import { initTheme } from "@/lib/theme";
 

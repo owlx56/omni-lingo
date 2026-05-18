@@ -1,76 +1,78 @@
-import { For, createSignal, onMount } from "solid-js";
+// Popup 面板：immersive 翻译的快速入口 + 其他功能开关。
+//
+// 设计（Claude.ai 扁平 row + 紧凑布局）：
+//   - 顶部 logo + brand，右侧 settings 按钮
+//   - 大 CTA：翻译此页面 / 显示原文（根据 active 切换）+ 状态摘要
+//   - 段 1「当前页面」：目标语言 / 引擎 / 显示模式 / 点击显示原文
+//   - 段 2「其他功能」：悬停翻译 / 划词翻译 总开关
+//   - 底部 ⚙ 打开完整设置
+//
+// 行为约定：
+//   - 改 target / engine / mode 同时写 settings（作为全局默认）和当前页面（per-page）。
+//     当前页面 active 时立即重翻；未 active 则只保存 per-page pref。
+//   - 改 clickToShowOriginal / hoverEnabled / selectionEnabled 只写 settings。
+//     immersive 的 click toggle 通过 settings watcher 在下次翻译时生效。
+
+import { createSignal, onMount, type JSX } from "solid-js";
 import { sendMessage } from "@/lib/messaging";
 import {
-  getSettings,
   resolveTargetLang,
+  setSettings,
+  useSettings,
   type FullPageEngineId,
   type FullPageMode,
 } from "@/lib/storage/settings";
-import { useT } from "@/lib/i18n";
-import "./App.css";
+import { useT, type TFn } from "@/lib/i18n";
+import { IconLogo, IconSettings } from "@/lib/ui/icons";
+import {
+  Row,
+  Segment,
+  Switch,
+  type SegmentOption,
+} from "@/lib/ui/controls";
 
-const ENGINES: { value: FullPageEngineId; label: string }[] = [
-  { value: "google2", label: "Google 2" },
+const ENGINES: SegmentOption<FullPageEngineId>[] = [
+  { value: "google2", label: "Google" },
   { value: "microsoft", label: "Microsoft" },
 ];
 
-const DEFAULT_FULL_PAGE_MODE: FullPageMode = "replace";
-const DEFAULT_FULL_PAGE_ENGINE: FullPageEngineId = "google2";
-const DEFAULT_TARGET = "zh";
+type PageTargetLang = "zh" | "en";
 
-function Row(props: {
-  label: string;
-  children: import("solid-js").JSX.Element;
-}) {
-  return (
-    <div class="popup-row">
-      <span class="popup-label">{props.label}</span>
-      <div class="popup-controls">{props.children}</div>
-    </div>
-  );
+function pageTargetOptions(t: TFn): SegmentOption<PageTargetLang>[] {
+  return [
+    { value: "zh", label: t("common.chinese") },
+    { value: "en", label: t("common.english") },
+  ];
 }
 
-function SegBtn(props: {
-  active: boolean;
-  onClick?: () => void;
-  children: import("solid-js").JSX.Element;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      class="seg-button"
-      classList={{ active: props.active }}
-      disabled={props.disabled}
-      onClick={props.onClick}
-      type="button"
-    >
-      {props.children}
-    </button>
-  );
+function modeOptions(t: TFn): SegmentOption<FullPageMode>[] {
+  return [
+    { value: "replace", label: t("mode.replace") },
+    { value: "bilingual", label: t("mode.bilingual") },
+  ];
 }
 
-function App() {
+type ActionState = "idle" | "starting" | "restoring" | "retranslating";
+
+function App(): JSX.Element {
   const t = useT();
-  const [action, setAction] = createSignal<
-    "idle" | "starting" | "restoring" | "retranslating"
-  >("idle");
+  const settings = useSettings();
+
+  const [action, setAction] = createSignal<ActionState>("idle");
   const [status, setStatus] = createSignal("");
   const [statusIsError, setStatusIsError] = createSignal(false);
   const [immersiveActive, setImmersiveActive] = createSignal(false);
-  const [pageMode, setPageMode] = createSignal<FullPageMode>(
-    DEFAULT_FULL_PAGE_MODE,
-  );
-  const [pageEngine, setPageEngine] = createSignal<FullPageEngineId>(
-    DEFAULT_FULL_PAGE_ENGINE,
-  );
-  const [pageTarget, setPageTarget] = createSignal(DEFAULT_TARGET);
+  // page-level 偏好：popup 内显式选择，per-page 立即生效；同时写回 settings 当全局默认。
+  const [pageMode, setPageMode] = createSignal<FullPageMode>("replace");
+  const [pageEngine, setPageEngine] = createSignal<FullPageEngineId>("google2");
+  const [pageTarget, setPageTarget] = createSignal<PageTargetLang>("zh");
+
   let actionSeq = 0;
   let lastCommandId = 0;
 
-  const openOptions = (): void => {
-    void browser.runtime.openOptionsPage().catch(() => {
-      window.open(browser.runtime.getURL("/options.html"), "_blank");
-    });
+  const nextCommandId = (): number => {
+    lastCommandId = Math.max(lastCommandId + 1, Date.now());
+    return lastCommandId;
   };
 
   const setInfoStatus = (message: string): void => {
@@ -87,74 +89,86 @@ function App() {
     );
   };
 
-  const nextCommandId = (): number => {
-    lastCommandId = Math.max(lastCommandId + 1, Date.now());
-    return lastCommandId;
-  };
-
   const startedStatus = (blocks: number): string =>
     blocks > 0
       ? t("popup.status.startedBlocks", { n: blocks })
       : t("popup.status.noBlocks");
 
-  const modeLabel = (mode: FullPageMode): string =>
-    mode === "replace" ? t("mode.replace") : t("mode.bilingual");
-
   const engineLabel = (engine: FullPageEngineId): string =>
     ENGINES.find((e) => e.value === engine)?.label ?? engine;
 
-  const targetLabel = (): string =>
-    pageTarget() === "zh" ? t("common.chinese") : t("common.english");
+  const targetLabel = (lang: PageTargetLang): string =>
+    lang === "zh" ? t("common.chinese") : t("common.english");
 
-  const nextFullPageMode = (): FullPageMode =>
-    pageMode() === "replace" ? "bilingual" : "replace";
+  const modeLabel = (mode: FullPageMode): string =>
+    mode === "replace" ? t("mode.replace") : t("mode.bilingual");
 
   const pageStateText = (): string =>
     immersiveActive()
       ? t("popup.state.translatedDetail", {
           engine: engineLabel(pageEngine()),
-          target: targetLabel(),
+          target: targetLabel(pageTarget()),
           mode: modeLabel(pageMode()),
         })
       : t("popup.state.untranslatedDetail", {
           engine: engineLabel(pageEngine()),
-          target: targetLabel(),
+          target: targetLabel(pageTarget()),
           mode: modeLabel(pageMode()),
         });
 
-  const updatePagePrefs = (patch: {
-    target?: string;
+  // ─── 应用 per-page 偏好（同步写 settings 全局默认）─────────────
+
+  const persistGlobalDefault = (patch: {
+    target?: PageTargetLang;
     engine?: FullPageEngineId;
     mode?: FullPageMode;
   }): void => {
-    void sendMessage("setPageTranslatePrefs", patch).catch(() => {});
+    const next: Parameters<typeof setSettings>[0] = {};
+    if (patch.target) next.immersiveTargetLang = patch.target;
+    if (patch.engine) next.engines = { fullPage: patch.engine };
+    if (patch.mode) next.fullPageMode = patch.mode;
+    void setSettings(next);
   };
 
-  const retranslateCurrentPage = (
-    patch: { target?: string; engine?: FullPageEngineId; mode?: FullPageMode },
-    message: string,
+  const applyPagePref = (
+    patch: {
+      target?: PageTargetLang;
+      engine?: FullPageEngineId;
+      mode?: FullPageMode;
+    },
+    pendingStatus: string,
   ): void => {
-    const target = patch.target ?? pageTarget();
-    const engine = patch.engine ?? pageEngine();
-    const mode = patch.mode ?? pageMode();
+    persistGlobalDefault(patch);
+
+    if (patch.target) setPageTarget(patch.target);
+    if (patch.engine) setPageEngine(patch.engine);
+    if (patch.mode) setPageMode(patch.mode);
+
+    if (!immersiveActive()) {
+      // 未翻译时只保存 per-page pref，待用户点 CTA 时统一发起
+      void sendMessage("setPageTranslatePrefs", patch).catch(() => {});
+      return;
+    }
+
+    // 已翻译：立即重翻
     const seq = ++actionSeq;
-
     setAction("retranslating");
-    setInfoStatus(message);
-
+    setInfoStatus(pendingStatus);
     void sendMessage("translatePage", {
-      target,
-      engine,
-      mode,
+      target: patch.target ?? pageTarget(),
+      engine: patch.engine ?? pageEngine(),
+      mode: patch.mode ?? pageMode(),
       commandId: nextCommandId(),
     })
       .then((res) => {
         if (seq !== actionSeq) return;
         const active = res.active || res.translating === true;
         setImmersiveActive(active);
-        setPageMode(res.mode ?? mode);
-        setPageEngine(res.engine ?? engine);
-        setPageTarget(res.target ?? target);
+        setPageMode(res.mode ?? patch.mode ?? pageMode());
+        setPageEngine(res.engine ?? patch.engine ?? pageEngine());
+        setPageTarget(
+          (res.target as PageTargetLang) ?? patch.target ?? pageTarget(),
+        );
         setInfoStatus(
           active ? t("popup.status.retranslated") : startedStatus(res.blocks),
         );
@@ -168,62 +182,9 @@ function App() {
       });
   };
 
-  const toggleFullPageMode = (): void => {
-    const mode = nextFullPageMode();
-    if (!immersiveActive()) {
-      setPageMode(mode);
-      updatePagePrefs({ mode });
-      setInfoStatus(t("popup.status.modeIdleNote", { mode: modeLabel(mode) }));
-      return;
-    }
+  // ─── CTA：开始翻译 / 显示原文 ────────────────────────────────
 
-    const seq = ++actionSeq;
-    setPageMode(mode);
-    setAction("retranslating");
-    setInfoStatus(t("popup.status.modeSwitching"));
-    void (async () => {
-      const res = await sendMessage("translatePage", {
-        target: pageTarget(),
-        engine: pageEngine(),
-        mode,
-        commandId: nextCommandId(),
-      });
-      if (seq !== actionSeq) return;
-      const active = res.active || res.translating === true;
-      setImmersiveActive(active);
-      setPageMode(res.mode ?? mode);
-      setPageEngine(res.engine ?? pageEngine());
-      setPageTarget(res.target ?? pageTarget());
-      setInfoStatus(
-        res.active ? t("popup.status.modeSwitched") : startedStatus(res.blocks),
-      );
-    })()
-      .catch((e) => {
-        if (seq !== actionSeq) return;
-        setErrorStatus(e);
-      })
-      .finally(() => {
-        if (seq === actionSeq) setAction("idle");
-      });
-  };
-
-  const setFullPageEngine = (engine: FullPageEngineId): void => {
-    if (pageEngine() === engine) return;
-    setPageEngine(engine);
-    if (immersiveActive()) {
-      retranslateCurrentPage(
-        { engine },
-        t("popup.status.engineSwitchPending", { engine: engineLabel(engine) }),
-      );
-    } else {
-      updatePagePrefs({ engine });
-      setInfoStatus(
-        t("popup.status.engineSwitched", { engine: engineLabel(engine) }),
-      );
-    }
-  };
-
-  const run = async () => {
+  const runCta = async (): Promise<void> => {
     if (immersiveActive()) {
       const seq = ++actionSeq;
       const commandId = nextCommandId();
@@ -248,7 +209,6 @@ function App() {
     const mode = pageMode();
     setAction("starting");
     setImmersiveActive(true);
-    setPageMode(mode);
     setInfoStatus(t("popup.status.started"));
     try {
       const res = await sendMessage("translatePage", {
@@ -261,7 +221,7 @@ function App() {
       setImmersiveActive(res.active);
       setPageMode(res.mode ?? mode);
       setPageEngine(res.engine ?? pageEngine());
-      setPageTarget(res.target ?? pageTarget());
+      setPageTarget((res.target as PageTargetLang) ?? pageTarget());
       setInfoStatus(startedStatus(res.blocks));
     } catch (e) {
       if (seq !== actionSeq) return;
@@ -272,91 +232,171 @@ function App() {
     }
   };
 
+  // ─── 初始化 ────────────────────────────────────────────────
+
   onMount(() => {
     void (async () => {
-      const defaults = await getSettings();
-      const res = await sendMessage("getPageTranslateStatus", {});
-      const mode = res.mode ?? defaults.fullPageMode;
-      const engine = res.engine ?? defaults.engines.fullPage;
-      const target =
-        res.target ??
-        resolveTargetLang(defaults.immersiveTargetLang, defaults.uiLang);
+      const defaults = settings();
+      try {
+        const res = await sendMessage("getPageTranslateStatus", {});
+        const mode = res.mode ?? defaults.fullPageMode;
+        const engine = res.engine ?? defaults.engines.fullPage;
+        const resolved = resolveTargetLang(
+          defaults.immersiveTargetLang,
+          defaults.uiLang,
+        );
+        const target = (res.target as PageTargetLang | undefined) ?? resolved;
 
-      setPageMode(mode);
-      setPageEngine(engine);
-      setPageTarget(target);
-      setImmersiveActive(res.active || res.translating);
-    })().catch(() => {
-      void getSettings().then((defaults) => {
+        setPageMode(mode);
+        setPageEngine(engine);
+        setPageTarget(target);
+        setImmersiveActive(res.active || res.translating);
+      } catch {
+        // 没拿到页面状态就用全局默认值兜底
         setPageMode(defaults.fullPageMode);
         setPageEngine(defaults.engines.fullPage);
         setPageTarget(
-          resolveTargetLang(defaults.immersiveTargetLang, defaults.uiLang),
+          resolveTargetLang(
+            defaults.immersiveTargetLang,
+            defaults.uiLang,
+          ) as PageTargetLang,
         );
-      });
-    });
+      }
+    })().catch(() => {});
   });
+
+  const openOptions = (): void => {
+    void browser.runtime.openOptionsPage().catch(() => {
+      window.open(browser.runtime.getURL("/options.html"), "_blank");
+    });
+  };
+
+  const ctaLabel = (): string => {
+    if (action() === "restoring") return t("popup.button.restoring");
+    return immersiveActive()
+      ? t("popup.button.restore")
+      : t("popup.button.start");
+  };
 
   return (
     <main class="popup">
       <header class="popup-header">
-        <h1 class="popup-title">OneLingo</h1>
-        <span class="popup-scope">{t("sidebar.immersive")}</span>
-      </header>
-
-      <section class="popup-section">
-        <Row label={t("popup.label.lang")}>
-          <SegBtn active disabled>
-            {targetLabel()}
-          </SegBtn>
-        </Row>
-
-        <Row label={t("popup.label.engine")}>
-          <For each={ENGINES}>
-            {(e) => (
-              <SegBtn
-                active={pageEngine() === e.value}
-                onClick={() => setFullPageEngine(e.value)}
-              >
-                {e.label}
-              </SegBtn>
-            )}
-          </For>
-        </Row>
-
-        <Row label={t("popup.label.mode")}>
-          <SegBtn active={immersiveActive()} onClick={toggleFullPageMode}>
-            {t("popup.modeToggle", { label: modeLabel(pageMode()) })}
-          </SegBtn>
-        </Row>
-        <p class="status-card">{pageStateText()}</p>
+        <span class="popup-brand">
+          <span aria-hidden="true" class="popup-logo">
+            <IconLogo size={20} />
+          </span>
+          <span>OneLingo</span>
+        </span>
         <button
-          class="primary-button"
-          classList={{ idle: !immersiveActive() }}
-          onClick={run}
-          disabled={action() === "restoring"}
+          aria-label={t("popup.openSettings")}
+          class="icon-button"
+          onClick={openOptions}
+          title={t("popup.openSettings")}
           type="button"
         >
-          {action() === "restoring"
-            ? t("popup.button.restoring")
-            : immersiveActive()
-              ? t("popup.button.restore")
-              : t("popup.button.start")}
+          <IconSettings size={16} />
+        </button>
+      </header>
+
+      <div class="popup-cta-block">
+        <button
+          class="popup-cta"
+          classList={{ active: immersiveActive() }}
+          disabled={action() !== "idle"}
+          onClick={() => void runCta()}
+          type="button"
+        >
+          {ctaLabel()}
         </button>
         <p
-          class="status-line"
+          class="popup-status"
           classList={{ error: statusIsError() }}
         >
-          {status()}
+          {status() || pageStateText()}
         </p>
+      </div>
+
+      <section class="section">
+        <h2>{t("popup.section.page")}</h2>
+        <Row label={t("popup.label.lang")}>
+          <Segment
+            label={t("popup.label.lang")}
+            onChange={(target) =>
+              applyPagePref(
+                { target },
+                t("popup.status.modeSwitching"),
+              )
+            }
+            options={pageTargetOptions(t)}
+            value={pageTarget()}
+          />
+        </Row>
+        <Row label={t("popup.label.engine")}>
+          <Segment
+            label={t("popup.label.engine")}
+            onChange={(engine) =>
+              applyPagePref(
+                { engine },
+                t("popup.status.engineSwitchPending", {
+                  engine: engineLabel(engine),
+                }),
+              )
+            }
+            options={ENGINES}
+            value={pageEngine()}
+          />
+        </Row>
+        <Row label={t("popup.label.mode")}>
+          <Segment
+            label={t("popup.label.mode")}
+            onChange={(mode) =>
+              applyPagePref({ mode }, t("popup.status.modeSwitching"))
+            }
+            options={modeOptions(t)}
+            value={pageMode()}
+          />
+        </Row>
+        <Row label={t("section.clickToShowOriginal")}>
+          <Switch
+            checked={settings().fullPageClickToShowOriginal}
+            label={t("section.clickToShowOriginal")}
+            onChange={(fullPageClickToShowOriginal) =>
+              void setSettings({ fullPageClickToShowOriginal })
+            }
+          />
+        </Row>
+      </section>
+
+      <section class="section">
+        <h2>{t("popup.section.features")}</h2>
+        <Row label={t("popup.row.hoverEnabled")}>
+          <Switch
+            checked={settings().hoverEnabled}
+            label={t("popup.row.hoverEnabled")}
+            onChange={(hoverEnabled) => void setSettings({ hoverEnabled })}
+          />
+        </Row>
+        <Row label={t("popup.row.selectionEnabled")}>
+          <Switch
+            checked={settings().selectionEnabled}
+            label={t("popup.row.selectionEnabled")}
+            onChange={(selectionEnabled) =>
+              void setSettings({ selectionEnabled })
+            }
+          />
+        </Row>
+      </section>
+
+      <footer class="popup-footer">
         <button
-          class="secondary-button"
+          class="footer-button"
           onClick={openOptions}
           type="button"
         >
-          {t("popup.button.openOptions")}
+          <IconSettings size={14} />
+          <span>{t("popup.button.openOptions")}</span>
         </button>
-      </section>
+      </footer>
     </main>
   );
 }
