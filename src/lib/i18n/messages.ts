@@ -26,6 +26,7 @@ export type MessageKey =
   | "appearance.light"
   | "appearance.dark"
   | "section.about"
+  | "section.featureSwitch"
   | "about.tagline"
   | "about.version"
   | "section.targetLang"
@@ -40,6 +41,10 @@ export type MessageKey =
   | "common.english"
   | "common.on"
   | "common.off"
+  | "featureSwitch.hover.on.note"
+  | "featureSwitch.hover.off.note"
+  | "featureSwitch.selection.on.note"
+  | "featureSwitch.selection.off.note"
   | "granularity.word"
   | "granularity.word.note"
   | "granularity.sentence"
@@ -130,6 +135,7 @@ const ZH: Dict = {
   "appearance.light": "亮色",
   "appearance.dark": "暗色",
   "section.about": "关于",
+  "section.featureSwitch": "功能开关",
   "about.tagline": "OneLingo 浏览器翻译扩展",
   "about.version": "版本 {version}",
   "section.targetLang": "目标语言",
@@ -144,6 +150,10 @@ const ZH: Dict = {
   "common.english": "English",
   "common.on": "开启",
   "common.off": "关闭",
+  "featureSwitch.hover.on.note": "鼠标悬停时自动翻译",
+  "featureSwitch.hover.off.note": "停止悬停高亮和翻译请求",
+  "featureSwitch.selection.on.note": "划词后显示翻译气泡",
+  "featureSwitch.selection.off.note": "停止划词气泡和翻译请求",
   "granularity.word": "词",
   "granularity.word.note": "命中单词后翻译单词",
   "granularity.sentence": "句子",
@@ -236,6 +246,7 @@ const EN: Dict = {
   "appearance.light": "Light",
   "appearance.dark": "Dark",
   "section.about": "About",
+  "section.featureSwitch": "Feature switch",
   "about.tagline": "OneLingo browser translation extension",
   "about.version": "Version {version}",
   "section.targetLang": "Target language",
@@ -250,6 +261,11 @@ const EN: Dict = {
   "common.english": "English",
   "common.on": "On",
   "common.off": "Off",
+  "featureSwitch.hover.on.note": "Translate automatically on hover",
+  "featureSwitch.hover.off.note": "Stop hover highlights and translation requests",
+  "featureSwitch.selection.on.note": "Show a translation bubble after selecting text",
+  "featureSwitch.selection.off.note":
+    "Stop selection bubbles and translation requests",
   "granularity.word": "Word",
   "granularity.word.note": "Translate the word under cursor",
   "granularity.sentence": "Sentence",

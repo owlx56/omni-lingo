@@ -9,7 +9,7 @@
 
 import { sendMessage } from "@/lib/messaging";
 import type { TranslateResponse } from "@/engines/types";
-import { isTargetSameAsText } from "@/lib/lang-detect";
+import { shouldSkipSameLanguageText } from "@/lib/lang-detect";
 import {
   getSettings,
   resolveTargetLang,
@@ -43,6 +43,7 @@ interface TextHit {
 }
 
 interface State {
+  enabled: boolean;
   target: string;
   engine: string;
   granularity: HoverGranularity;
@@ -64,6 +65,7 @@ interface HoverTranslateRequest {
 
 export function initHover(): void {
   const state: State = {
+    enabled: false,
     target: "zh",
     engine: "google",
     granularity: "word",
@@ -80,18 +82,22 @@ export function initHover(): void {
   };
 
   void getSettings().then((s) => {
+    state.enabled = s.hoverEnabled;
     state.target = resolveTargetLang(s.hoverTargetLang, s.uiLang);
     state.engine = s.engines.hover;
     state.granularity = s.hoverGranularity;
     state.fontSize = s.hoverFontSize;
     applyTooltipFontSize(state);
+    if (!state.enabled) dismiss(state);
   });
   watchSettings((s) => {
+    state.enabled = s.hoverEnabled;
     state.target = resolveTargetLang(s.hoverTargetLang, s.uiLang);
     state.engine = s.engines.hover;
     state.granularity = s.hoverGranularity;
     state.fontSize = s.hoverFontSize;
     applyTooltipFontSize(state);
+    if (!state.enabled) dismiss(state);
   });
 
   document.addEventListener("mousemove", (e) => onMove(e, state), {
@@ -102,6 +108,7 @@ export function initHover(): void {
 }
 
 function onMove(e: MouseEvent, s: State): void {
+  if (!s.enabled) return;
   if (isEditable(e.target) || isOurUi(e.target)) {
     dismiss(s);
     return;
@@ -117,9 +124,8 @@ function onMove(e: MouseEvent, s: State): void {
     dismiss(s);
     return;
   }
-  // 文本主要语言已等同于目标语言 → 不高亮不翻译。
-  // 例：hoverTargetLang=zh 时 hover 中文不触发。
-  if (isTargetSameAsText(hit.text, s.target)) {
+  // 高置信同语种文本不高亮不翻译；不确定时交给引擎。
+  if (shouldSkipSameLanguageText(hit.text, s.target)) {
     dismiss(s);
     return;
   }

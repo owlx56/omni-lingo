@@ -115,6 +115,28 @@ const CLICK_TO_SHOW_ORIGINAL_OPTIONS = [
   { value: false, labelKey: "common.off", noteKey: "clickToShow.off.note" },
 ] as const;
 
+const HOVER_ENABLED_OPTIONS = [
+  { value: true, labelKey: "common.on", noteKey: "featureSwitch.hover.on.note" },
+  {
+    value: false,
+    labelKey: "common.off",
+    noteKey: "featureSwitch.hover.off.note",
+  },
+] as const;
+
+const SELECTION_ENABLED_OPTIONS = [
+  {
+    value: true,
+    labelKey: "common.on",
+    noteKey: "featureSwitch.selection.on.note",
+  },
+  {
+    value: false,
+    labelKey: "common.off",
+    noteKey: "featureSwitch.selection.off.note",
+  },
+] as const;
+
 const THEMES: {
   value: ThemePreference;
   labelKey: MessageKey;
@@ -386,6 +408,19 @@ function App() {
 
   const renderHover = (): JSX.Element => (
     <>
+      <Section title={t("section.featureSwitch")}>
+        <For each={HOVER_ENABLED_OPTIONS}>
+          {(option) => (
+            <OptionButton
+              active={settings().hoverEnabled === option.value}
+              label={t(option.labelKey)}
+              note={t(option.noteKey)}
+              onClick={() => void setSettings({ hoverEnabled: option.value })}
+            />
+          )}
+        </For>
+      </Section>
+
       <Section title={t("section.targetLang")}>
         <TargetLanguageOptions
           value={settings().hoverTargetLang}
@@ -450,6 +485,21 @@ function App() {
 
   const renderSelection = (): JSX.Element => (
     <>
+      <Section title={t("section.featureSwitch")}>
+        <For each={SELECTION_ENABLED_OPTIONS}>
+          {(option) => (
+            <OptionButton
+              active={settings().selectionEnabled === option.value}
+              label={t(option.labelKey)}
+              note={t(option.noteKey)}
+              onClick={() =>
+                void setSettings({ selectionEnabled: option.value })
+              }
+            />
+          )}
+        </For>
+      </Section>
+
       <Section title={t("section.targetLang")}>
         <TargetLanguageOptions
           value={settings().selectionTargetLang}

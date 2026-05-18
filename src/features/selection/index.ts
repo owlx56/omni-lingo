@@ -28,6 +28,7 @@ const HOVER_CONFIRM_MS = 500; // mouseenter → 弹卡片延迟
 const LEAVE_CONFIRM_MS = 100; // mouseleave → 取消延迟（防鼠标划过抖动）
 
 interface State {
+  enabled: boolean;
   target: string;
   engine: string;
   logo: HTMLButtonElement | null;
@@ -45,6 +46,7 @@ interface State {
 
 export function initSelection(): void {
   const s: State = {
+    enabled: false,
     target: "zh",
     engine: "google",
     logo: null,
@@ -61,16 +63,20 @@ export function initSelection(): void {
   };
 
   void getSettings().then((cfg) => {
+    s.enabled = cfg.selectionEnabled;
     const target = resolveTargetLang(cfg.selectionTargetLang, cfg.uiLang);
     s.target = target;
     s.engine = cfg.engines.selection;
     setSelTarget(target);
+    if (!s.enabled) hide(s);
   });
   watchSettings((cfg) => {
+    s.enabled = cfg.selectionEnabled;
     const target = resolveTargetLang(cfg.selectionTargetLang, cfg.uiLang);
     s.target = target;
     s.engine = cfg.engines.selection;
     setSelTarget(target);
+    if (!s.enabled) hide(s);
   });
 
   // ★ 关键修复：shadow DOM 内的 mouseup retarget 到 host，
@@ -99,6 +105,7 @@ export function initSelection(): void {
 // ─── 选区 ─────────────────────────────────────────────
 
 function onMouseUp(e: MouseEvent, s: State): void {
+  if (!s.enabled) return;
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const text = sel.toString().trim();

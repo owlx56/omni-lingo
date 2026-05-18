@@ -46,6 +46,8 @@ export const HOVER_FONT_SIZE_MAX = 17;
 
 export interface Settings {
   uiLang: UiLang; // options/popup/未来悬浮球的 UI 语言，同时是三个功能 target 的 inherit 回退值
+  hoverEnabled: boolean;
+  selectionEnabled: boolean;
   hoverTargetLang: TargetLang;
   selectionTargetLang: TargetLang;
   immersiveTargetLang: TargetLang;
@@ -76,6 +78,8 @@ export type SettingsPatch = Omit<
 
 const DEFAULTS: Settings = {
   uiLang: "zh",
+  hoverEnabled: true,
+  selectionEnabled: true,
   hoverTargetLang: "inherit",
   selectionTargetLang: "inherit",
   immersiveTargetLang: "inherit",
@@ -119,6 +123,14 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
   );
   // uiLang 优先读新字段；否则回退到 legacy targetLang。
   const uiLang = normalizeUiLang(legacy?.uiLang ?? legacy?.targetLang);
+  const hoverEnabled = normalizeBoolean(
+    legacy?.hoverEnabled,
+    DEFAULTS.hoverEnabled,
+  );
+  const selectionEnabled = normalizeBoolean(
+    legacy?.selectionEnabled,
+    DEFAULTS.selectionEnabled,
+  );
   const hoverTargetLang = normalizeTargetLang(legacy?.hoverTargetLang);
   const selectionTargetLang = normalizeTargetLang(legacy?.selectionTargetLang);
   const immersiveTargetLang = normalizeTargetLang(legacy?.immersiveTargetLang);
@@ -131,6 +143,8 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     translationStyle,
     hoverFontSize,
     uiLang,
+    hoverEnabled,
+    selectionEnabled,
     hoverTargetLang,
     selectionTargetLang,
     immersiveTargetLang,
@@ -152,6 +166,10 @@ function normalizeTheme(value: unknown): ThemePreference {
   return value === "system" || value === "light" || value === "dark"
     ? value
     : DEFAULTS.theme;
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  return typeof value === "boolean" ? value : fallback;
 }
 
 /**
