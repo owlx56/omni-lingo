@@ -8,6 +8,8 @@
 html {
     min-height: 100%;
     background: var(--bg);
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
 }
 
 body {
