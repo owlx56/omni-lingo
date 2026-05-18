@@ -117,6 +117,10 @@ export function IconMoon(props: IconProps): JSX.Element {
   );
 }
 
+export function IconChevron(props: IconProps): JSX.Element {
+  return svg(<path d="M6 9l6 6 6-6" />, props.size ?? 14);
+}
+
 export function IconLogo(props: IconProps): JSX.Element {
   // OneLingo 占位 logo：一个文字气泡 + 翻译箭头。
   return svg(

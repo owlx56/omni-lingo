@@ -29,6 +29,7 @@ export type MessageKey =
   | "section.featureSwitch"
   | "about.tagline"
   | "about.version"
+  | "about.versionLabel"
   | "section.targetLang"
   | "section.engine"
   | "section.granularity"
@@ -41,6 +42,23 @@ export type MessageKey =
   | "common.english"
   | "common.on"
   | "common.off"
+  | "desc.uiLang"
+  | "desc.appearance"
+  | "desc.hoverEnabled"
+  | "desc.hoverTargetLang"
+  | "desc.hoverEngine"
+  | "desc.granularity"
+  | "desc.fontSize"
+  | "desc.selectionEnabled"
+  | "desc.selectionTargetLang"
+  | "desc.selectionEngine"
+  | "desc.immersiveTargetLang"
+  | "desc.immersiveEngine"
+  | "desc.displayMode"
+  | "desc.clickToShowOriginal"
+  | "desc.underline"
+  | "desc.font"
+  | "desc.color"
   | "featureSwitch.hover.on.note"
   | "featureSwitch.hover.off.note"
   | "featureSwitch.selection.on.note"
@@ -138,6 +156,7 @@ const ZH: Dict = {
   "section.featureSwitch": "功能开关",
   "about.tagline": "OneLingo 浏览器翻译扩展",
   "about.version": "版本 {version}",
+  "about.versionLabel": "版本",
   "section.targetLang": "目标语言",
   "section.engine": "翻译引擎",
   "section.granularity": "悬停粒度",
@@ -150,6 +169,23 @@ const ZH: Dict = {
   "common.english": "English",
   "common.on": "开启",
   "common.off": "关闭",
+  "desc.uiLang": "设置页、弹出面板以及默认目标语言的语言",
+  "desc.appearance": "跟随系统或手动选择亮/暗主题",
+  "desc.hoverEnabled": "鼠标悬停时高亮并翻译词/句/段",
+  "desc.hoverTargetLang": "悬停翻译的目标语言，跳过已是该语言的文本",
+  "desc.hoverEngine": "悬停翻译使用的服务提供商",
+  "desc.granularity": "鼠标位置取词、取句还是取整段",
+  "desc.fontSize": "悬停译文气泡的文字大小",
+  "desc.selectionEnabled": "划词后在选区旁边弹出译文气泡",
+  "desc.selectionTargetLang": "划词翻译的目标语言，跳过已是该语言的选区",
+  "desc.selectionEngine": "划词翻译使用的服务提供商",
+  "desc.immersiveTargetLang": "全文翻译的目标语言",
+  "desc.immersiveEngine": "全文翻译使用的服务提供商",
+  "desc.displayMode": "译文是替换原文还是双语並列",
+  "desc.clickToShowOriginal": "译文点击后临时显示原文",
+  "desc.underline": "译文下方的装饰线",
+  "desc.font": "译文的字体",
+  "desc.color": "译文的颜色",
   "featureSwitch.hover.on.note": "鼠标悬停时自动翻译",
   "featureSwitch.hover.off.note": "停止悬停高亮和翻译请求",
   "featureSwitch.selection.on.note": "划词后显示翻译气泡",
@@ -249,6 +285,7 @@ const EN: Dict = {
   "section.featureSwitch": "Feature switch",
   "about.tagline": "OneLingo browser translation extension",
   "about.version": "Version {version}",
+  "about.versionLabel": "Version",
   "section.targetLang": "Target language",
   "section.engine": "Translation engine",
   "section.granularity": "Hover granularity",
@@ -261,6 +298,23 @@ const EN: Dict = {
   "common.english": "English",
   "common.on": "On",
   "common.off": "Off",
+  "desc.uiLang": "Language for the settings page, popups, and default target language",
+  "desc.appearance": "Follow the system or pick a light / dark theme",
+  "desc.hoverEnabled": "Highlight and translate the word, sentence, or paragraph under the cursor",
+  "desc.hoverTargetLang": "Target language for hover translation; text already in this language is skipped",
+  "desc.hoverEngine": "Provider used for hover translation",
+  "desc.granularity": "Whether the cursor picks a word, sentence, or paragraph",
+  "desc.fontSize": "Font size of the hover translation tooltip",
+  "desc.selectionEnabled": "Show a translation bubble next to the selection after selecting text",
+  "desc.selectionTargetLang": "Target language for selection translation; selections already in this language are skipped",
+  "desc.selectionEngine": "Provider used for selection translation",
+  "desc.immersiveTargetLang": "Target language for full-page translation",
+  "desc.immersiveEngine": "Provider used for full-page translation",
+  "desc.displayMode": "Whether translation replaces the original or shows alongside it",
+  "desc.clickToShowOriginal": "Click a translation to temporarily reveal the original text",
+  "desc.underline": "Decoration drawn under translated text",
+  "desc.font": "Font family of translated text",
+  "desc.color": "Color of translated text",
   "featureSwitch.hover.on.note": "Translate automatically on hover",
   "featureSwitch.hover.off.note": "Stop hover highlights and translation requests",
   "featureSwitch.selection.on.note": "Show a translation bubble after selecting text",

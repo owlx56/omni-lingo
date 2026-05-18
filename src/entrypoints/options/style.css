@@ -1,3 +1,12 @@
+/* Options 页样式：Claude.ai 扁平 row + 细分隔线风格。
+ *
+ * 设计要点：
+ *   - 颜色 token 用 CSS 变量；亮/暗主题切 [data-theme] 即可。
+ *   - 不用 card border + shadow，section 仅一个 bold 标题，下面是 row 列表。
+ *   - row 之间靠 1px 分隔线区分，section 自身没有 padding/border。
+ *   - control 紧贴右；范围 slider / 译文预览 用 .row-full 撑开整行。
+ */
+
 :root {
     font-family:
         Georgia,
@@ -8,41 +17,43 @@
         SimSun,
         "宋体",
         serif;
-    background: var(--bg);
     color: var(--text);
+    background: var(--bg);
     color-scheme: light;
 }
 
 :root,
 :root[data-theme="light"] {
-    --bg: #faf9f5;
+    --bg: #f7f5f1;
     --surface: #ffffff;
-    --surface-alt: #f3f1ea;
-    --surface-strong: #ebe9e2;
+    --surface-alt: #ece9e1;
+    --surface-strong: #dfdcd2;
     --text: #1f1e1d;
-    --text-muted: #6b6a67;
-    --border: #e6e3da;
-    --border-strong: #d2cec2;
+    --text-muted: #6f6e6a;
+    --border: #e2dfd5;
+    --border-strong: #c8c4b8;
     --accent: #1f1e1d;
     --selected-bg: #ebe9e2;
-    --danger: #b42318;
-    --shadow: 0 14px 42px rgba(31, 30, 29, 0.08);
+    --switch-on: #2c75e0;
+    --switch-thumb: #ffffff;
+    --shadow-soft: 0 1px 2px rgba(31, 30, 29, 0.08);
     color-scheme: light;
 }
 
 :root[data-theme="dark"] {
     --bg: #1c1c1c;
     --surface: #232323;
-    --surface-alt: #2a2a2a;
-    --surface-strong: #30302f;
-    --text: #e7e5dd;
-    --text-muted: #aaa7a0;
-    --border: #353432;
+    --surface-alt: #2c2c2b;
+    --surface-strong: #353433;
+    --text: #ebe8df;
+    --text-muted: #a3a09a;
+    --border: #2f2f2e;
     --border-strong: #4a4843;
-    --accent: #e7e5dd;
-    --selected-bg: #2f2f2d;
-    --danger: #ffb4a8;
-    --shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
+    --accent: #ebe8df;
+    --selected-bg: #353433;
+    --switch-on: #2c75e0;
+    --switch-thumb: #ffffff;
+    --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
     color-scheme: dark;
 }
 
@@ -62,13 +73,13 @@ body {
 }
 
 button,
-input {
+input,
+select {
     font: inherit;
-}
-
-button {
     color: inherit;
 }
+
+/* ── 页面骨架 ─────────────────────────────────────────────── */
 
 .page {
     width: min(960px, calc(100vw - 40px));
@@ -99,15 +110,9 @@ h2 {
 }
 
 h1 {
-    font-size: 38px;
+    font-size: 36px;
     font-weight: 650;
     line-height: 1.05;
-}
-
-h2 {
-    font-size: 17px;
-    font-weight: 650;
-    line-height: 1.25;
 }
 
 .scope {
@@ -119,9 +124,11 @@ h2 {
 .settings-shell {
     display: grid;
     grid-template-columns: 200px minmax(0, 1fr);
-    gap: 34px;
+    gap: 36px;
     padding-top: 30px;
 }
+
+/* ── Sidebar ──────────────────────────────────────────────── */
 
 .sidebar {
     position: sticky;
@@ -129,7 +136,7 @@ h2 {
     display: flex;
     align-self: start;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 
 .sidebar-item {
@@ -137,17 +144,17 @@ h2 {
     align-items: center;
     gap: 10px;
     width: 100%;
-    min-height: 38px;
+    min-height: 36px;
     padding: 0 12px;
-    border: 1px solid transparent;
+    border: none;
     border-radius: 8px;
     background: transparent;
     color: var(--text-muted);
+    font-size: 14px;
     text-align: left;
     cursor: pointer;
     transition:
         background-color 120ms ease,
-        border-color 120ms ease,
         color 120ms ease;
 }
 
@@ -157,233 +164,326 @@ h2 {
 }
 
 .sidebar-item.active {
-    border-color: var(--border);
     background: var(--selected-bg);
     color: var(--text);
+    font-weight: 600;
 }
+
+/* ── 内容面板 ─────────────────────────────────────────────── */
 
 .content-panel {
     min-width: 0;
 }
 
 .tab-heading {
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
 }
 
 .tab-heading h2 {
-    font-size: 24px;
+    font-size: 22px;
+    font-weight: 650;
+    line-height: 1.2;
 }
 
 .section {
-    padding: 24px 0 2px;
+    padding: 28px 0 0;
 }
 
 .section > h2 {
-    margin-bottom: 12px;
-}
-
-.option-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-    gap: 10px;
-}
-
-.option-grid.compact {
-    grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
-}
-
-.inline-grid {
-    width: 100%;
-}
-
-.option-button {
-    min-height: 62px;
-    padding: 12px 14px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--text);
-    text-align: left;
-    cursor: pointer;
-    transition:
-        border-color 120ms ease,
-        background-color 120ms ease,
-        box-shadow 120ms ease;
-}
-
-.option-button:hover {
-    border-color: var(--border-strong);
-    background: var(--surface-alt);
-}
-
-.option-button.active {
-    border-color: var(--accent);
-    background: var(--selected-bg);
-    box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.option-button span {
-    display: block;
-    overflow-wrap: anywhere;
     font-size: 14px;
-    font-weight: 650;
-    line-height: 1.25;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 4px;
 }
 
-.option-button small {
-    display: block;
-    margin-top: 5px;
-    color: var(--text-muted);
-    font-size: 12px;
+/* ── Row 模式（核心）─────────────────────────────────────── */
+
+.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 18px 0;
+    border-top: 1px solid var(--border);
+}
+
+.section .row:last-of-type {
+    border-bottom: 1px solid var(--border);
+}
+
+.row-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.row-label {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
     line-height: 1.35;
 }
 
-.field-stack,
-.style-panel,
-.profile-panel,
-.about-panel {
-    display: grid;
-    gap: 14px;
-    padding: 16px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    box-shadow: var(--shadow);
+.row-desc {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.45;
 }
 
-.field {
-    display: grid;
-    grid-template-columns: minmax(120px, 180px) minmax(0, 1fr);
-    gap: 16px;
+.row-control {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.row-static {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* FullRow：control 占整行 */
+
+.row-full {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+}
+
+.row-full .row-info {
+    flex: 1 1 auto;
+}
+
+.row-control-full {
+    width: 100%;
+    justify-content: stretch;
+}
+
+/* ── 控件：Switch ─────────────────────────────────────────── */
+
+.switch {
+    appearance: none;
+    position: relative;
+    width: 36px;
+    height: 22px;
+    border: none;
+    border-radius: 999px;
+    background: var(--surface-strong);
+    cursor: pointer;
+    padding: 0;
+    transition: background-color 150ms ease;
+}
+
+.switch.on {
+    background: var(--switch-on);
+}
+
+.switch-thumb {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    background: var(--switch-thumb);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    transition: transform 150ms ease;
+}
+
+.switch.on .switch-thumb {
+    transform: translateX(14px);
+}
+
+/* ── 控件：Select ─────────────────────────────────────────── */
+
+.select {
+    position: relative;
+    display: inline-flex;
     align-items: center;
 }
 
-.field-label,
-.style-label {
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 650;
+.select-input {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    padding: 4px 22px 4px 6px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 120ms ease;
 }
 
-.field-control {
-    min-width: 0;
-}
-
-.text-input {
-    width: 100%;
-    min-height: 38px;
-    padding: 0 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+.select-input:hover {
     background: var(--surface-alt);
+}
+
+.select-input:focus-visible {
+    outline: 2px solid var(--switch-on);
+    outline-offset: 1px;
+}
+
+.select-chevron {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    display: inline-flex;
     color: var(--text-muted);
 }
 
-.avatar {
-    display: grid;
-    width: 48px;
-    height: 48px;
-    place-items: center;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface-alt);
+.select.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* native option 在系统层渲染：light 主题用浅，dark 主题用深 */
+.select-input option {
+    background: var(--surface);
     color: var(--text);
 }
 
-.notice {
-    padding: 10px 12px;
-    border-radius: 8px;
+/* ── 控件：Segment（文字段控件）─────────────────────────── */
+
+.segment {
+    display: inline-flex;
     background: var(--surface-alt);
-    color: var(--text-muted);
-    font-size: 13px;
-    line-height: 1.45;
+    border-radius: 8px;
+    padding: 2px;
+    gap: 2px;
 }
 
-.about-panel {
-    gap: 8px;
+.segment-button {
+    border: none;
+    background: transparent;
     color: var(--text-muted);
     font-size: 13px;
-    line-height: 1.45;
+    font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition:
+        background-color 120ms ease,
+        color 120ms ease;
 }
 
-.about-panel strong {
+.segment-button:hover:not(.active) {
     color: var(--text);
-    font-size: 15px;
 }
+
+.segment-button.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-soft);
+}
+
+/* ── 控件：IconSegment（主题切换）──────────────────────── */
 
 .icon-segment {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
+    display: inline-flex;
+    background: var(--surface-alt);
+    border-radius: 8px;
+    padding: 2px;
+    gap: 2px;
 }
 
-.icon-option {
-    display: flex;
+.icon-segment-button {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    min-height: 40px;
-    padding: 0 10px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
+    width: 32px;
+    height: 26px;
+    border: none;
+    background: transparent;
     color: var(--text-muted);
+    border-radius: 6px;
     cursor: pointer;
+    padding: 0;
+    transition:
+        background-color 120ms ease,
+        color 120ms ease;
 }
 
-.icon-option:hover,
-.icon-option.active {
-    border-color: var(--accent);
-    background: var(--selected-bg);
+.icon-segment-button:hover:not(.active) {
     color: var(--text);
 }
 
-.style-block {
-    display: grid;
-    gap: 10px;
+.icon-segment-button.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow-soft);
 }
 
-.color-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-    gap: 10px;
-}
+/* ── Range slider（hover 字号）──────────────────────────── */
 
-.color-button {
+.range-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    min-height: 44px;
-    padding: 0 12px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
+    gap: 16px;
+    width: 100%;
+}
+
+.range-input {
+    flex: 1;
+    accent-color: var(--switch-on);
+}
+
+.range-value {
+    min-width: 48px;
     color: var(--text);
-    cursor: pointer;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    text-align: right;
 }
 
-.color-button:hover {
-    background: var(--surface-alt);
+/* ── Color swatch row ─────────────────────────────────────── */
+
+.color-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
-.color-button.active {
-    border-color: var(--accent);
-    background: var(--selected-bg);
-    box-shadow: inset 0 0 0 1px var(--accent);
-}
-
-.color-swatch {
-    flex: 0 0 auto;
-    width: 16px;
-    height: 16px;
+.color-swatch-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
     border: 1px solid var(--border-strong);
     border-radius: 999px;
+    background: transparent;
+    cursor: pointer;
+    transition: outline 120ms ease;
+}
+
+.color-swatch-button.active {
+    outline: 2px solid var(--switch-on);
+    outline-offset: 2px;
+}
+
+.color-swatch-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--swatch);
+    /* inherit 用透明：保留 checker 背景 */
+}
+
+/* inherit 透明色用 checker 提示 */
+.color-swatch-button:first-child .color-swatch-dot {
     background-image:
-        linear-gradient(45deg, var(--surface) 25%, transparent 25%),
-        linear-gradient(-45deg, var(--surface) 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, var(--surface) 75%),
-        linear-gradient(-45deg, transparent 75%, var(--surface) 75%);
+        linear-gradient(45deg, var(--surface-strong) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--surface-strong) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--surface-strong) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--surface-strong) 75%);
     background-size: 8px 8px;
     background-position:
         0 0,
@@ -392,65 +492,63 @@ h2 {
         -4px 0;
 }
 
-.color-input {
-    width: 100%;
-    min-height: 44px;
-    padding: 6px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
+.color-swatch-button-custom {
+    overflow: hidden;
 }
 
-.color-input:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.color-swatch-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    border: none;
+    padding: 0;
 }
+
+/* ── Translation preview ─────────────────────────────────── */
 
 .style-preview {
-    min-height: 48px;
-    padding: 12px 14px;
+    width: 100%;
+    padding: 14px 16px;
     border: 1px dashed var(--border-strong);
     border-radius: 8px;
     background: var(--surface-alt);
+    color: var(--text);
     font-size: 15px;
+    line-height: 1.55;
+}
+
+/* ── Avatar / Notice / About ─────────────────────────────── */
+
+.avatar {
+    display: inline-grid;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-alt);
+    color: var(--text);
+}
+
+.avatar-small {
+    width: 32px;
+    height: 32px;
+}
+
+.notice {
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    font-size: 13px;
     line-height: 1.5;
 }
 
-.range-row {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 16px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    box-shadow: var(--shadow);
-}
-
-.range-input {
-    flex: 1;
-    accent-color: var(--accent);
-}
-
-.range-value {
-    min-width: 48px;
-    color: var(--text);
-    text-align: right;
-    font-size: 14px;
-    font-variant-numeric: tabular-nums;
-    font-weight: 650;
-}
-
-.muted-note {
-    margin: 18px 0 0;
-    padding: 12px 14px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--text-muted);
-    font-size: 13px;
-    line-height: 1.45;
-}
+/* ── Responsive ───────────────────────────────────────────── */
 
 @media (max-width: 720px) {
     .page {
@@ -459,8 +557,8 @@ h2 {
     }
 
     .header {
-        align-items: start;
         flex-direction: column;
+        align-items: start;
         gap: 8px;
     }
 
@@ -475,27 +573,19 @@ h2 {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .field {
-        grid-template-columns: 1fr;
-        gap: 8px;
+    .row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .row-control {
+        justify-content: flex-start;
     }
 }
 
 @media (max-width: 460px) {
     .sidebar {
         grid-template-columns: 1fr;
-    }
-
-    .icon-segment {
-        grid-template-columns: 1fr;
-    }
-
-    .range-row {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .range-value {
-        text-align: left;
     }
 }

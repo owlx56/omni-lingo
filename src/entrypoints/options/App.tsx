@@ -1,4 +1,16 @@
-import { For, createSignal, type JSX } from "solid-js";
+// Options 页主容器。
+//
+// 布局：左 sidebar 切 tab，右内容区。Tab 内容用 row primitives 排成
+// Claude.ai 风格的扁平列表（section 标题 + 细分隔线行）。
+//
+// 设计原则：
+//   - 每行一个设置，左侧 label + 可选 description，右侧单一控件。
+//   - 复杂控件（slider / 译文样式色板 / 预览）用 FullRow，独占整行。
+//   - boolean 用 Switch；多选用 Select；2~3 选文字段控件用 Segment；
+//     主题用 IconSegment。
+//   - About 页是只读 row，不做控件。
+
+import { For, Show, createSignal, type JSX } from "solid-js";
 import {
   resolveTranslationStyleColor,
   resolveTranslationStyleFontFamily,
@@ -31,17 +43,25 @@ import {
   IconSystem,
   IconUser,
 } from "./icons";
+import {
+  FullRow,
+  IconSegment,
+  Row,
+  Segment,
+  Select,
+  Switch,
+  type IconSegmentOption,
+  type SegmentOption,
+  type SelectOption,
+} from "./components";
+
 
 type TabId = "account" | "hover" | "selection" | "immersive" | "about";
 type OptionIcon = (props: { size?: number }) => JSX.Element;
 
 const VERSION = "0.0.0";
 
-const TABS: {
-  id: TabId;
-  labelKey: MessageKey;
-  icon: OptionIcon;
-}[] = [
+const TABS: { id: TabId; labelKey: MessageKey; icon: OptionIcon }[] = [
   { id: "account", labelKey: "sidebar.account", icon: IconUser },
   { id: "hover", labelKey: "sidebar.hover", icon: IconHover },
   { id: "selection", labelKey: "sidebar.selection", icon: IconSelection },
@@ -49,216 +69,64 @@ const TABS: {
   { id: "about", labelKey: "sidebar.about", icon: IconInfo },
 ];
 
-const UI_LANGS: { value: UiLang; labelKey: MessageKey }[] = [
-  { value: "zh", labelKey: "common.chinese" },
-  { value: "en", labelKey: "common.english" },
+const UI_LANG_KEYS: Record<UiLang, MessageKey> = {
+  zh: "common.chinese",
+  en: "common.english",
+};
+
+const TARGET_LANG_KEYS: Record<TargetLang, MessageKey> = {
+  inherit: "common.followUiLang",
+  zh: "common.chinese",
+  en: "common.english",
+};
+
+const HOVER_ENGINES: { value: string; label: string }[] = [
+  { value: "google", label: "Google" },
+  { value: "google2", label: "Google 2" },
+  { value: "microsoft", label: "Microsoft" },
 ];
 
-const TARGET_LANGS: { value: TargetLang; labelKey: MessageKey }[] = [
-  { value: "inherit", labelKey: "common.followUiLang" },
-  { value: "zh", labelKey: "common.chinese" },
-  { value: "en", labelKey: "common.english" },
+const FULL_PAGE_ENGINES: { value: FullPageEngineId; label: string }[] = [
+  { value: "google2", label: "Google 2" },
+  { value: "microsoft", label: "Microsoft" },
 ];
 
-const HOVER_ENGINES: { value: string; label: string; noteKey: MessageKey }[] = [
-  { value: "google", label: "Google", noteKey: "engine.note.google" },
-  { value: "google2", label: "Google 2", noteKey: "engine.note.google2" },
-  { value: "microsoft", label: "Microsoft", noteKey: "engine.note.microsoft" },
+const GRANULARITIES: { value: HoverGranularity; labelKey: MessageKey }[] = [
+  { value: "word", labelKey: "granularity.word" },
+  { value: "sentence", labelKey: "granularity.sentence" },
+  { value: "paragraph", labelKey: "granularity.paragraph" },
 ];
 
-const FULL_PAGE_ENGINES: {
-  value: FullPageEngineId;
-  label: string;
-  noteKey: MessageKey;
-}[] = [
-  { value: "google2", label: "Google 2", noteKey: "engine.note.google2" },
-  { value: "microsoft", label: "Microsoft", noteKey: "engine.note.microsoft" },
+const MODES: { value: FullPageMode; labelKey: MessageKey }[] = [
+  { value: "replace", labelKey: "mode.replace" },
+  { value: "bilingual", labelKey: "mode.bilingual" },
 ];
 
-const GRANULARITIES: {
-  value: HoverGranularity;
-  labelKey: MessageKey;
-  noteKey: MessageKey;
-}[] = [
-  {
-    value: "word",
-    labelKey: "granularity.word",
-    noteKey: "granularity.word.note",
-  },
-  {
-    value: "sentence",
-    labelKey: "granularity.sentence",
-    noteKey: "granularity.sentence.note",
-  },
-  {
-    value: "paragraph",
-    labelKey: "granularity.paragraph",
-    noteKey: "granularity.paragraph.note",
-  },
+const FONT_FAMILIES: { value: TranslationFontFamily; labelKey: MessageKey }[] = [
+  { value: "inherit", labelKey: "font.inherit" },
+  { value: "serif", labelKey: "font.serif" },
+  { value: "sans", labelKey: "font.sans" },
+  { value: "mono", labelKey: "font.mono" },
 ];
-
-const MODES: {
-  value: FullPageMode;
-  labelKey: MessageKey;
-  noteKey: MessageKey;
-}[] = [
-  { value: "replace", labelKey: "mode.replace", noteKey: "mode.replace.note" },
-  {
-    value: "bilingual",
-    labelKey: "mode.bilingual",
-    noteKey: "mode.bilingual.note",
-  },
-];
-
-const CLICK_TO_SHOW_ORIGINAL_OPTIONS = [
-  { value: true, labelKey: "common.on", noteKey: "clickToShow.on.note" },
-  { value: false, labelKey: "common.off", noteKey: "clickToShow.off.note" },
-] as const;
-
-const HOVER_ENABLED_OPTIONS = [
-  { value: true, labelKey: "common.on", noteKey: "featureSwitch.hover.on.note" },
-  {
-    value: false,
-    labelKey: "common.off",
-    noteKey: "featureSwitch.hover.off.note",
-  },
-] as const;
-
-const SELECTION_ENABLED_OPTIONS = [
-  {
-    value: true,
-    labelKey: "common.on",
-    noteKey: "featureSwitch.selection.on.note",
-  },
-  {
-    value: false,
-    labelKey: "common.off",
-    noteKey: "featureSwitch.selection.off.note",
-  },
-] as const;
-
-const THEMES: {
-  value: ThemePreference;
-  labelKey: MessageKey;
-  icon: OptionIcon;
-}[] = [
-  { value: "system", labelKey: "appearance.system", icon: IconSystem },
-  { value: "light", labelKey: "appearance.light", icon: IconSun },
-  { value: "dark", labelKey: "appearance.dark", icon: IconMoon },
-];
-
-const FONT_FAMILIES: {
-  value: TranslationFontFamily;
-  labelKey: MessageKey;
-  noteKey: MessageKey;
-}[] = [
-  { value: "inherit", labelKey: "font.inherit", noteKey: "font.inherit.note" },
-  { value: "serif", labelKey: "font.serif", noteKey: "font.serif.note" },
-  { value: "sans", labelKey: "font.sans", noteKey: "font.sans.note" },
-  { value: "mono", labelKey: "font.mono", noteKey: "font.mono.note" },
-];
-
-const COLORS: { value: TranslationColor; labelKey: MessageKey; color?: string }[] =
-  [
-    { value: "inherit", labelKey: "color.inherit" },
-    { value: "muted", labelKey: "color.muted", color: "#6b7280" },
-    { value: "blue", labelKey: "color.blue", color: "#2563eb" },
-    { value: "green", labelKey: "color.green", color: "#047857" },
-    { value: "red", labelKey: "color.red", color: "#dc2626" },
-    { value: "custom", labelKey: "color.custom" },
-  ];
 
 const UNDERLINE_STYLES: {
   value: TranslationUnderlineStyle;
   labelKey: MessageKey;
-  noteKey: MessageKey;
 }[] = [
-  {
-    value: "none",
-    labelKey: "underline.none",
-    noteKey: "underline.none.note",
-  },
-  {
-    value: "solid",
-    labelKey: "underline.solid",
-    noteKey: "underline.solid.note",
-  },
-  {
-    value: "dotted",
-    labelKey: "underline.dotted",
-    noteKey: "underline.dotted.note",
-  },
-  {
-    value: "wavy",
-    labelKey: "underline.wavy",
-    noteKey: "underline.wavy.note",
-  },
+  { value: "none", labelKey: "underline.none" },
+  { value: "solid", labelKey: "underline.solid" },
+  { value: "dotted", labelKey: "underline.dotted" },
+  { value: "wavy", labelKey: "underline.wavy" },
 ];
 
-function OptionButton(props: {
-  active: boolean;
-  label: string;
-  note?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      class="option-button"
-      classList={{ active: props.active }}
-      onClick={props.onClick}
-      type="button"
-    >
-      <span>{props.label}</span>
-      {props.note ? <small>{props.note}</small> : null}
-    </button>
-  );
-}
-
-function ColorButton(props: {
-  active: boolean;
-  label: string;
-  color?: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      class="color-button"
-      classList={{ active: props.active }}
-      onClick={props.onClick}
-      type="button"
-    >
-      <span
-        class="color-swatch"
-        style={{ "background-color": props.color ?? "transparent" }}
-      />
-      <span>{props.label}</span>
-    </button>
-  );
-}
-
-function Section(props: {
-  title: string;
-  children: JSX.Element;
-  compact?: boolean;
-}) {
-  return (
-    <section class="section">
-      <h2>{props.title}</h2>
-      <div class="option-grid" classList={{ compact: props.compact }}>
-        {props.children}
-      </div>
-    </section>
-  );
-}
-
-function Field(props: { label: string; children: JSX.Element }) {
-  return (
-    <div class="field">
-      <span class="field-label">{props.label}</span>
-      <div class="field-control">{props.children}</div>
-    </div>
-  );
-}
+const COLOR_PRESETS: { value: TranslationColor; labelKey: MessageKey; swatch?: string }[] =
+  [
+    { value: "inherit", labelKey: "color.inherit" },
+    { value: "muted", labelKey: "color.muted", swatch: "#6b7280" },
+    { value: "blue", labelKey: "color.blue", swatch: "#2563eb" },
+    { value: "green", labelKey: "color.green", swatch: "#047857" },
+    { value: "red", labelKey: "color.red", swatch: "#dc2626" },
+  ];
 
 function Sidebar(props: {
   activeTab: TabId;
@@ -277,7 +145,7 @@ function Sidebar(props: {
               onClick={() => props.onSelect(tab.id)}
               type="button"
             >
-              <Icon size={17} />
+              <Icon size={16} />
               <span>{props.t(tab.labelKey)}</span>
             </button>
           );
@@ -287,47 +155,98 @@ function Sidebar(props: {
   );
 }
 
-function AppearanceSwitch(props: { value: ThemePreference; t: TFn }) {
-  return (
-    <div class="icon-segment" role="group">
-      <For each={THEMES}>
-        {(theme) => {
-          const Icon = theme.icon;
-          const label = props.t(theme.labelKey);
-          return (
-            <button
-              aria-label={label}
-              class="icon-option"
-              classList={{ active: props.value === theme.value }}
-              onClick={() => void setSettings({ theme: theme.value })}
-              title={label}
-              type="button"
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-            </button>
-          );
-        }}
-      </For>
-    </div>
-  );
+function uiLangSegmentOptions(t: TFn): SegmentOption<UiLang>[] {
+  return [
+    { value: "zh", label: t(UI_LANG_KEYS.zh) },
+    { value: "en", label: t(UI_LANG_KEYS.en) },
+  ];
 }
 
-function TargetLanguageOptions(props: {
-  value: TargetLang;
-  onChange: (value: TargetLang) => void;
-  t: TFn;
+function targetLangSegmentOptions(t: TFn): SegmentOption<TargetLang>[] {
+  return [
+    { value: "inherit", label: t(TARGET_LANG_KEYS.inherit) },
+    { value: "zh", label: t(TARGET_LANG_KEYS.zh) },
+    { value: "en", label: t(TARGET_LANG_KEYS.en) },
+  ];
+}
+
+function granularitySelectOptions(t: TFn): SelectOption<HoverGranularity>[] {
+  return GRANULARITIES.map((item) => ({
+    value: item.value,
+    label: t(item.labelKey),
+  }));
+}
+
+function modeSegmentOptions(t: TFn): SegmentOption<FullPageMode>[] {
+  return MODES.map((item) => ({ value: item.value, label: t(item.labelKey) }));
+}
+
+function fontSelectOptions(t: TFn): SelectOption<TranslationFontFamily>[] {
+  return FONT_FAMILIES.map((item) => ({
+    value: item.value,
+    label: t(item.labelKey),
+  }));
+}
+
+function underlineSelectOptions(
+  t: TFn,
+): SelectOption<TranslationUnderlineStyle>[] {
+  return UNDERLINE_STYLES.map((item) => ({
+    value: item.value,
+    label: t(item.labelKey),
+  }));
+}
+
+function appearanceOptions(t: TFn): IconSegmentOption<ThemePreference>[] {
+  return [
+    { value: "system", label: t("appearance.system"), icon: IconSystem },
+    { value: "light", label: t("appearance.light"), icon: IconSun },
+    { value: "dark", label: t("appearance.dark"), icon: IconMoon },
+  ];
+}
+
+function ColorRowControl(props: {
+  value: TranslationColor;
+  customColor: string;
+  onSelect: (next: TranslationColor) => void;
+  onCustom: (color: string) => void;
 }) {
   return (
-    <For each={TARGET_LANGS}>
-      {(lang) => (
-        <OptionButton
-          active={props.value === lang.value}
-          label={props.t(lang.labelKey)}
-          onClick={() => props.onChange(lang.value)}
+    <div class="color-control">
+      <For each={COLOR_PRESETS}>
+        {(preset) => (
+          <button
+            aria-label={preset.value}
+            class="color-swatch-button"
+            classList={{ active: props.value === preset.value }}
+            onClick={() => props.onSelect(preset.value)}
+            style={
+              preset.swatch
+                ? { "--swatch": preset.swatch }
+                : { "--swatch": "transparent" }
+            }
+            type="button"
+          >
+            <span aria-hidden="true" class="color-swatch-dot" />
+          </button>
+        )}
+      </For>
+      <label
+        class="color-swatch-button color-swatch-button-custom"
+        classList={{ active: props.value === "custom" }}
+        style={{ "--swatch": props.customColor }}
+      >
+        <span aria-hidden="true" class="color-swatch-dot" />
+        <input
+          class="color-swatch-input"
+          onInput={(event) => {
+            props.onCustom(event.currentTarget.value);
+          }}
+          type="color"
+          value={props.customColor}
         />
-      )}
-    </For>
+      </label>
+    </div>
   );
 }
 
@@ -351,334 +270,288 @@ function App() {
     <>
       <section class="section">
         <h2>{t("section.profile")}</h2>
-        <div class="profile-panel">
-          <div class="avatar" aria-hidden="true">
-            <IconLogo size={28} />
-          </div>
-          <Field label={t("profile.displayName")}>
-            <input
-              class="text-input"
-              disabled
-              type="text"
-              value={t("profile.placeholder")}
-            />
-          </Field>
-          <div class="notice">{t("profile.notice")}</div>
-        </div>
+        <Row label={t("profile.avatar")}>
+          <span aria-hidden="true" class="avatar">
+            <IconLogo size={22} />
+          </span>
+        </Row>
+        <Row label={t("profile.displayName")}>
+          <span class="row-static">{t("profile.placeholder")}</span>
+        </Row>
+        <FullRow>
+          <p class="notice">{t("profile.notice")}</p>
+        </FullRow>
       </section>
 
       <section class="section">
         <h2>{t("section.preferences")}</h2>
-        <div class="field-stack">
-          <Field label={t("preferences.uiLang")}>
-            <div class="option-grid compact inline-grid">
-              <For each={UI_LANGS}>
-                {(lang) => (
-                  <OptionButton
-                    active={settings().uiLang === lang.value}
-                    label={t(lang.labelKey)}
-                    onClick={() => void setSettings({ uiLang: lang.value })}
-                  />
-                )}
-              </For>
-            </div>
-          </Field>
-          <Field label={t("preferences.appearance")}>
-            <AppearanceSwitch value={settings().theme} t={t} />
-          </Field>
-        </div>
+        <Row label={t("preferences.uiLang")} description={t("desc.uiLang")}>
+          <Segment
+            label={t("preferences.uiLang")}
+            onChange={(uiLang) => void setSettings({ uiLang })}
+            options={uiLangSegmentOptions(t)}
+            value={settings().uiLang}
+          />
+        </Row>
+        <Row
+          label={t("preferences.appearance")}
+          description={t("desc.appearance")}
+        >
+          <IconSegment
+            label={t("preferences.appearance")}
+            onChange={(theme) => void setSettings({ theme })}
+            options={appearanceOptions(t)}
+            value={settings().theme}
+          />
+        </Row>
+      </section>
+    </>
+  );
+
+  const renderHover = (): JSX.Element => (
+    <>
+      <section class="section">
+        <h2>{t("section.featureSwitch")}</h2>
+        <Row
+          label={t("sidebar.hover")}
+          description={t("desc.hoverEnabled")}
+        >
+          <Switch
+            checked={settings().hoverEnabled}
+            label={t("sidebar.hover")}
+            onChange={(hoverEnabled) => void setSettings({ hoverEnabled })}
+          />
+        </Row>
+        <Row
+          label={t("section.targetLang")}
+          description={t("desc.hoverTargetLang")}
+        >
+          <Segment
+            label={t("section.targetLang")}
+            onChange={(hoverTargetLang) =>
+              void setSettings({ hoverTargetLang })
+            }
+            options={targetLangSegmentOptions(t)}
+            value={settings().hoverTargetLang}
+          />
+        </Row>
+        <Row label={t("section.engine")} description={t("desc.hoverEngine")}>
+          <Select
+            label={t("section.engine")}
+            onChange={(value) => void setSettings({ engines: { hover: value } })}
+            options={HOVER_ENGINES}
+            value={settings().engines.hover}
+          />
+        </Row>
+        <Row
+          label={t("section.granularity")}
+          description={t("desc.granularity")}
+        >
+          <Select
+            label={t("section.granularity")}
+            onChange={(hoverGranularity) =>
+              void setSettings({ hoverGranularity })
+            }
+            options={granularitySelectOptions(t)}
+            value={settings().hoverGranularity}
+          />
+        </Row>
       </section>
 
+      <section class="section">
+        <h2>{t("section.fontSize")}</h2>
+        <FullRow
+          description={t("desc.fontSize")}
+          label={t("section.fontSize")}
+        >
+          <div class="range-row">
+            <input
+              aria-label={t("slider.fontSize.aria")}
+              aria-valuetext={t("slider.fontSize.valuetext", {
+                n: settings().hoverFontSize,
+              })}
+              class="range-input"
+              max={HOVER_FONT_SIZE_MAX}
+              min={HOVER_FONT_SIZE_MIN}
+              onInput={(event) =>
+                void setSettings({
+                  hoverFontSize: Number(event.currentTarget.value),
+                })
+              }
+              step={1}
+              type="range"
+              value={settings().hoverFontSize}
+            />
+            <span aria-hidden="true" class="range-value">
+              {settings().hoverFontSize}px
+            </span>
+          </div>
+        </FullRow>
+      </section>
+    </>
+  );
+
+  const renderSelection = (): JSX.Element => (
+    <section class="section">
+      <h2>{t("section.featureSwitch")}</h2>
+      <Row
+        label={t("sidebar.selection")}
+        description={t("desc.selectionEnabled")}
+      >
+        <Switch
+          checked={settings().selectionEnabled}
+          label={t("sidebar.selection")}
+          onChange={(selectionEnabled) =>
+            void setSettings({ selectionEnabled })
+          }
+        />
+      </Row>
+      <Row
+        label={t("section.targetLang")}
+        description={t("desc.selectionTargetLang")}
+      >
+        <Segment
+          label={t("section.targetLang")}
+          onChange={(selectionTargetLang) =>
+            void setSettings({ selectionTargetLang })
+          }
+          options={targetLangSegmentOptions(t)}
+          value={settings().selectionTargetLang}
+        />
+      </Row>
+      <Row label={t("section.engine")} description={t("desc.selectionEngine")}>
+        <Select
+          label={t("section.engine")}
+          onChange={(value) =>
+            void setSettings({ engines: { selection: value } })
+          }
+          options={HOVER_ENGINES}
+          value={settings().engines.selection}
+        />
+      </Row>
+    </section>
+  );
+
+  const renderImmersive = (): JSX.Element => (
+    <>
+      <section class="section">
+        <h2>{t("section.featureSwitch")}</h2>
+        <Row
+          label={t("section.targetLang")}
+          description={t("desc.immersiveTargetLang")}
+        >
+          <Segment
+            label={t("section.targetLang")}
+            onChange={(immersiveTargetLang) =>
+              void setSettings({ immersiveTargetLang })
+            }
+            options={targetLangSegmentOptions(t)}
+            value={settings().immersiveTargetLang}
+          />
+        </Row>
+        <Row
+          label={t("section.engine")}
+          description={t("desc.immersiveEngine")}
+        >
+          <Select
+            label={t("section.engine")}
+            onChange={(value) =>
+              void setSettings({ engines: { fullPage: value } })
+            }
+            options={FULL_PAGE_ENGINES}
+            value={settings().engines.fullPage}
+          />
+        </Row>
+        <Row
+          label={t("section.displayMode")}
+          description={t("desc.displayMode")}
+        >
+          <Segment
+            label={t("section.displayMode")}
+            onChange={(fullPageMode) => void setSettings({ fullPageMode })}
+            options={modeSegmentOptions(t)}
+            value={settings().fullPageMode}
+          />
+        </Row>
+        <Row
+          label={t("section.clickToShowOriginal")}
+          description={t("desc.clickToShowOriginal")}
+        >
+          <Switch
+            checked={settings().fullPageClickToShowOriginal}
+            label={t("section.clickToShowOriginal")}
+            onChange={(fullPageClickToShowOriginal) =>
+              void setSettings({ fullPageClickToShowOriginal })
+            }
+          />
+        </Row>
+      </section>
+
+      <section class="section">
+        <h2>{t("section.translationStyle")}</h2>
+        <Row
+          label={t("style.label.underline")}
+          description={t("desc.underline")}
+        >
+          <Select
+            label={t("style.label.underline")}
+            onChange={(underlineStyle) =>
+              setTranslationStyle({ underlineStyle })
+            }
+            options={underlineSelectOptions(t)}
+            value={settings().translationStyle.underlineStyle}
+          />
+        </Row>
+        <Row label={t("style.label.font")} description={t("desc.font")}>
+          <Select
+            label={t("style.label.font")}
+            onChange={(fontFamily) => setTranslationStyle({ fontFamily })}
+            options={fontSelectOptions(t)}
+            value={settings().translationStyle.fontFamily}
+          />
+        </Row>
+        <Row label={t("style.label.color")} description={t("desc.color")}>
+          <ColorRowControl
+            customColor={settings().translationStyle.customColor}
+            onCustom={(customColor) =>
+              setTranslationStyle({ color: "custom", customColor })
+            }
+            onSelect={(color) => setTranslationStyle({ color })}
+            value={settings().translationStyle.color}
+          />
+        </Row>
+        <FullRow>
+          <div
+            class="style-preview"
+            style={{
+              color: resolveTranslationStyleColor(settings().translationStyle),
+              "font-family": resolveTranslationStyleFontFamily(
+                settings().translationStyle.fontFamily,
+              ),
+              "text-decoration": resolveTranslationStyleTextDecoration(
+                settings().translationStyle,
+              ),
+            }}
+          >
+            {t("style.preview")}
+          </div>
+        </FullRow>
+      </section>
     </>
   );
 
   const renderAbout = (): JSX.Element => (
     <section class="section">
       <h2>{t("section.about")}</h2>
-      <div class="about-panel">
-        <div class="avatar" aria-hidden="true">
-          <IconLogo size={28} />
-        </div>
-        <strong>OneLingo</strong>
-        <span>{t("about.tagline")}</span>
-        <span>{t("about.version", { version: VERSION })}</span>
-      </div>
+      <Row label="OneLingo" description={t("about.tagline")}>
+        <span aria-hidden="true" class="avatar avatar-small">
+          <IconLogo size={20} />
+        </span>
+      </Row>
+      <Row label={t("about.versionLabel")}>
+        <span class="row-static">{VERSION}</span>
+      </Row>
     </section>
-  );
-
-  const renderHover = (): JSX.Element => (
-    <>
-      <Section title={t("section.featureSwitch")}>
-        <For each={HOVER_ENABLED_OPTIONS}>
-          {(option) => (
-            <OptionButton
-              active={settings().hoverEnabled === option.value}
-              label={t(option.labelKey)}
-              note={t(option.noteKey)}
-              onClick={() => void setSettings({ hoverEnabled: option.value })}
-            />
-          )}
-        </For>
-      </Section>
-
-      <Section title={t("section.targetLang")}>
-        <TargetLanguageOptions
-          value={settings().hoverTargetLang}
-          onChange={(hoverTargetLang) => void setSettings({ hoverTargetLang })}
-          t={t}
-        />
-      </Section>
-
-      <Section title={t("section.engine")}>
-        <For each={HOVER_ENGINES}>
-          {(engine) => (
-            <OptionButton
-              active={settings().engines.hover === engine.value}
-              label={engine.label}
-              note={t(engine.noteKey)}
-              onClick={() => void setSettings({ engines: { hover: engine.value } })}
-            />
-          )}
-        </For>
-      </Section>
-
-      <Section title={t("section.granularity")}>
-        <For each={GRANULARITIES}>
-          {(item) => (
-            <OptionButton
-              active={settings().hoverGranularity === item.value}
-              label={t(item.labelKey)}
-              note={t(item.noteKey)}
-              onClick={() => void setSettings({ hoverGranularity: item.value })}
-            />
-          )}
-        </For>
-      </Section>
-
-      <section class="section">
-        <h2>{t("section.fontSize")}</h2>
-        <div class="range-row">
-          <input
-            aria-label={t("slider.fontSize.aria")}
-            aria-valuetext={t("slider.fontSize.valuetext", {
-              n: settings().hoverFontSize,
-            })}
-            class="range-input"
-            max={HOVER_FONT_SIZE_MAX}
-            min={HOVER_FONT_SIZE_MIN}
-            onInput={(event) =>
-              void setSettings({
-                hoverFontSize: Number(event.currentTarget.value),
-              })
-            }
-            step={1}
-            type="range"
-            value={settings().hoverFontSize}
-          />
-          <span aria-hidden="true" class="range-value">
-            {settings().hoverFontSize}px
-          </span>
-        </div>
-      </section>
-    </>
-  );
-
-  const renderSelection = (): JSX.Element => (
-    <>
-      <Section title={t("section.featureSwitch")}>
-        <For each={SELECTION_ENABLED_OPTIONS}>
-          {(option) => (
-            <OptionButton
-              active={settings().selectionEnabled === option.value}
-              label={t(option.labelKey)}
-              note={t(option.noteKey)}
-              onClick={() =>
-                void setSettings({ selectionEnabled: option.value })
-              }
-            />
-          )}
-        </For>
-      </Section>
-
-      <Section title={t("section.targetLang")}>
-        <TargetLanguageOptions
-          value={settings().selectionTargetLang}
-          onChange={(selectionTargetLang) =>
-            void setSettings({ selectionTargetLang })
-          }
-          t={t}
-        />
-      </Section>
-
-      <Section title={t("section.engine")}>
-        <For each={HOVER_ENGINES}>
-          {(engine) => (
-            <OptionButton
-              active={settings().engines.selection === engine.value}
-              label={engine.label}
-              note={t(engine.noteKey)}
-              onClick={() =>
-                void setSettings({ engines: { selection: engine.value } })
-              }
-            />
-          )}
-        </For>
-      </Section>
-
-      <p class="muted-note">{t("selection.note")}</p>
-    </>
-  );
-
-  const renderTranslationStyle = (): JSX.Element => (
-    <section class="section">
-      <h2>{t("section.translationStyle")}</h2>
-      <div class="style-panel">
-        <div class="style-block">
-          <span class="style-label">{t("style.label.underline")}</span>
-          <div class="option-grid compact">
-            <For each={UNDERLINE_STYLES}>
-              {(item) => (
-                <OptionButton
-                  active={
-                    settings().translationStyle.underlineStyle === item.value
-                  }
-                  label={t(item.labelKey)}
-                  note={t(item.noteKey)}
-                  onClick={() =>
-                    setTranslationStyle({ underlineStyle: item.value })
-                  }
-                />
-              )}
-            </For>
-          </div>
-        </div>
-
-        <div class="style-block">
-          <span class="style-label">{t("style.label.font")}</span>
-          <div class="option-grid compact">
-            <For each={FONT_FAMILIES}>
-              {(font) => (
-                <OptionButton
-                  active={settings().translationStyle.fontFamily === font.value}
-                  label={t(font.labelKey)}
-                  note={t(font.noteKey)}
-                  onClick={() => setTranslationStyle({ fontFamily: font.value })}
-                />
-              )}
-            </For>
-          </div>
-        </div>
-
-        <div class="style-block">
-          <span class="style-label">{t("style.label.color")}</span>
-          <div class="color-grid">
-            <For each={COLORS}>
-              {(color) => (
-                <ColorButton
-                  active={settings().translationStyle.color === color.value}
-                  color={
-                    color.value === "custom"
-                      ? settings().translationStyle.customColor
-                      : color.color
-                  }
-                  label={t(color.labelKey)}
-                  onClick={() => setTranslationStyle({ color: color.value })}
-                />
-              )}
-            </For>
-            <input
-              aria-label={t("color.custom.aria")}
-              class="color-input"
-              disabled={settings().translationStyle.color !== "custom"}
-              onInput={(event) =>
-                setTranslationStyle({
-                  color: "custom",
-                  customColor: event.currentTarget.value,
-                })
-              }
-              type="color"
-              value={settings().translationStyle.customColor}
-            />
-          </div>
-        </div>
-
-        <div
-          class="style-preview"
-          style={{
-            color: resolveTranslationStyleColor(settings().translationStyle),
-            "font-family": resolveTranslationStyleFontFamily(
-              settings().translationStyle.fontFamily,
-            ),
-            "text-decoration": resolveTranslationStyleTextDecoration(
-              settings().translationStyle,
-            ),
-          }}
-        >
-          {t("style.preview")}
-        </div>
-      </div>
-    </section>
-  );
-
-  const renderImmersive = (): JSX.Element => (
-    <>
-      <Section title={t("section.targetLang")}>
-        <TargetLanguageOptions
-          value={settings().immersiveTargetLang}
-          onChange={(immersiveTargetLang) =>
-            void setSettings({ immersiveTargetLang })
-          }
-          t={t}
-        />
-      </Section>
-
-      <Section title={t("section.engine")}>
-        <For each={FULL_PAGE_ENGINES}>
-          {(engine) => (
-            <OptionButton
-              active={settings().engines.fullPage === engine.value}
-              label={engine.label}
-              note={t(engine.noteKey)}
-              onClick={() =>
-                void setSettings({ engines: { fullPage: engine.value } })
-              }
-            />
-          )}
-        </For>
-      </Section>
-
-      <Section title={t("section.displayMode")}>
-        <For each={MODES}>
-          {(mode) => (
-            <OptionButton
-              active={settings().fullPageMode === mode.value}
-              label={t(mode.labelKey)}
-              note={t(mode.noteKey)}
-              onClick={() => void setSettings({ fullPageMode: mode.value })}
-            />
-          )}
-        </For>
-      </Section>
-
-      <Section title={t("section.clickToShowOriginal")}>
-        <For each={CLICK_TO_SHOW_ORIGINAL_OPTIONS}>
-          {(option) => (
-            <OptionButton
-              active={settings().fullPageClickToShowOriginal === option.value}
-              label={t(option.labelKey)}
-              note={t(option.noteKey)}
-              onClick={() =>
-                void setSettings({
-                  fullPageClickToShowOriginal: option.value,
-                })
-              }
-            />
-          )}
-        </For>
-      </Section>
-
-      {renderTranslationStyle()}
-    </>
   );
 
   const renderActiveTab = (): JSX.Element => {
@@ -704,12 +577,14 @@ function App() {
           <p class="eyebrow">OneLingo</p>
           <h1>{t("settings.title")}</h1>
         </div>
-        <span class="scope">{t("settings.scope")}</span>
+        <Show when={activeTab() === "about"}>
+          <span class="scope">{t("about.version", { version: VERSION })}</span>
+        </Show>
       </header>
 
       <div class="settings-shell">
         <Sidebar activeTab={activeTab()} onSelect={setActiveTab} t={t} />
-        <section class="content-panel" aria-labelledby="tab-title">
+        <section aria-labelledby="tab-title" class="content-panel">
           <div class="tab-heading">
             <h2 id="tab-title">{tabTitle()}</h2>
           </div>
