@@ -30,6 +30,7 @@ export interface PageTranslateAck {
   accepted: boolean;
   blocks: number;
   active: boolean;
+  hasPagePrefs: boolean;
   translating?: boolean;
   mode?: "replace" | "bilingual";
   engine?: FullPageEngineId;
@@ -40,6 +41,7 @@ export interface PageTranslateStatus {
   active: boolean;
   translating: boolean;
   blocks: number;
+  hasPagePrefs: boolean;
   mode?: "replace" | "bilingual";
   engine?: FullPageEngineId;
   target?: string;

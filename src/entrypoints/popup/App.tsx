@@ -8,7 +8,8 @@
 //   - 底部 ⚙ 打开完整设置
 //
 // 行为约定：
-//   - 改 target / engine / mode 同时写 settings（作为全局默认）和当前页面（per-page）。
+//   - target / engine / mode 默认跟随 options 的 immersive 全局设置。
+//   - popup 内显式修改 target / engine / mode 后，写成当前页面的独立设置。
 //     当前页面 active 时立即重翻；未 active 则只保存 per-page pref。
 //   - 改 clickToShowOriginal / hoverEnabled / selectionEnabled 只写 settings。
 //     immersive 的 click toggle 通过 settings watcher 在下次翻译时生效。
@@ -62,10 +63,10 @@ function App(): JSX.Element {
   const [status, setStatus] = createSignal("");
   const [statusIsError, setStatusIsError] = createSignal(false);
   const [immersiveActive, setImmersiveActive] = createSignal(false);
-  // page-level 偏好：popup 内显式选择，per-page 立即生效；同时写回 settings 当全局默认。
   const [pageMode, setPageMode] = createSignal<FullPageMode>("replace");
   const [pageEngine, setPageEngine] = createSignal<FullPageEngineId>("google2");
   const [pageTarget, setPageTarget] = createSignal<PageTargetLang>("zh");
+  const [hasPagePrefs, setHasPagePrefs] = createSignal(false);
 
   let actionSeq = 0;
   let lastCommandId = 0;
@@ -103,32 +104,40 @@ function App(): JSX.Element {
   const modeLabel = (mode: FullPageMode): string =>
     mode === "replace" ? t("mode.replace") : t("mode.bilingual");
 
+  const defaultPageMode = (): FullPageMode => settings().fullPageMode;
+
+  const defaultPageEngine = (): FullPageEngineId =>
+    settings().engines.fullPage;
+
+  const defaultPageTarget = (): PageTargetLang =>
+    resolveTargetLang(
+      settings().immersiveTargetLang,
+      settings().uiLang,
+    ) as PageTargetLang;
+
+  const pageModeValue = (): FullPageMode =>
+    hasPagePrefs() || immersiveActive() ? pageMode() : defaultPageMode();
+
+  const pageEngineValue = (): FullPageEngineId =>
+    hasPagePrefs() || immersiveActive() ? pageEngine() : defaultPageEngine();
+
+  const pageTargetValue = (): PageTargetLang =>
+    hasPagePrefs() || immersiveActive() ? pageTarget() : defaultPageTarget();
+
   const pageStateText = (): string =>
     immersiveActive()
       ? t("popup.state.translatedDetail", {
-          engine: engineLabel(pageEngine()),
-          target: targetLabel(pageTarget()),
-          mode: modeLabel(pageMode()),
+          engine: engineLabel(pageEngineValue()),
+          target: targetLabel(pageTargetValue()),
+          mode: modeLabel(pageModeValue()),
         })
       : t("popup.state.untranslatedDetail", {
-          engine: engineLabel(pageEngine()),
-          target: targetLabel(pageTarget()),
-          mode: modeLabel(pageMode()),
+          engine: engineLabel(pageEngineValue()),
+          target: targetLabel(pageTargetValue()),
+          mode: modeLabel(pageModeValue()),
         });
 
-  // ─── 应用 per-page 偏好（同步写 settings 全局默认）─────────────
-
-  const persistGlobalDefault = (patch: {
-    target?: PageTargetLang;
-    engine?: FullPageEngineId;
-    mode?: FullPageMode;
-  }): void => {
-    const next: Parameters<typeof setSettings>[0] = {};
-    if (patch.target) next.immersiveTargetLang = patch.target;
-    if (patch.engine) next.engines = { fullPage: patch.engine };
-    if (patch.mode) next.fullPageMode = patch.mode;
-    void setSettings(next);
-  };
+  // ─── 应用当前页面偏好 ────────────────────────────────────────
 
   const applyPagePref = (
     patch: {
@@ -138,15 +147,24 @@ function App(): JSX.Element {
     },
     pendingStatus: string,
   ): void => {
-    persistGlobalDefault(patch);
+    const next = {
+      target: patch.target ?? pageTargetValue(),
+      engine: patch.engine ?? pageEngineValue(),
+      mode: patch.mode ?? pageModeValue(),
+    };
 
-    if (patch.target) setPageTarget(patch.target);
-    if (patch.engine) setPageEngine(patch.engine);
-    if (patch.mode) setPageMode(patch.mode);
+    setHasPagePrefs(true);
+    setPageTarget(next.target);
+    setPageEngine(next.engine);
+    setPageMode(next.mode);
+
+    const savePagePrefs = sendMessage("setPageTranslatePrefs", next).catch(
+      () => null,
+    );
 
     if (!immersiveActive()) {
-      // 未翻译时只保存 per-page pref，待用户点 CTA 时统一发起
-      void sendMessage("setPageTranslatePrefs", patch).catch(() => {});
+      // 未翻译时只保存当前页 pref，待用户点 CTA 时统一发起
+      void savePagePrefs;
       return;
     }
 
@@ -154,21 +172,23 @@ function App(): JSX.Element {
     const seq = ++actionSeq;
     setAction("retranslating");
     setInfoStatus(pendingStatus);
-    void sendMessage("translatePage", {
-      target: patch.target ?? pageTarget(),
-      engine: patch.engine ?? pageEngine(),
-      mode: patch.mode ?? pageMode(),
-      commandId: nextCommandId(),
-    })
+    void savePagePrefs
+      .then(() =>
+        sendMessage("translatePage", {
+          target: next.target,
+          engine: next.engine,
+          mode: next.mode,
+          commandId: nextCommandId(),
+        }),
+      )
       .then((res) => {
         if (seq !== actionSeq) return;
         const active = res.active || res.translating === true;
         setImmersiveActive(active);
-        setPageMode(res.mode ?? patch.mode ?? pageMode());
-        setPageEngine(res.engine ?? patch.engine ?? pageEngine());
-        setPageTarget(
-          (res.target as PageTargetLang) ?? patch.target ?? pageTarget(),
-        );
+        setHasPagePrefs(true);
+        setPageMode(res.mode ?? next.mode);
+        setPageEngine(res.engine ?? next.engine);
+        setPageTarget((res.target as PageTargetLang) ?? next.target);
         setInfoStatus(
           active ? t("popup.status.retranslated") : startedStatus(res.blocks),
         );
@@ -206,22 +226,25 @@ function App(): JSX.Element {
 
     const seq = ++actionSeq;
     const commandId = nextCommandId();
-    const mode = pageMode();
+    const mode = pageModeValue();
+    const engine = pageEngineValue();
+    const target = pageTargetValue();
     setAction("starting");
     setImmersiveActive(true);
     setInfoStatus(t("popup.status.started"));
     try {
       const res = await sendMessage("translatePage", {
-        target: pageTarget(),
-        engine: pageEngine(),
+        target,
+        engine,
         mode,
         commandId,
       });
       if (seq !== actionSeq) return;
       setImmersiveActive(res.active);
+      setHasPagePrefs(res.hasPagePrefs);
       setPageMode(res.mode ?? mode);
-      setPageEngine(res.engine ?? pageEngine());
-      setPageTarget((res.target as PageTargetLang) ?? pageTarget());
+      setPageEngine(res.engine ?? engine);
+      setPageTarget((res.target as PageTargetLang) ?? target);
       setInfoStatus(startedStatus(res.blocks));
     } catch (e) {
       if (seq !== actionSeq) return;
@@ -250,6 +273,7 @@ function App(): JSX.Element {
         setPageMode(mode);
         setPageEngine(engine);
         setPageTarget(target);
+        setHasPagePrefs(res.hasPagePrefs);
         setImmersiveActive(res.active || res.translating);
       } catch {
         // 没拿到页面状态就用全局默认值兜底
@@ -261,6 +285,7 @@ function App(): JSX.Element {
             defaults.uiLang,
           ) as PageTargetLang,
         );
+        setHasPagePrefs(false);
       }
     })().catch(() => {});
   });
@@ -328,7 +353,7 @@ function App(): JSX.Element {
               )
             }
             options={pageTargetOptions(t)}
-            value={pageTarget()}
+            value={pageTargetValue()}
           />
         </Row>
         <Row label={t("popup.label.engine")}>
@@ -343,7 +368,7 @@ function App(): JSX.Element {
               )
             }
             options={ENGINES}
-            value={pageEngine()}
+            value={pageEngineValue()}
           />
         </Row>
         <Row label={t("popup.label.mode")}>
@@ -353,7 +378,7 @@ function App(): JSX.Element {
               applyPagePref({ mode }, t("popup.status.modeSwitching"))
             }
             options={modeOptions(t)}
-            value={pageMode()}
+            value={pageModeValue()}
           />
         </Row>
         <Row label={t("section.clickToShowOriginal")}>

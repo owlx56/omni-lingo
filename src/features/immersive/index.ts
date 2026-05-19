@@ -16,6 +16,7 @@ import {
   resolveTargetLang,
   watchSettings,
   type FullPageEngineId,
+  type FullPageMode,
   type Settings,
 } from "@/lib/storage/settings";
 import { buildTranslationStyleCss } from "@/lib/translation-style";
@@ -268,6 +269,8 @@ let currentTarget: string | null = null;
 let preferredMode: PageTranslateMode | null = null;
 let preferredEngine: FullPageEngineId | null = null;
 let preferredTarget: string | null = null;
+let settingsMode: FullPageMode = "replace";
+let settingsEngine: FullPageEngineId = "google2";
 let settingsTarget: string | null = null;
 let originalTitle: string | null = null;
 let batchQueues: Record<TranslateFormat, TranslateBatchQueue> | null = null;
@@ -361,9 +364,6 @@ async function startPageTranslate(
   currentRule = await loadRule(input);
   currentEngine = currentRule.engine;
   currentTarget = currentRule.target;
-  preferredMode = mode;
-  preferredEngine = currentEngine;
-  preferredTarget = currentTarget;
   lastTranslateInput = {
     target: currentRule.target,
     engine: currentRule.engine,
@@ -419,6 +419,8 @@ function updatePageTranslatePrefs(input: PageTranslatePrefs): void {
 }
 
 function handleSettingsChanged(settings: Settings): void {
+  settingsMode = settings.fullPageMode;
+  settingsEngine = settings.engines.fullPage;
   settingsTarget = resolveTargetLang(
     settings.immersiveTargetLang,
     settings.uiLang,
@@ -1563,12 +1565,15 @@ function getStatus(): PageTranslateStatus {
   pruneDisconnectedNodes();
   const blocks =
     observedNodes.size > 0 ? observedNodes.size : translatedHosts.size;
+  const hasPagePrefs =
+    preferredMode !== null || preferredEngine !== null || preferredTarget !== null;
   return {
     active: translatedHosts.size > 0 || pendingCount > 0,
     translating: pendingCount > 0,
     blocks,
-    mode: currentMode ?? preferredMode ?? undefined,
-    engine: currentEngine ?? preferredEngine ?? undefined,
+    hasPagePrefs,
+    mode: currentMode ?? preferredMode ?? settingsMode,
+    engine: currentEngine ?? preferredEngine ?? settingsEngine,
     target: currentTarget ?? preferredTarget ?? settingsTarget ?? undefined,
   };
 }
