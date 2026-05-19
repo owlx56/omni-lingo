@@ -48,6 +48,7 @@ type LegacyTranslationStyle = Partial<TranslationStyle> & {
 
 export const HOVER_FONT_SIZE_MIN = 13;
 export const HOVER_FONT_SIZE_MAX = 17;
+const HOVER_FONT_SIZE_STEP = 0.5;
 
 export interface Settings {
   uiLang: UiLang; // 主语言：options/popup/未来悬浮球的 UI 语言，同时是三个功能 target 的 inherit 回退值
@@ -217,9 +218,10 @@ function clampFontSize(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return DEFAULTS.hoverFontSize;
   }
+  const stepped = Math.round(value / HOVER_FONT_SIZE_STEP) * HOVER_FONT_SIZE_STEP;
   return Math.min(
     HOVER_FONT_SIZE_MAX,
-    Math.max(HOVER_FONT_SIZE_MIN, Math.round(value)),
+    Math.max(HOVER_FONT_SIZE_MIN, stepped),
   );
 }
 

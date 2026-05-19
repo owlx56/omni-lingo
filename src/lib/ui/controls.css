@@ -310,8 +310,93 @@ select {
 }
 
 .range-input {
+    appearance: none;
     flex: 1;
-    accent-color: var(--switch-on);
+    height: 24px;
+    border-radius: 999px;
+    background:
+        linear-gradient(
+            to right,
+            var(--switch-on) 0,
+            var(--switch-on) var(--range-progress, 0%),
+            var(--surface-strong) var(--range-progress, 0%),
+            var(--surface-strong) 100%
+        )
+        center / 100% 6px no-repeat;
+    cursor: pointer;
+}
+
+.range-input:focus {
+    outline: none;
+}
+
+.range-input:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--switch-on) 55%, transparent);
+    outline-offset: 2px;
+}
+
+.range-input::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 999px;
+    background: transparent;
+}
+
+.range-input::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    margin-top: -6px;
+    border: 3px solid var(--switch-on);
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+    transition:
+        transform 120ms ease,
+        box-shadow 120ms ease;
+}
+
+.range-input:hover::-webkit-slider-thumb {
+    transform: scale(1.12);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+
+.range-input:active::-webkit-slider-thumb {
+    transform: scale(1.22);
+    box-shadow: 0 2px 10px rgba(44, 117, 224, 0.38);
+}
+
+.range-input::-moz-range-track {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--surface-strong);
+}
+
+.range-input::-moz-range-progress {
+    height: 6px;
+    border-radius: 999px;
+    background: var(--switch-on);
+}
+
+.range-input::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border: 3px solid var(--switch-on);
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+    transition:
+        transform 120ms ease,
+        box-shadow 120ms ease;
+}
+
+.range-input:hover::-moz-range-thumb {
+    transform: scale(1.12);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+}
+
+.range-input:active::-moz-range-thumb {
+    transform: scale(1.22);
+    box-shadow: 0 2px 10px rgba(44, 117, 224, 0.38);
 }
 
 .range-value {

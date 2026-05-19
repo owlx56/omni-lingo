@@ -253,6 +253,15 @@ function ColorRowControl(props: {
   );
 }
 
+function rangeProgress(value: number, min: number, max: number): string {
+  const progress = ((value - min) / (max - min)) * 100;
+  return `${Math.min(100, Math.max(0, progress))}%`;
+}
+
+function formatPx(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
 function App() {
   const settings = useSettings();
   const t = useT();
@@ -371,7 +380,7 @@ function App() {
             <input
               aria-label={t("slider.fontSize.aria")}
               aria-valuetext={t("slider.fontSize.valuetext", {
-                n: settings().hoverFontSize,
+                n: formatPx(settings().hoverFontSize),
               })}
               class="range-input"
               max={HOVER_FONT_SIZE_MAX}
@@ -381,12 +390,19 @@ function App() {
                   hoverFontSize: Number(event.currentTarget.value),
                 })
               }
-              step={1}
+              step={0.5}
+              style={{
+                "--range-progress": rangeProgress(
+                  settings().hoverFontSize,
+                  HOVER_FONT_SIZE_MIN,
+                  HOVER_FONT_SIZE_MAX,
+                ),
+              }}
               type="range"
               value={settings().hoverFontSize}
             />
             <span aria-hidden="true" class="range-value">
-              {settings().hoverFontSize}px
+              {formatPx(settings().hoverFontSize)}px
             </span>
           </div>
         </Row>
