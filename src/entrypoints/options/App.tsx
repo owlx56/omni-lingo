@@ -40,9 +40,8 @@ import {
   IconSelection,
   IconSun,
   IconSystem,
-  IconUser,
 } from "./icons";
-import { IconLogo } from "@/lib/ui/icons";
+import { IconLogo, IconSettings } from "@/lib/ui/icons";
 import {
   FullRow,
   IconSegment,
@@ -62,7 +61,7 @@ type OptionIcon = (props: { size?: number }) => JSX.Element;
 const VERSION = "0.0.0";
 
 const TABS: { id: TabId; labelKey: MessageKey; icon: OptionIcon }[] = [
-  { id: "account", labelKey: "sidebar.account", icon: IconUser },
+  { id: "account", labelKey: "sidebar.account", icon: IconSettings },
   { id: "hover", labelKey: "sidebar.hover", icon: IconHover },
   { id: "selection", labelKey: "sidebar.selection", icon: IconSelection },
   { id: "immersive", labelKey: "sidebar.immersive", icon: IconImmersive },
@@ -119,13 +118,18 @@ const UNDERLINE_STYLES: {
   { value: "wavy", labelKey: "underline.wavy" },
 ];
 
-const COLOR_PRESETS: { value: TranslationColor; labelKey: MessageKey; swatch?: string }[] =
+const COLOR_PRESETS: { value: TranslationColor; labelKey: MessageKey; swatch: string }[] =
   [
-    { value: "inherit", labelKey: "color.inherit" },
-    { value: "muted", labelKey: "color.muted", swatch: "#6b7280" },
-    { value: "blue", labelKey: "color.blue", swatch: "#2563eb" },
-    { value: "green", labelKey: "color.green", swatch: "#047857" },
-    { value: "red", labelKey: "color.red", swatch: "#dc2626" },
+    { value: "yellow", labelKey: "color.yellow", swatch: "rgb(251, 188, 4)" },
+    { value: "green", labelKey: "color.green", swatch: "rgb(19, 129, 37)" },
+    { value: "teal", labelKey: "color.teal", swatch: "rgb(25, 174, 160)" },
+    { value: "blue", labelKey: "color.blue", swatch: "rgb(26, 115, 232)" },
+    { value: "indigo", labelKey: "color.indigo", swatch: "rgb(91, 96, 232)" },
+    { value: "orange", labelKey: "color.orange", swatch: "rgb(245, 124, 0)" },
+    { value: "purple", labelKey: "color.purple", swatch: "rgb(142, 68, 173)" },
+    { value: "pink", labelKey: "color.pink", swatch: "rgb(236, 64, 122)" },
+    { value: "red", labelKey: "color.red", swatch: "rgb(234, 51, 59)" },
+    { value: "gray", labelKey: "color.gray", swatch: "rgb(147, 147, 147)" },
   ];
 
 function Sidebar(props: {
@@ -208,6 +212,7 @@ function appearanceOptions(t: TFn): IconSegmentOption<ThemePreference>[] {
 function ColorRowControl(props: {
   value: TranslationColor;
   customColor: string;
+  t: TFn;
   onSelect: (next: TranslationColor) => void;
   onCustom: (color: string) => void;
 }) {
@@ -216,15 +221,12 @@ function ColorRowControl(props: {
       <For each={COLOR_PRESETS}>
         {(preset) => (
           <button
-            aria-label={preset.value}
+            aria-label={props.t(preset.labelKey)}
             class="color-swatch-button"
             classList={{ active: props.value === preset.value }}
             onClick={() => props.onSelect(preset.value)}
-            style={
-              preset.swatch
-                ? { "--swatch": preset.swatch }
-                : { "--swatch": "transparent" }
-            }
+            style={{ "--swatch": preset.swatch }}
+            title={props.t(preset.labelKey)}
             type="button"
           >
             <span aria-hidden="true" class="color-swatch-dot" />
@@ -234,10 +236,11 @@ function ColorRowControl(props: {
       <label
         class="color-swatch-button color-swatch-button-custom"
         classList={{ active: props.value === "custom" }}
-        style={{ "--swatch": props.customColor }}
+        title={props.t("color.custom")}
       >
         <span aria-hidden="true" class="color-swatch-dot" />
         <input
+          aria-label={props.t("color.custom.aria")}
           class="color-swatch-input"
           onInput={(event) => {
             props.onCustom(event.currentTarget.value);
@@ -360,11 +363,11 @@ function App() {
 
       <section class="section">
         <h2>{t("section.fontSize")}</h2>
-        <FullRow
+        <Row
           description={t("desc.fontSize")}
           label={t("section.fontSize")}
         >
-          <div class="range-row">
+          <div class="range-row hover-font-size-control">
             <input
               aria-label={t("slider.fontSize.aria")}
               aria-valuetext={t("slider.fontSize.valuetext", {
@@ -386,7 +389,7 @@ function App() {
               {settings().hoverFontSize}px
             </span>
           </div>
-        </FullRow>
+        </Row>
       </section>
     </>
   );
@@ -510,16 +513,17 @@ function App() {
             value={settings().translationStyle.fontFamily}
           />
         </Row>
-        <Row label={t("style.label.color")} description={t("desc.color")}>
+        <FullRow label={t("style.label.color")} description={t("desc.color")}>
           <ColorRowControl
             customColor={settings().translationStyle.customColor}
             onCustom={(customColor) =>
               setTranslationStyle({ color: "custom", customColor })
             }
             onSelect={(color) => setTranslationStyle({ color })}
+            t={t}
             value={settings().translationStyle.color}
           />
-        </Row>
+        </FullRow>
         <FullRow>
           <div
             class="style-preview"
@@ -574,7 +578,6 @@ function App() {
     <main class="page">
       <header class="header">
         <div>
-          <p class="eyebrow">OneLingo</p>
           <h1>{t("settings.title")}</h1>
         </div>
         <Show when={activeTab() === "about"}>

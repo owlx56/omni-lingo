@@ -86,11 +86,16 @@ export type MessageKey =
   | "font.sans.note"
   | "font.mono"
   | "font.mono.note"
-  | "color.inherit"
-  | "color.muted"
+  | "color.yellow"
   | "color.blue"
   | "color.green"
+  | "color.teal"
+  | "color.indigo"
+  | "color.orange"
+  | "color.purple"
+  | "color.pink"
   | "color.red"
+  | "color.gray"
   | "color.custom"
   | "color.custom.aria"
   | "underline.none"
@@ -142,20 +147,20 @@ export type MessageKey =
 type Dict = Record<MessageKey, string>;
 
 const ZH: Dict = {
-  "settings.title": "设置",
+  "settings.title": "OneLingo",
   "settings.scope": "本地扩展页面",
-  "sidebar.account": "账户",
-  "sidebar.hover": "Hover",
-  "sidebar.selection": "Selection",
-  "sidebar.immersive": "Immersive",
+  "sidebar.account": "通用设置",
+  "sidebar.hover": "悬停翻译",
+  "sidebar.selection": "划词翻译",
+  "sidebar.immersive": "沉浸翻译",
   "sidebar.about": "关于",
   "section.profile": "档案",
   "profile.avatar": "头像",
   "profile.displayName": "显示名",
   "profile.placeholder": "本地用户",
-  "profile.notice": "未启用：OneLingo 是本地扩展，无需账户",
+  "profile.notice": "OneLingo 是本地扩展，设置保存在浏览器内",
   "section.preferences": "偏好",
-  "preferences.uiLang": "界面语言",
+  "preferences.uiLang": "主语言",
   "preferences.appearance": "外观",
   "appearance.system": "跟随系统",
   "appearance.light": "亮色",
@@ -172,12 +177,12 @@ const ZH: Dict = {
   "section.displayMode": "显示模式",
   "section.clickToShowOriginal": "点击译文显示原文",
   "section.translationStyle": "译文样式",
-  "common.followUiLang": "跟随界面",
+  "common.followUiLang": "跟随主语言",
   "common.chinese": "中文",
   "common.english": "English",
   "common.on": "开启",
   "common.off": "关闭",
-  "desc.uiLang": "设置页、弹出面板以及默认目标语言的语言",
+  "desc.uiLang": "设置页、弹出面板的显示语言，也是目标语言选择“跟随主语言”时使用的语言",
   "desc.appearance": "跟随系统或手动选择亮/暗主题",
   "desc.hoverEnabled": "鼠标悬停时高亮并翻译词/句/段",
   "desc.hoverTargetLang": "悬停翻译的目标语言，跳过已是该语言的文本",
@@ -221,11 +226,16 @@ const ZH: Dict = {
   "font.sans.note": "Segoe UI / system-ui",
   "font.mono": "等宽",
   "font.mono.note": "Consolas / monospace",
-  "color.inherit": "默认",
-  "color.muted": "灰色",
-  "color.blue": "蓝色",
+  "color.yellow": "黄色",
   "color.green": "绿色",
+  "color.teal": "青色",
+  "color.blue": "蓝色",
+  "color.indigo": "靛蓝",
+  "color.orange": "橙色",
+  "color.purple": "紫色",
+  "color.pink": "粉色",
   "color.red": "红色",
+  "color.gray": "灰色",
   "color.custom": "自定义",
   "color.custom.aria": "自定义译文颜色",
   "underline.none": "无样式",
@@ -278,21 +288,21 @@ const ZH: Dict = {
 };
 
 const EN: Dict = {
-  "settings.title": "Settings",
+  "settings.title": "OneLingo",
   "settings.scope": "Local extension page",
-  "sidebar.account": "Account",
-  "sidebar.hover": "Hover",
-  "sidebar.selection": "Selection",
-  "sidebar.immersive": "Immersive",
+  "sidebar.account": "General settings",
+  "sidebar.hover": "Hover translation",
+  "sidebar.selection": "Selection translation",
+  "sidebar.immersive": "Immersive translation",
   "sidebar.about": "About",
   "section.profile": "Profile",
   "profile.avatar": "Avatar",
   "profile.displayName": "Display name",
   "profile.placeholder": "Local user",
   "profile.notice":
-    "Not active: OneLingo is a local extension and does not need an account",
+    "OneLingo is a local extension; settings are stored in your browser",
   "section.preferences": "Preferences",
-  "preferences.uiLang": "Interface language",
+  "preferences.uiLang": "Primary language",
   "preferences.appearance": "Appearance",
   "appearance.system": "System",
   "appearance.light": "Light",
@@ -309,12 +319,13 @@ const EN: Dict = {
   "section.displayMode": "Display mode",
   "section.clickToShowOriginal": "Click translation to show original",
   "section.translationStyle": "Translation style",
-  "common.followUiLang": "Follow UI",
+  "common.followUiLang": "Follow primary language",
   "common.chinese": "Chinese",
   "common.english": "English",
   "common.on": "On",
   "common.off": "Off",
-  "desc.uiLang": "Language for the settings page, popups, and default target language",
+  "desc.uiLang":
+    "Language used by settings and popups, and by target-language options set to Follow primary language",
   "desc.appearance": "Follow the system or pick a light / dark theme",
   "desc.hoverEnabled": "Highlight and translate the word, sentence, or paragraph under the cursor",
   "desc.hoverTargetLang": "Target language for hover translation; text already in this language is skipped",
@@ -359,11 +370,16 @@ const EN: Dict = {
   "font.sans.note": "Segoe UI / system-ui",
   "font.mono": "Mono",
   "font.mono.note": "Consolas / monospace",
-  "color.inherit": "Default",
-  "color.muted": "Muted",
-  "color.blue": "Blue",
+  "color.yellow": "Yellow",
   "color.green": "Green",
+  "color.teal": "Teal",
+  "color.blue": "Blue",
+  "color.indigo": "Indigo",
+  "color.orange": "Orange",
+  "color.purple": "Purple",
+  "color.pink": "Pink",
   "color.red": "Red",
+  "color.gray": "Gray",
   "color.custom": "Custom",
   "color.custom.aria": "Custom translation color",
   "underline.none": "None",

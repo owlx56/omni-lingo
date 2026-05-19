@@ -18,11 +18,16 @@ export type TargetLang = "inherit" | "zh" | "en";
 export type ThemePreference = "system" | "light" | "dark";
 export type TranslationFontFamily = "inherit" | "serif" | "sans" | "mono";
 export type TranslationColor =
-  | "inherit"
-  | "muted"
-  | "blue"
+  | "yellow"
   | "green"
+  | "teal"
+  | "blue"
+  | "indigo"
+  | "orange"
+  | "purple"
+  | "pink"
   | "red"
+  | "gray"
   | "custom";
 export type TranslationUnderlineStyle =
   | "none"
@@ -45,7 +50,7 @@ export const HOVER_FONT_SIZE_MIN = 13;
 export const HOVER_FONT_SIZE_MAX = 17;
 
 export interface Settings {
-  uiLang: UiLang; // options/popup/未来悬浮球的 UI 语言，同时是三个功能 target 的 inherit 回退值
+  uiLang: UiLang; // 主语言：options/popup/未来悬浮球的 UI 语言，同时是三个功能 target 的 inherit 回退值
   hoverEnabled: boolean;
   selectionEnabled: boolean;
   hoverTargetLang: TargetLang;
@@ -92,8 +97,8 @@ const DEFAULTS: Settings = {
   translationStyle: {
     underlineStyle: "none",
     fontFamily: "inherit",
-    color: "inherit",
-    customColor: "#2563eb",
+    color: "yellow",
+    customColor: "#fbbc04",
   },
 };
 
@@ -114,6 +119,7 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
   const translationStyle: TranslationStyle = {
     ...DEFAULTS.translationStyle,
     ...rawTranslationStyle,
+    color: normalizeTranslationColor(rawTranslationStyle.color),
     underlineStyle,
   };
   // hoverFontSize 优先读新字段；否则回退到 legacy hoverLargeText。
@@ -172,9 +178,33 @@ function normalizeBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
 }
 
+function normalizeTranslationColor(value: unknown): TranslationColor {
+  if (
+    value === "yellow" ||
+    value === "green" ||
+    value === "teal" ||
+    value === "blue" ||
+    value === "indigo" ||
+    value === "orange" ||
+    value === "purple" ||
+    value === "pink" ||
+    value === "red" ||
+    value === "gray" ||
+    value === "custom"
+  ) {
+    return value;
+  }
+  if (value === "light-green" || value === "olive") return "green";
+  if (value === "amber") return "yellow";
+  if (value === "coral" || value === "burnt-orange") return "orange";
+  if (value === "dark-red") return "red";
+  if (value === "muted" || value === "inherit") return "gray";
+  return DEFAULTS.translationStyle.color;
+}
+
 /**
  * 将功能 target 语言 resolve 为实际语言码。
- * "inherit" 表示跟随 Account 的 uiLang。
+ * "inherit" 表示跟随主语言 uiLang。
  */
 export function resolveTargetLang(
   target: TargetLang,
