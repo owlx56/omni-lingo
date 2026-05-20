@@ -18,6 +18,7 @@ export type TargetLang = "inherit" | "zh" | "en";
 export type ThemePreference = "system" | "light" | "dark";
 export type TranslationFontFamily = "inherit" | "serif" | "sans" | "mono";
 export type TranslationColor =
+  | "inherit"
   | "yellow"
   | "green"
   | "teal"
@@ -98,7 +99,7 @@ const DEFAULTS: Settings = {
   translationStyle: {
     underlineStyle: "none",
     fontFamily: "inherit",
-    color: "yellow",
+    color: "inherit",
     customColor: "#fbbc04",
   },
 };
@@ -181,6 +182,7 @@ function normalizeBoolean(value: unknown, fallback: boolean): boolean {
 
 function normalizeTranslationColor(value: unknown): TranslationColor {
   if (
+    value === "inherit" ||
     value === "yellow" ||
     value === "green" ||
     value === "teal" ||
@@ -199,7 +201,7 @@ function normalizeTranslationColor(value: unknown): TranslationColor {
   if (value === "amber") return "yellow";
   if (value === "coral" || value === "burnt-orange") return "orange";
   if (value === "dark-red") return "red";
-  if (value === "muted" || value === "inherit") return "gray";
+  if (value === "muted") return "gray";
   return DEFAULTS.translationStyle.color;
 }
 

@@ -86,6 +86,7 @@ export type MessageKey =
   | "font.sans.note"
   | "font.mono"
   | "font.mono.note"
+  | "color.inherit"
   | "color.yellow"
   | "color.blue"
   | "color.green"
@@ -226,6 +227,7 @@ const ZH: Dict = {
   "font.sans.note": "Segoe UI / system-ui",
   "font.mono": "等宽",
   "font.mono.note": "Consolas / monospace",
+  "color.inherit": "默认",
   "color.yellow": "黄色",
   "color.green": "绿色",
   "color.teal": "青色",
@@ -370,6 +372,7 @@ const EN: Dict = {
   "font.sans.note": "Segoe UI / system-ui",
   "font.mono": "Mono",
   "font.mono.note": "Consolas / monospace",
+  "color.inherit": "Default",
   "color.yellow": "Yellow",
   "color.green": "Green",
   "color.teal": "Teal",

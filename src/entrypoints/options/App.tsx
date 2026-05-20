@@ -120,6 +120,7 @@ const UNDERLINE_STYLES: {
 
 const COLOR_PRESETS: { value: TranslationColor; labelKey: MessageKey; swatch: string }[] =
   [
+    { value: "inherit", labelKey: "color.inherit", swatch: "transparent" },
     { value: "yellow", labelKey: "color.yellow", swatch: "rgb(251, 188, 4)" },
     { value: "green", labelKey: "color.green", swatch: "rgb(19, 129, 37)" },
     { value: "teal", labelKey: "color.teal", swatch: "rgb(25, 174, 160)" },
@@ -529,7 +530,7 @@ function App() {
             value={settings().translationStyle.fontFamily}
           />
         </Row>
-        <FullRow label={t("style.label.color")} description={t("desc.color")}>
+        <Row label={t("style.label.color")} description={t("desc.color")}>
           <ColorRowControl
             customColor={settings().translationStyle.customColor}
             onCustom={(customColor) =>
@@ -539,7 +540,7 @@ function App() {
             t={t}
             value={settings().translationStyle.color}
           />
-        </FullRow>
+        </Row>
         <FullRow>
           <div
             class="style-preview"

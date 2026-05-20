@@ -46,9 +46,7 @@ export function buildTranslationStyleCss(style: TranslationStyle): string {
   const css: string[] = [];
 
   const textDecoration = resolveTranslationStyleTextDecoration(style);
-  if (textDecoration !== "none") {
-    css.push(`text-decoration: ${textDecoration};`);
-  }
+  css.push(`text-decoration: ${textDecoration};`);
 
   const fontFamily = resolveTranslationStyleFontFamily(style.fontFamily);
   if (fontFamily) css.push(`font-family: ${fontFamily};`);
