@@ -10,7 +10,7 @@
 //     主题用 IconSegment。
 //   - About 页是只读 row，不做控件。
 
-import { For, Show, createSignal, type JSX } from "solid-js";
+import { For, Show, createEffect, createSignal, type JSX } from "solid-js";
 import {
   resolveTranslationStyleColor,
   resolveTranslationStyleFontFamily,
@@ -59,6 +59,7 @@ type TabId = "account" | "hover" | "selection" | "immersive" | "about";
 type OptionIcon = (props: { size?: number }) => JSX.Element;
 
 const VERSION = "0.0.0";
+const HOVER_FONT_SIZE_STEP = 0.5;
 
 const TABS: { id: TabId; labelKey: MessageKey; icon: OptionIcon }[] = [
   { id: "account", labelKey: "sidebar.account", icon: IconSettings },
@@ -254,19 +255,36 @@ function ColorRowControl(props: {
   );
 }
 
-function rangeProgress(value: number, min: number, max: number): string {
-  const progress = ((value - min) / (max - min)) * 100;
-  return `${Math.min(100, Math.max(0, progress))}%`;
+function formatPx(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(value);
 }
 
-function formatPx(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+function clampFontSizeValue(value: number): number {
+  return Math.min(HOVER_FONT_SIZE_MAX, Math.max(HOVER_FONT_SIZE_MIN, value));
+}
+
+function cleanFontSizeValue(value: number): number {
+  return Number(value.toFixed(3));
+}
+
+function parseFontSizeDraft(value: string): number | null {
+  const trimmed = value.trim();
+  if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function App() {
   const settings = useSettings();
   const t = useT();
   const [activeTab, setActiveTab] = createSignal<TabId>("account");
+  const [hoverFontSizeDraft, setHoverFontSizeDraft] = createSignal(
+    formatPx(HOVER_FONT_SIZE_MIN),
+  );
+
+  createEffect(() => {
+    setHoverFontSizeDraft(formatPx(settings().hoverFontSize));
+  });
 
   const setTranslationStyle = (
     patch: Parameters<typeof setSettings>[0]["translationStyle"],
@@ -277,6 +295,22 @@ function App() {
   const tabTitle = (): string => {
     const tab = TABS.find((item) => item.id === activeTab());
     return tab ? t(tab.labelKey) : t("sidebar.account");
+  };
+
+  const commitHoverFontSize = (value: number): void => {
+    const next = cleanFontSizeValue(clampFontSizeValue(value));
+    setHoverFontSizeDraft(formatPx(next));
+    void setSettings({ hoverFontSize: next });
+  };
+
+  const commitHoverFontSizeDraft = (): void => {
+    commitHoverFontSize(parseFontSizeDraft(hoverFontSizeDraft()) ?? HOVER_FONT_SIZE_MIN);
+  };
+
+  const stepHoverFontSize = (delta: number): void => {
+    const draftValue = parseFontSizeDraft(hoverFontSizeDraft());
+    const base = draftValue ?? settings().hoverFontSize;
+    commitHoverFontSize(base + delta);
   };
 
   const renderAccount = (): JSX.Element => (
@@ -377,34 +411,51 @@ function App() {
           description={t("desc.fontSize")}
           label={t("section.fontSize")}
         >
-          <div class="range-row hover-font-size-control">
+          <div class="number-stepper hover-font-size-control">
+            <button
+              aria-label={`${t("slider.fontSize.aria")} -${HOVER_FONT_SIZE_STEP}`}
+              class="number-stepper-button"
+              onClick={() => stepHoverFontSize(-HOVER_FONT_SIZE_STEP)}
+              type="button"
+            >
+              -
+            </button>
             <input
               aria-label={t("slider.fontSize.aria")}
-              aria-valuetext={t("slider.fontSize.valuetext", {
-                n: formatPx(settings().hoverFontSize),
-              })}
-              class="range-input"
+              class="number-stepper-input"
+              inputMode="decimal"
               max={HOVER_FONT_SIZE_MAX}
               min={HOVER_FONT_SIZE_MIN}
-              onInput={(event) =>
-                void setSettings({
-                  hoverFontSize: Number(event.currentTarget.value),
-                })
-              }
-              step={0.5}
-              style={{
-                "--range-progress": rangeProgress(
-                  settings().hoverFontSize,
-                  HOVER_FONT_SIZE_MIN,
-                  HOVER_FONT_SIZE_MAX,
-                ),
+              onBlur={commitHoverFontSizeDraft}
+              onInput={(event) => setHoverFontSizeDraft(event.currentTarget.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.currentTarget.blur();
+                  return;
+                }
+                if (event.key === "ArrowUp") {
+                  event.preventDefault();
+                  stepHoverFontSize(HOVER_FONT_SIZE_STEP);
+                  return;
+                }
+                if (event.key === "ArrowDown") {
+                  event.preventDefault();
+                  stepHoverFontSize(-HOVER_FONT_SIZE_STEP);
+                }
               }}
-              type="range"
-              value={settings().hoverFontSize}
+              step="any"
+              type="text"
+              value={hoverFontSizeDraft()}
             />
-            <span aria-hidden="true" class="range-value">
-              {formatPx(settings().hoverFontSize)}px
-            </span>
+            <span aria-hidden="true" class="number-stepper-unit">px</span>
+            <button
+              aria-label={`${t("slider.fontSize.aria")} +${HOVER_FONT_SIZE_STEP}`}
+              class="number-stepper-button"
+              onClick={() => stepHoverFontSize(HOVER_FONT_SIZE_STEP)}
+              type="button"
+            >
+              +
+            </button>
           </div>
         </Row>
       </section>

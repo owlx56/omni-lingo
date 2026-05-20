@@ -146,7 +146,7 @@ h1 {
 }
 
 .hover-font-size-control {
-    width: clamp(240px, 34vw, 360px);
+    width: auto;
 }
 
 /* ── Translation preview（immersive 段独占）─────────────── */
@@ -198,7 +198,7 @@ h1 {
     }
 
     .hover-font-size-control {
-        width: min(100%, 360px);
+        width: auto;
     }
 }
 
