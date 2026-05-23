@@ -27,18 +27,16 @@ import {
   type FullPageEngineId,
   type FullPageMode,
 } from "@/lib/storage/settings";
-import { useT, type TFn } from "@/lib/i18n";
-import { IconLogo, IconSettings } from "@/lib/ui/icons";
+import { useT } from "@/lib/i18n";
+import { IconChevron, IconLogo, IconSettings } from "@/lib/ui/icons";
 import {
   Row,
   Select,
-  Segment,
   Switch,
-  type SegmentOption,
   type SelectOption,
 } from "@/lib/ui/controls";
 
-const ENGINES: SegmentOption<FullPageEngineId>[] = [
+const ENGINES: SelectOption<FullPageEngineId>[] = [
   { value: "google2", label: "Google" },
   { value: "microsoft", label: "Microsoft" },
 ];
@@ -52,13 +50,6 @@ function pageTargetOptions(): SelectOption<PageTargetLang>[] {
   }));
 }
 
-function modeOptions(t: TFn): SegmentOption<FullPageMode>[] {
-  return [
-    { value: "replace", label: t("mode.replace") },
-    { value: "bilingual", label: t("mode.bilingual") },
-  ];
-}
-
 type ActionState = "idle" | "starting" | "restoring" | "retranslating";
 
 const DEFAULT_PAGE_FEATURE_STATUS: PageFeatureStatus = {
@@ -69,6 +60,86 @@ const DEFAULT_PAGE_FEATURE_STATUS: PageFeatureStatus = {
   hasHoverEnabledPref: false,
   hasSelectionEnabledPref: false,
 };
+
+function IconArrowRight(): JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="24"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="1.7"
+      viewBox="0 0 24 24"
+      width="24"
+    >
+      <path d="M5 12h14" />
+      <path d="M13 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+function IconReplaceMode(): JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="30"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="2"
+      viewBox="0 0 32 32"
+      width="30"
+    >
+      <path d="M8 7H5v18h3" />
+      <path d="M24 7h3v18h-3" />
+      <path d="M12 21l4-11 4 11" />
+      <path d="M13.4 17h5.2" />
+    </svg>
+  );
+}
+
+function IconBilingualMode(): JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height="30"
+      stroke="currentColor"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      stroke-width="1.8"
+      viewBox="0 0 32 32"
+      width="30"
+    >
+      <rect height="15" rx="2" width="15" x="5" y="5" />
+      <rect height="15" rx="2" width="15" x="12" y="12" />
+      <path d="M9 16l3.2-7 3.2 7" />
+      <path d="M10.2 13.4h4" />
+      <path d="M16.5 19h7" />
+      <path d="M20 16.5v8" />
+      <path d="M17.5 23c2.9-1 4.9-3.1 5.4-6" />
+      <path d="M23.5 23c-2.6-.9-4.2-2.6-5-5" />
+    </svg>
+  );
+}
+
+function EngineMark(props: { engine: FullPageEngineId }): JSX.Element {
+  if (props.engine === "microsoft") {
+    return (
+      <span aria-hidden="true" class="engine-mark microsoft-mark">
+        <span class="microsoft-mark-red" />
+        <span class="microsoft-mark-green" />
+        <span class="microsoft-mark-blue" />
+        <span class="microsoft-mark-yellow" />
+      </span>
+    );
+  }
+
+  return <span aria-hidden="true" class="engine-mark google-mark">G</span>;
+}
 
 function isMissingContentScriptError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -371,7 +442,12 @@ function App(): JSX.Element {
     if (action() === "restoring") return t("popup.button.restoring");
     return immersiveActive()
       ? t("popup.button.restore")
-      : t("popup.button.start");
+      : t("popup.button.translate");
+  };
+
+  const selectMode = (mode: FullPageMode): void => {
+    if (action() !== "idle" || pageModeValue() === mode) return;
+    applyPagePref({ mode }, t("popup.status.modeSwitching"));
   };
 
   return (
@@ -379,7 +455,7 @@ function App(): JSX.Element {
       <header class="popup-header">
         <span class="popup-brand">
           <span aria-hidden="true" class="popup-logo">
-            <IconLogo size={20} />
+            <IconLogo size={18} />
           </span>
           <span>OneLingo</span>
         </span>
@@ -394,7 +470,85 @@ function App(): JSX.Element {
         </button>
       </header>
 
-      <div class="popup-cta-block">
+      <section aria-label={t("popup.section.page")} class="translate-card">
+        <div class="language-flow">
+          <button
+            aria-disabled="true"
+            aria-label={t("popup.label.sourceLang")}
+            class="source-language-button"
+            tabIndex={-1}
+            type="button"
+          >
+            <span>{t("popup.label.sourceAuto")}</span>
+            <IconChevron size={16} />
+          </button>
+          <span aria-hidden="true" class="language-arrow">
+            <IconArrowRight />
+          </span>
+          <div class="target-language-select">
+            <Select
+              label={t("popup.label.lang")}
+              onChange={(target) =>
+                applyPagePref(
+                  { target },
+                  t("popup.status.modeSwitching"),
+                )
+              }
+              options={pageTargetOptions()}
+              value={pageTargetValue()}
+            />
+          </div>
+        </div>
+
+        <div class="service-row">
+          <span class="service-label">{t("popup.label.service")}:</span>
+          <span class="service-control">
+            <EngineMark engine={pageEngineValue()} />
+            <Select
+              label={t("popup.label.service")}
+              onChange={(engine) =>
+                applyPagePref(
+                  { engine },
+                  t("popup.status.engineSwitchPending", {
+                    engine: engineLabel(engine),
+                  }),
+                )
+              }
+              options={ENGINES}
+              value={pageEngineValue()}
+            />
+          </span>
+        </div>
+      </section>
+
+      <div class="popup-primary-actions">
+        <div aria-label={t("popup.label.mode")} class="mode-switch" role="group">
+          <button
+            aria-label={t("mode.replace")}
+            aria-pressed={pageModeValue() === "replace"}
+            class="mode-button"
+            classList={{ active: pageModeValue() === "replace" }}
+            disabled={action() !== "idle"}
+            onClick={() => selectMode("replace")}
+            title={t("mode.replace")}
+            type="button"
+          >
+            <IconReplaceMode />
+          </button>
+          <button
+            aria-label={t("mode.bilingual")}
+            aria-pressed={pageModeValue() === "bilingual"}
+            class="mode-button"
+            classList={{ active: pageModeValue() === "bilingual" }}
+            disabled={action() !== "idle"}
+            onClick={() => selectMode("bilingual")}
+            title={t("mode.bilingual")}
+            type="button"
+          >
+            <IconBilingualMode />
+          </button>
+        </div>
+
         <button
           class="popup-cta"
           classList={{ active: immersiveActive() }}
@@ -402,56 +556,20 @@ function App(): JSX.Element {
           onClick={() => void runCta()}
           type="button"
         >
-          {ctaLabel()}
+          <span>{ctaLabel()}</span>
+          <span class="popup-shortcut">{t("popup.shortcut")}</span>
         </button>
-        <p
-          class="popup-status"
-          classList={{ error: statusIsError() }}
-        >
-          {status() || pageStateText()}
-        </p>
       </div>
 
-      <section class="section">
-        <h2>{t("popup.section.page")}</h2>
-        <Row label={t("popup.label.lang")}>
-          <Select
-            label={t("popup.label.lang")}
-            onChange={(target) =>
-              applyPagePref(
-                { target },
-                t("popup.status.modeSwitching"),
-              )
-            }
-            options={pageTargetOptions()}
-            value={pageTargetValue()}
-          />
-        </Row>
-        <Row label={t("popup.label.engine")}>
-          <Segment
-            label={t("popup.label.engine")}
-            onChange={(engine) =>
-              applyPagePref(
-                { engine },
-                t("popup.status.engineSwitchPending", {
-                  engine: engineLabel(engine),
-                }),
-              )
-            }
-            options={ENGINES}
-            value={pageEngineValue()}
-          />
-        </Row>
-        <Row label={t("popup.label.mode")}>
-          <Segment
-            label={t("popup.label.mode")}
-            onChange={(mode) =>
-              applyPagePref({ mode }, t("popup.status.modeSwitching"))
-            }
-            options={modeOptions(t)}
-            value={pageModeValue()}
-          />
-        </Row>
+      <p
+        class="popup-status"
+        classList={{ error: statusIsError() }}
+      >
+        {status() || pageStateText()}
+      </p>
+
+      <section class="section popup-settings-section">
+        <h2>{t("popup.section.features")}</h2>
         <Row label={t("section.clickToShowOriginal")}>
           <Switch
             checked={clickToShowOriginalValue()}
@@ -461,10 +579,6 @@ function App(): JSX.Element {
             }
           />
         </Row>
-      </section>
-
-      <section class="section">
-        <h2>{t("popup.section.features")}</h2>
         <Row label={t("popup.row.hoverEnabled")}>
           <Switch
             checked={hoverEnabledValue()}
