@@ -15,6 +15,7 @@
 //     immersive 的 click toggle 通过 settings watcher 在下次翻译时生效。
 
 import { createSignal, onMount, type JSX } from "solid-js";
+import { UI_LANG_LABELS, UI_LANGS, type UiLang } from "@/lib/languages";
 import { sendMessage } from "@/lib/messaging";
 import {
   resolveTargetLang,
@@ -27,9 +28,11 @@ import { useT, type TFn } from "@/lib/i18n";
 import { IconLogo, IconSettings } from "@/lib/ui/icons";
 import {
   Row,
+  Select,
   Segment,
   Switch,
   type SegmentOption,
+  type SelectOption,
 } from "@/lib/ui/controls";
 
 const ENGINES: SegmentOption<FullPageEngineId>[] = [
@@ -37,13 +40,13 @@ const ENGINES: SegmentOption<FullPageEngineId>[] = [
   { value: "microsoft", label: "Microsoft" },
 ];
 
-type PageTargetLang = "zh" | "en";
+type PageTargetLang = UiLang;
 
-function pageTargetOptions(t: TFn): SegmentOption<PageTargetLang>[] {
-  return [
-    { value: "zh", label: t("common.chinese") },
-    { value: "en", label: t("common.english") },
-  ];
+function pageTargetOptions(): SelectOption<PageTargetLang>[] {
+  return UI_LANGS.map((value) => ({
+    value,
+    label: UI_LANG_LABELS[value],
+  }));
 }
 
 function modeOptions(t: TFn): SegmentOption<FullPageMode>[] {
@@ -65,7 +68,7 @@ function App(): JSX.Element {
   const [immersiveActive, setImmersiveActive] = createSignal(false);
   const [pageMode, setPageMode] = createSignal<FullPageMode>("replace");
   const [pageEngine, setPageEngine] = createSignal<FullPageEngineId>("google2");
-  const [pageTarget, setPageTarget] = createSignal<PageTargetLang>("zh");
+  const [pageTarget, setPageTarget] = createSignal<PageTargetLang>("en");
   const [hasPagePrefs, setHasPagePrefs] = createSignal(false);
 
   let actionSeq = 0;
@@ -98,8 +101,7 @@ function App(): JSX.Element {
   const engineLabel = (engine: FullPageEngineId): string =>
     ENGINES.find((e) => e.value === engine)?.label ?? engine;
 
-  const targetLabel = (lang: PageTargetLang): string =>
-    lang === "zh" ? t("common.chinese") : t("common.english");
+  const targetLabel = (lang: PageTargetLang): string => UI_LANG_LABELS[lang];
 
   const modeLabel = (mode: FullPageMode): string =>
     mode === "replace" ? t("mode.replace") : t("mode.bilingual");
@@ -344,7 +346,7 @@ function App(): JSX.Element {
       <section class="section">
         <h2>{t("popup.section.page")}</h2>
         <Row label={t("popup.label.lang")}>
-          <Segment
+          <Select
             label={t("popup.label.lang")}
             onChange={(target) =>
               applyPagePref(
@@ -352,7 +354,7 @@ function App(): JSX.Element {
                 t("popup.status.modeSwitching"),
               )
             }
-            options={pageTargetOptions(t)}
+            options={pageTargetOptions()}
             value={pageTargetValue()}
           />
         </Row>

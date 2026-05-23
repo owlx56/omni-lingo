@@ -8,8 +8,10 @@
 // 因为 useSettings() 是 Solid signal，渲染处调 t(key) 会被自动追踪；
 // uiLang 切换时所有用 t() 的位置都会重渲染。
 
-import { useSettings, type UiLang } from "@/lib/storage/settings";
-import { format, MESSAGES, type MessageKey } from "./messages";
+import { useSettings } from "@/lib/storage/settings";
+import type { UiLang } from "@/lib/languages";
+import { format, type MessageKey } from "./messages";
+import { MESSAGES } from "./locales";
 
 export type { MessageKey } from "./messages";
 
@@ -32,6 +34,7 @@ export function translate(
   key: MessageKey,
   params?: Record<string, string | number>,
 ): string {
-  const tpl = MESSAGES[lang]?.[key] ?? MESSAGES.en[key] ?? key;
+  const uiDict = MESSAGES[lang];
+  const tpl = uiDict[key] ?? MESSAGES.en[key] ?? key;
   return format(tpl, params);
 }

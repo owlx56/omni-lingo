@@ -11,6 +11,7 @@
 //   - About 页是只读 row，不做控件。
 
 import { For, Show, createEffect, createSignal, type JSX } from "solid-js";
+import { TARGET_LANGS, UI_LANG_LABELS, UI_LANGS } from "@/lib/languages";
 import {
   resolveTranslationStyleColor,
   resolveTranslationStyleFontFamily,
@@ -68,17 +69,6 @@ const TABS: { id: TabId; labelKey: MessageKey; icon: OptionIcon }[] = [
   { id: "immersive", labelKey: "sidebar.immersive", icon: IconImmersive },
   { id: "about", labelKey: "sidebar.about", icon: IconInfo },
 ];
-
-const UI_LANG_KEYS: Record<UiLang, MessageKey> = {
-  zh: "common.chinese",
-  en: "common.english",
-};
-
-const TARGET_LANG_KEYS: Record<TargetLang, MessageKey> = {
-  inherit: "common.followUiLang",
-  zh: "common.chinese",
-  en: "common.english",
-};
 
 const HOVER_ENGINES: { value: string; label: string }[] = [
   { value: "google", label: "Google" },
@@ -161,19 +151,18 @@ function Sidebar(props: {
   );
 }
 
-function uiLangSegmentOptions(t: TFn): SegmentOption<UiLang>[] {
-  return [
-    { value: "zh", label: t(UI_LANG_KEYS.zh) },
-    { value: "en", label: t(UI_LANG_KEYS.en) },
-  ];
+function uiLangSelectOptions(): SelectOption<UiLang>[] {
+  return UI_LANGS.map((value) => ({
+    value,
+    label: UI_LANG_LABELS[value],
+  }));
 }
 
 function targetLangSelectOptions(t: TFn): SelectOption<TargetLang>[] {
-  return [
-    { value: "inherit", label: t(TARGET_LANG_KEYS.inherit) },
-    { value: "zh", label: t(TARGET_LANG_KEYS.zh) },
-    { value: "en", label: t(TARGET_LANG_KEYS.en) },
-  ];
+  return TARGET_LANGS.map((value) => ({
+    value,
+    label: value === "inherit" ? t("common.followUiLang") : UI_LANG_LABELS[value],
+  }));
 }
 
 function granularitySelectOptions(t: TFn): SelectOption<HoverGranularity>[] {
@@ -333,10 +322,10 @@ function App() {
       <section class="section">
         <h2>{t("section.preferences")}</h2>
         <Row label={t("preferences.uiLang")} description={t("desc.uiLang")}>
-          <Segment
+          <Select
             label={t("preferences.uiLang")}
             onChange={(uiLang) => void setSettings({ uiLang })}
-            options={uiLangSegmentOptions(t)}
+            options={uiLangSelectOptions()}
             value={settings().uiLang}
           />
         </Row>

@@ -1,4 +1,12 @@
 import { createSignal, onCleanup, type Accessor } from "solid-js";
+import {
+  isTargetLang,
+  isUiLang,
+  type TargetLang,
+  type UiLang,
+} from "@/lib/languages";
+
+export type { TargetLang, UiLang } from "@/lib/languages";
 
 export type FullPageEngineId = "google2" | "microsoft";
 
@@ -13,8 +21,6 @@ export interface EngineMap {
 
 export type HoverGranularity = "word" | "sentence" | "paragraph";
 export type FullPageMode = "replace" | "bilingual";
-export type UiLang = "zh" | "en";
-export type TargetLang = "inherit" | "zh" | "en";
 export type ThemePreference = "system" | "light" | "dark";
 export type TranslationFontFamily = "inherit" | "serif" | "sans" | "mono";
 export type TranslationColor =
@@ -160,13 +166,11 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
 }
 
 function normalizeUiLang(value: unknown): UiLang {
-  return value === "zh" || value === "en" ? value : DEFAULTS.uiLang;
+  return isUiLang(value) ? value : DEFAULTS.uiLang;
 }
 
 function normalizeTargetLang(value: unknown): TargetLang {
-  return value === "inherit" || value === "zh" || value === "en"
-    ? value
-    : "inherit";
+  return isTargetLang(value) ? value : "inherit";
 }
 
 function normalizeTheme(value: unknown): ThemePreference {
