@@ -2,7 +2,7 @@
  *
  * 通用控件 / 主题 token / row primitives 在 src/lib/ui/controls.css。
  * 这里只放 options 独有的：page 容器 / header / sidebar / section 间距 /
- * tab heading / 译文预览 / 响应式断点。
+ * 译文预览 / 响应式断点。
  */
 
 html {
@@ -118,18 +118,12 @@ h1 {
     min-width: 0;
 }
 
-.tab-heading {
-    padding-bottom: 8px;
-}
-
-.tab-heading h2 {
-    font-size: 22px;
-    font-weight: 650;
-    line-height: 1.2;
-}
-
 .section {
     padding: 28px 0 0;
+}
+
+.content-panel > .section:first-child {
+    padding-top: 0;
 }
 
 .section > h2 {
@@ -142,11 +136,12 @@ h1 {
 
 /* options 列表里 row 间距比共享默认稍宽 */
 .section .row {
+    border-top: none;
     padding: 18px 0;
 }
 
-.section .row:last-of-type {
-    border-bottom: 1px solid var(--border);
+.section .row + .row {
+    border-top: 1px solid var(--border);
 }
 
 .hover-font-size-control {

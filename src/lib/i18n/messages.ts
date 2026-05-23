@@ -31,6 +31,7 @@ export type MessageKey =
   | "section.engine"
   | "section.granularity"
   | "section.fontSize"
+  | "fontSize.label"
   | "section.displayMode"
   | "section.clickToShowOriginal"
   | "section.translationStyle"

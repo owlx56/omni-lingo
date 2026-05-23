@@ -398,7 +398,7 @@ function App() {
         <h2>{t("section.fontSize")}</h2>
         <Row
           description={t("desc.fontSize")}
-          label={t("section.fontSize")}
+          label={t("fontSize.label")}
         >
           <div class="number-stepper hover-font-size-control">
             <button
@@ -644,10 +644,7 @@ function App() {
 
       <div class="settings-shell">
         <Sidebar activeTab={activeTab()} onSelect={setActiveTab} t={t} />
-        <section aria-labelledby="tab-title" class="content-panel">
-          <div class="tab-heading">
-            <h2 id="tab-title">{tabTitle()}</h2>
-          </div>
+        <section aria-label={tabTitle()} class="content-panel">
           {renderActiveTab()}
         </section>
       </div>
