@@ -6,13 +6,21 @@
 //   - row 左侧 label + 可选 description（muted），右侧 control（紧贴右）。
 //   - FullRow 让 control 占满整行（slider、translation preview 等）。
 //
-// 控件原语：Switch（boolean）、Select（多选 native dropdown）、
+// 控件原语：Switch（boolean）、Select（多选 dropdown）、
 // Segment（2~3 选文字段控件）、IconSegment（带图标的段控件，主题用）。
 //
 // 这些组件都是命令式 click 处理的，避免 Solid signal 在控件内部嵌套。
 
-import { For, Show, type JSX } from "solid-js";
-import { IconChevron } from "./icons";
+import {
+  For,
+  Show,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  onCleanup,
+  type JSX,
+} from "solid-js";
+import { IconCheck, IconChevron } from "./icons";
 
 export function Row(props: {
   label: string;
@@ -86,23 +94,138 @@ export function Select<T extends string>(props: {
   label?: string;
   disabled?: boolean;
 }) {
-  // native select 兼容性最好；视觉用 wrapper + chevron 装饰。
+  let root: HTMLSpanElement | undefined;
+  let button: HTMLButtonElement | undefined;
+  const id = createUniqueId();
+  const [open, setOpen] = createSignal(false);
+  const [activeIndex, setActiveIndex] = createSignal(-1);
+  const selectedIndex = createMemo(() => {
+    const index = props.options.findIndex((option) => option.value === props.value);
+    return index >= 0 ? index : 0;
+  });
+  const selectedOption = createMemo(() => props.options[selectedIndex()]);
+
+  const close = (): void => {
+    setOpen(false);
+  };
+  const openMenu = (): void => {
+    if (props.disabled) return;
+    setActiveIndex(-1);
+    setOpen(true);
+  };
+  const selectOption = (option: SelectOption<T>): void => {
+    props.onChange(option.value);
+    close();
+    button?.focus();
+  };
+
+  const handleDocumentPointerDown = (event: PointerEvent): void => {
+    if (!root?.contains(event.target as Node)) close();
+  };
+  document.addEventListener("pointerdown", handleDocumentPointerDown);
+  onCleanup(() => {
+    document.removeEventListener("pointerdown", handleDocumentPointerDown);
+  });
+
+  const moveActive = (delta: number): void => {
+    if (props.options.length === 0) return;
+    setActiveIndex((current) => {
+      if (current < 0) return selectedIndex();
+      const next = current + delta;
+      if (next < 0) return props.options.length - 1;
+      if (next >= props.options.length) return 0;
+      return next;
+    });
+  };
+
+  const handleKeyDown: JSX.EventHandlerUnion<HTMLButtonElement, KeyboardEvent> = (
+    event,
+  ) => {
+    if (props.disabled) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!open()) openMenu();
+      else moveActive(1);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!open()) openMenu();
+      else moveActive(-1);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      close();
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (!open()) {
+        openMenu();
+        return;
+      }
+      const option = props.options[
+        activeIndex() >= 0 ? activeIndex() : selectedIndex()
+      ];
+      if (option) selectOption(option);
+    }
+  };
+
   return (
-    <span class="select" classList={{ disabled: props.disabled }}>
-      <select
+    <span class="select" classList={{ disabled: props.disabled, open: open() }} ref={root}>
+      <button
+        aria-activedescendant={
+          open() && activeIndex() >= 0
+            ? `${id}-option-${activeIndex()}`
+            : undefined
+        }
+        aria-controls={`${id}-menu`}
+        aria-expanded={open()}
         aria-label={props.label}
-        class="select-input"
+        class="select-button"
         disabled={props.disabled}
-        onChange={(event) => props.onChange(event.currentTarget.value as T)}
-        value={props.value}
+        onClick={() => {
+          if (open()) close();
+          else openMenu();
+        }}
+        onKeyDown={handleKeyDown}
+        ref={button}
+        role="combobox"
+        type="button"
       >
-        <For each={props.options}>
-          {(option) => <option value={option.value}>{option.label}</option>}
-        </For>
-      </select>
-      <span aria-hidden="true" class="select-chevron">
-        <IconChevron size={14} />
-      </span>
+        <span class="select-value">{selectedOption()?.label ?? ""}</span>
+        <span aria-hidden="true" class="select-chevron">
+          <IconChevron size={15} />
+        </span>
+      </button>
+      <Show when={open()}>
+        <div class="select-menu" id={`${id}-menu`} role="listbox">
+          <For each={props.options}>
+            {(option, index) => (
+              <button
+                aria-selected={props.value === option.value}
+                class="select-option"
+                classList={{
+                  active: activeIndex() === index(),
+                  selected: props.value === option.value,
+                }}
+                id={`${id}-option-${index()}`}
+                onClick={() => selectOption(option)}
+                role="option"
+                type="button"
+              >
+                <span class="select-option-label">{option.label}</span>
+                <Show when={props.value === option.value}>
+                  <span aria-hidden="true" class="select-option-check">
+                    <IconCheck size={17} />
+                  </span>
+                </Show>
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
     </span>
   );
 }

@@ -27,6 +27,10 @@ export function IconChevron(props: IconProps): JSX.Element {
   return svg(<path d="M6 9l6 6 6-6" />, props.size ?? 14);
 }
 
+export function IconCheck(props: IconProps): JSX.Element {
+  return svg(<path d="M20 6L9 17l-5-5" />, props.size ?? 16);
+}
+
 export function IconSettings(props: IconProps): JSX.Element {
   return svg(
     <>
