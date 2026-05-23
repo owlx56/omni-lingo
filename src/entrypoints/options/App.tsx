@@ -168,7 +168,7 @@ function uiLangSegmentOptions(t: TFn): SegmentOption<UiLang>[] {
   ];
 }
 
-function targetLangSegmentOptions(t: TFn): SegmentOption<TargetLang>[] {
+function targetLangSelectOptions(t: TFn): SelectOption<TargetLang>[] {
   return [
     { value: "inherit", label: t(TARGET_LANG_KEYS.inherit) },
     { value: "zh", label: t(TARGET_LANG_KEYS.zh) },
@@ -373,12 +373,12 @@ function App() {
           label={t("section.targetLang")}
           description={t("desc.hoverTargetLang")}
         >
-          <Segment
+          <Select
             label={t("section.targetLang")}
             onChange={(hoverTargetLang) =>
               void setSettings({ hoverTargetLang })
             }
-            options={targetLangSegmentOptions(t)}
+            options={targetLangSelectOptions(t)}
             value={settings().hoverTargetLang}
           />
         </Row>
@@ -481,12 +481,12 @@ function App() {
         label={t("section.targetLang")}
         description={t("desc.selectionTargetLang")}
       >
-        <Segment
+        <Select
           label={t("section.targetLang")}
           onChange={(selectionTargetLang) =>
             void setSettings({ selectionTargetLang })
           }
-          options={targetLangSegmentOptions(t)}
+          options={targetLangSelectOptions(t)}
           value={settings().selectionTargetLang}
         />
       </Row>
@@ -511,12 +511,12 @@ function App() {
           label={t("section.targetLang")}
           description={t("desc.immersiveTargetLang")}
         >
-          <Segment
+          <Select
             label={t("section.targetLang")}
             onChange={(immersiveTargetLang) =>
               void setSettings({ immersiveTargetLang })
             }
-            options={targetLangSegmentOptions(t)}
+            options={targetLangSelectOptions(t)}
             value={settings().immersiveTargetLang}
           />
         </Row>
