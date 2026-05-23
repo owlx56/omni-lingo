@@ -13,6 +13,8 @@ OneLingo 是一个浏览器翻译拓展，目标是提供悬停翻译、划词�
 - 翻译引擎：Google、Google2、Microsoft
 - 类型安全消息通道：`src/lib/messaging/`
 - 翻译缓存：内存 LRU + IndexedDB
+- 设置与语言：`src/lib/storage/settings.ts`、`src/lib/languages.ts`
+- options / popup 界面 i18n：18 种语言，文案按语言拆在 `src/lib/i18n/locales/`
 
 还未落地的能力不要提前创建目录，PDF 阅读器、文件翻译、字幕翻译、独立站点 adapter 等功能等到实现时再长出来。
 
@@ -50,6 +52,7 @@ WXT 在本项目中不会自动启动浏览器。手动加载拓展：
 bun run dev              # Chrome MV3 开发构建
 bun run dev:firefox      # Firefox 开发构建
 bun run compile          # TypeScript 检查
+bun test src/lib/i18n/index.test.js  # i18n 轻量回归测试
 bun run build            # Chrome MV3 生产构建
 bun run build:firefox    # Firefox 构建
 bun run zip              # Chrome 打包
@@ -59,6 +62,7 @@ Windows 上如果 package-script shim 解析失败，可以直接通过 Bun 调�
 
 ```powershell
 & 'C:\Users\owlx\scoop\shims\bun.exe' .\node_modules\typescript\bin\tsc --noEmit
+& 'C:\Users\owlx\scoop\shims\bun.exe' test .\src\lib\i18n\index.test.js
 & 'C:\Users\owlx\scoop\shims\bun.exe' .\node_modules\wxt\bin\wxt.mjs build
 ```
 
@@ -82,6 +86,11 @@ src/
     messaging/          # 类型安全消息通道
     storage/            # 设置和规则存储
     cache/              # 翻译缓存
+    i18n/               # options / popup UI 多语言文案
+      locales/          # 18 种语言，每种语言一个文件
+    languages.ts        # UI 语言 / 目标语言常量和类型
+    translation-style.ts # 全文译文样式解析
+    ui/                 # 共享 Solid 控件和图标
   ui/                   # Shadow DOM 挂载辅助和交互 UI 基础设施
 
 docs/
@@ -91,6 +100,21 @@ docs/
 ```
 
 更完整的模块边界见 [docs/architecture.md](docs/architecture.md)。
+
+## 设置和多语言
+
+设置统一走 `src/lib/storage/settings.ts`。`uiLang` 是 options / popup 的界面语言，也是 hover / selection / immersive 的目标语言设为 `inherit` 时的回退语言。
+
+语言列表集中在 `src/lib/languages.ts`，当前支持：
+
+```text
+English, 中文, 中文-繁体, 日本語, 한국어, العربية, Türk, русский, Việt, ไทย,
+Deutsch, Español, Français, Português(BR), हिन्दी, Italiano, Bahasa Indonesia, فارسی
+```
+
+i18n key 和模板格式化 helper 在 `src/lib/i18n/messages.ts`；实际文案按语言放在 `src/lib/i18n/locales/*.ts`，由 `src/lib/i18n/locales/index.ts` 汇总。新增 options / popup 文案时，先在 `messages.ts` 增加 key，再补对应语言文件。
+
+共享 UI 控件在 `src/lib/ui/controls.tsx` 和 `src/lib/ui/controls.css`。options / popup 的 Select、Segment、Switch、Row、色板等优先从这里改，避免两个入口样式漂移。
 
 ## 全文翻译模块
 

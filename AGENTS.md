@@ -23,6 +23,11 @@ OneLingo（一译）是跨 Chrome / Firefox / Safari 的浏览器翻译拓展。
 
 ## 当前架构速记
 
+- 用户主动触发的 UI 在 `src/entrypoints/options/`、`src/entrypoints/popup/` 和 `src/ui/`，可以使用 Solid。
+- 共享设置在 `src/lib/storage/settings.ts`，语言常量和类型在 `src/lib/languages.ts`。
+- `uiLang` 是 options / popup 的界面语言，也是各功能目标语言选择 `inherit` 时的回退语言。
+- UI 文案入口在 `src/lib/i18n/`：`messages.ts` 只放 key 和格式化 helper，18 种语言文案分别放在 `src/lib/i18n/locales/*.ts`。
+- 通用控件放在 `src/lib/ui/controls.tsx` 和 `src/lib/ui/controls.css`；改 options / popup 下拉菜单、开关、色板时优先复用这里。
 - 全文翻译在 `src/features/immersive/`。
 - `index.ts` 负责会话编排和翻译执行。
 - `scan.ts` 负责 DOM 发现和扫描期分类。
@@ -30,6 +35,7 @@ OneLingo（一译）是跨 Chrome / Firefox / Safari 的浏览器翻译拓展。
 - `rules.ts` 负责站点规则和规则解析。
 - 共享 wrapper 属性名放在 `dom-attrs.ts`。
 
+改 options / popup 或 i18n 前，先确认对应 key 是否在 `src/lib/i18n/messages.ts`，再改 `src/lib/i18n/locales/` 下的语言文件。
 改全文翻译前先读 [docs/architecture.md#全文翻译-immersive](docs/architecture.md#全文翻译-immersive)。
 修全文翻译 bug 前先读 [docs/immersive-debugging.md](docs/immersive-debugging.md)。
 
@@ -42,9 +48,16 @@ bun run compile
 bun run build
 ```
 
+当前有一条轻量 i18n 回归测试：
+
+```powershell
+bun test .\src\lib\i18n\index.test.js
+```
+
 如果 Windows shim 解析失败，直接用 Bun 调本地工具：
 
 ```powershell
 & 'C:\Users\owlx\scoop\shims\bun.exe' .\node_modules\typescript\bin\tsc --noEmit
 & 'C:\Users\owlx\scoop\shims\bun.exe' .\node_modules\wxt\bin\wxt.mjs build
+& 'C:\Users\owlx\scoop\shims\bun.exe' test .\src\lib\i18n\index.test.js
 ```
