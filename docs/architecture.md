@@ -28,6 +28,10 @@ src/lib/
   messaging/     -> 类型安全的 background/content/options 消息
   storage/       -> 设置和持久化辅助
   cache/         -> 翻译缓存基础设施
+  i18n/          -> options / popup UI 多语言文案
+  ui/            -> options / popup 共享控件原语
+  languages.ts   -> UI 语言 / 目标语言常量和类型
+  translation-style.ts -> 全文译文样式解析和默认值
 
 src/engines/     -> 翻译引擎适配
 src/ui/          -> Solid UI 和 Shadow DOM 挂载辅助
@@ -57,6 +61,31 @@ src/ui/          -> Solid UI 和 Shadow DOM 挂载辅助
 所有拓展消息走 `src/lib/messaging/`。协议类型集中在那里，background、content、popup、options 在编译期对齐。
 
 业务代码调用 `sendMessage` / `onMessage`，不要直接调用 runtime messaging。
+
+## 设置、语言和 UI 文案
+
+设置统一从 `src/lib/storage/settings.ts` 读写。`uiLang` 是 options / popup 的界面语言，也是 hover、selection、immersive 的目标语言设为 `inherit` 时的回退语言。
+
+语言列表集中在 `src/lib/languages.ts`：
+
+- `UI_LANGS` 是 options / popup 支持的 18 种界面语言；
+- `TARGET_LANGS` 在 `UI_LANGS` 前追加 `inherit`，用于功能目标语言；
+- `UI_LANG_LABELS` 必须使用每种语言自己的字符展示，例如 `English`、`中文`、`日本語`、`العربية`。
+
+UI 文案在 `src/lib/i18n/`：
+
+- `messages.ts` 只定义 key、字典类型和模板格式化 helper；
+- `locales/*.ts` 每种语言一个文件；
+- `locales/index.ts` 汇总所有语言；
+- `en.ts` 和 `zh.ts` 作为完整字典，其它语言可以用 `PartialDict`，缺失 key 会回退英文。
+
+新增 options / popup 文案时，先在 `messages.ts` 增加 key，再补相关 locale 文件，并用 `bun test src/lib/i18n/index.test.js` 做轻量回归。
+
+## 共享设置 UI
+
+options 和 popup 的通用控件放在 `src/lib/ui/controls.tsx`，样式放在 `src/lib/ui/controls.css`。当前包含 Row、FullRow、Switch、Select、Segment、IconSegment。
+
+改下拉菜单、开关、色板、分段按钮时优先改共享控件，避免 options 和 popup 样式漂移。Select 的触发按钮保持无边框的扁平样式，下拉菜单负责边框、阴影、圆角和滚动条；选项文本需要足够 line-height，避免 `g`、`y`、`p` 等下伸字母被裁切。
 
 ## 全文翻译 Immersive
 

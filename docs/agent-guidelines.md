@@ -49,6 +49,29 @@ CSS.highlights.set("onelingo-hover", new Highlight(range));
 
 background / content / options / popup 的消息全部走 `src/lib/messaging/`。业务代码不要直接调用 raw `browser.runtime.sendMessage`。
 
+### Options / Popup UI
+
+options 和 popup 使用 Solid，但通用控件必须优先复用 `src/lib/ui/controls.tsx` 和 `src/lib/ui/controls.css`。不要在 entrypoint 内各自复制 Select、Switch、Segment、Row 等样式。
+
+下拉菜单遵守当前 Claude/Gemini 风格约定：
+
+- 触发按钮扁平、无边框；
+- popover 自己承担淡边框、柔和阴影、圆角和 `overflow-y-auto`；
+- 选中项右侧显示 check；
+- 选项行要有足够上下留白和 line-height，不能裁掉下伸字母；
+- 选项很多时必须保留细滚动条。
+
+### UI i18n
+
+options / popup 的界面文案都走 `src/lib/i18n/`，不要在组件里硬编码可见字符串。新增文案时：
+
+1. 在 `src/lib/i18n/messages.ts` 增加 key；
+2. 在 `src/lib/i18n/locales/` 下补语言文件；
+3. 在组件里通过 `t("namespace.key")` 读取；
+4. 跑 `bun test src/lib/i18n/index.test.js` 检查语言文件结构。
+
+语言列表只在 `src/lib/languages.ts` 维护。语言下拉选项显示 `UI_LANG_LABELS`，必须用每种语言自己的文字，不要翻译成当前 UI 语言。
+
 ### 存储
 
 遵守当前存储边界：
