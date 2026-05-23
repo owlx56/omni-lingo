@@ -420,19 +420,15 @@ select {
 }
 
 .color-swatch-button:first-child .color-swatch-dot {
-    border: 1px solid var(--border-strong);
-    background-color: var(--surface);
-    background-image:
-        linear-gradient(45deg, var(--surface-strong) 25%, transparent 25%),
-        linear-gradient(-45deg, var(--surface-strong) 25%, transparent 25%),
-        linear-gradient(45deg, transparent 75%, var(--surface-strong) 75%),
-        linear-gradient(-45deg, transparent 75%, var(--surface-strong) 75%);
-    background-size: 8px 8px;
-    background-position:
-        0 0,
-        0 4px,
-        4px -4px,
-        -4px 0;
+    border: 1px solid #111111;
+    background:
+        conic-gradient(
+            from 0deg,
+            #111111 0 90deg,
+            #ffffff 90deg 180deg,
+            #111111 180deg 270deg,
+            #ffffff 270deg 360deg
+        );
 }
 
 .color-swatch-button-custom {
