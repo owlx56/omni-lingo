@@ -1,7 +1,23 @@
-import { sendMessage } from "@/lib/messaging";
-import { initHover } from "@/features/hover";
-import { initSelection } from "@/features/selection";
-import { initFullPage } from "@/features/immersive";
+import {
+  onMessage,
+  sendMessage,
+  type PageFeatureStatus,
+} from "@/lib/messaging";
+import {
+  getHoverEnabledStatus,
+  initHover,
+  updateHoverEnabledPref,
+} from "@/features/hover";
+import {
+  getSelectionEnabledStatus,
+  initSelection,
+  updateSelectionEnabledPref,
+} from "@/features/selection";
+import {
+  getFullPageClickToShowOriginalStatus,
+  initFullPage,
+  updateFullPageClickToShowOriginalPref,
+} from "@/features/immersive";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -16,5 +32,25 @@ export default defineContentScript({
     initFullPage();
     initHover();
     initSelection();
+
+    const readFeatureStatus = (): PageFeatureStatus => ({
+      ...getFullPageClickToShowOriginalStatus(),
+      ...getHoverEnabledStatus(),
+      ...getSelectionEnabledStatus(),
+    });
+
+    onMessage("readPageFeatureStatus", () => readFeatureStatus());
+    onMessage("updatePageFeaturePrefs", (input) => {
+      if (input.fullPageClickToShowOriginal !== undefined) {
+        updateFullPageClickToShowOriginalPref(input.fullPageClickToShowOriginal);
+      }
+      if (input.hoverEnabled !== undefined) {
+        updateHoverEnabledPref(input.hoverEnabled);
+      }
+      if (input.selectionEnabled !== undefined) {
+        updateSelectionEnabledPref(input.selectionEnabled);
+      }
+      return readFeatureStatus();
+    });
   },
 });

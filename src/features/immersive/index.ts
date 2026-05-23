@@ -260,6 +260,8 @@ let rescanTimer: number | undefined;
 let currentRule: ResolvedFullPageRule | null = null;
 let currentBaseTextExtStyle = "";
 let clickToShowOriginalEnabled = true;
+let settingsClickToShowOriginalEnabled = true;
+let preferredClickToShowOriginalEnabled: boolean | null = null;
 let runSeq = 0;
 let lastCommandId = 0;
 let pendingCount = 0;
@@ -418,6 +420,28 @@ function updatePageTranslatePrefs(input: PageTranslatePrefs): void {
   if (input.target) preferredTarget = input.target;
 }
 
+export function getFullPageClickToShowOriginalStatus(): {
+  fullPageClickToShowOriginal: boolean;
+  hasFullPageClickToShowOriginalPref: boolean;
+} {
+  return {
+    fullPageClickToShowOriginal: clickToShowOriginalEnabled,
+    hasFullPageClickToShowOriginalPref:
+      preferredClickToShowOriginalEnabled !== null,
+  };
+}
+
+export function updateFullPageClickToShowOriginalPref(
+  fullPageClickToShowOriginal: boolean,
+): {
+  fullPageClickToShowOriginal: boolean;
+  hasFullPageClickToShowOriginalPref: boolean;
+} {
+  preferredClickToShowOriginalEnabled = fullPageClickToShowOriginal;
+  updateClickToShowOriginalSetting(resolveClickToShowOriginalEnabled());
+  return getFullPageClickToShowOriginalStatus();
+}
+
 function handleSettingsChanged(settings: Settings): void {
   settingsMode = settings.fullPageMode;
   settingsEngine = settings.engines.fullPage;
@@ -425,7 +449,8 @@ function handleSettingsChanged(settings: Settings): void {
     settings.immersiveTargetLang,
     settings.uiLang,
   );
-  updateClickToShowOriginalSetting(settings.fullPageClickToShowOriginal);
+  settingsClickToShowOriginalEnabled = settings.fullPageClickToShowOriginal;
+  updateClickToShowOriginalSetting(resolveClickToShowOriginalEnabled());
 
   const rule = currentRule;
   if (!rule) return;
@@ -451,7 +476,8 @@ async function loadRule(
   const matched = matchFullPageRule(window.location.href, userRules);
   const baseRule = resolveFullPageRule(matched, input);
   currentBaseTextExtStyle = baseRule.textExtStyle;
-  clickToShowOriginalEnabled = settings.fullPageClickToShowOriginal;
+  settingsClickToShowOriginalEnabled = settings.fullPageClickToShowOriginal;
+  updateClickToShowOriginalSetting(resolveClickToShowOriginalEnabled());
   return {
     ...baseRule,
     textExtStyle: composeTranslationTextExtStyle(
@@ -468,6 +494,12 @@ function composeTranslationTextExtStyle(
   return appendCssText(
     baseTextExtStyle,
     buildTranslationStyleCss(settings.translationStyle),
+  );
+}
+
+function resolveClickToShowOriginalEnabled(): boolean {
+  return (
+    preferredClickToShowOriginalEnabled ?? settingsClickToShowOriginalEnabled
   );
 }
 

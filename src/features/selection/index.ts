@@ -29,6 +29,8 @@ const LEAVE_CONFIRM_MS = 100; // mouseleave → 取消延迟（防鼠标划过�
 
 interface State {
   enabled: boolean;
+  settingsEnabled: boolean;
+  preferredEnabled: boolean | null;
   target: string;
   engine: string;
   logo: HTMLButtonElement | null;
@@ -44,9 +46,13 @@ interface State {
   logoTop: number;
 }
 
+let selectionState: State | null = null;
+
 export function initSelection(): void {
   const s: State = {
-    enabled: false,
+    enabled: true,
+    settingsEnabled: true,
+    preferredEnabled: null,
     target: "zh",
     engine: "google",
     logo: null,
@@ -61,22 +67,23 @@ export function initSelection(): void {
     logoLeft: 0,
     logoTop: 0,
   };
+  selectionState = s;
 
   void getSettings().then((cfg) => {
-    s.enabled = cfg.selectionEnabled;
+    s.settingsEnabled = cfg.selectionEnabled;
     const target = resolveTargetLang(cfg.selectionTargetLang, cfg.uiLang);
     s.target = target;
     s.engine = cfg.engines.selection;
     setSelTarget(target);
-    if (!s.enabled) hide(s);
+    applyEnabled(s);
   });
   watchSettings((cfg) => {
-    s.enabled = cfg.selectionEnabled;
+    s.settingsEnabled = cfg.selectionEnabled;
     const target = resolveTargetLang(cfg.selectionTargetLang, cfg.uiLang);
     s.target = target;
     s.engine = cfg.engines.selection;
     setSelTarget(target);
-    if (!s.enabled) hide(s);
+    applyEnabled(s);
   });
 
   // ★ 关键修复：shadow DOM 内的 mouseup retarget 到 host，
@@ -100,6 +107,34 @@ export function initSelection(): void {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") hide(s);
   });
+}
+
+export function getSelectionEnabledStatus(): {
+  selectionEnabled: boolean;
+  hasSelectionEnabledPref: boolean;
+} {
+  return {
+    selectionEnabled: selectionState?.enabled ?? true,
+    hasSelectionEnabledPref:
+      selectionState !== null && selectionState.preferredEnabled !== null,
+  };
+}
+
+export function updateSelectionEnabledPref(selectionEnabled: boolean): {
+  selectionEnabled: boolean;
+  hasSelectionEnabledPref: boolean;
+} {
+  if (!selectionState) {
+    return { selectionEnabled, hasSelectionEnabledPref: true };
+  }
+  selectionState.preferredEnabled = selectionEnabled;
+  applyEnabled(selectionState);
+  return getSelectionEnabledStatus();
+}
+
+function applyEnabled(s: State): void {
+  s.enabled = s.preferredEnabled ?? s.settingsEnabled;
+  if (!s.enabled) hide(s);
 }
 
 // ─── 选区 ─────────────────────────────────────────────

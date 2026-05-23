@@ -11,15 +11,18 @@
 //   - target / engine / mode 默认跟随 options 的 immersive 全局设置。
 //   - popup 内显式修改 target / engine / mode 后，写成当前页面的独立设置。
 //     当前页面 active 时立即重翻；未 active 则只保存 per-page pref。
-//   - 改 clickToShowOriginal / hoverEnabled / selectionEnabled 只写 settings。
-//     immersive 的 click toggle 通过 settings watcher 在下次翻译时生效。
+//   - popup 内修改 clickToShowOriginal / hoverEnabled / selectionEnabled 后，
+//     写成当前页面 tab 的独立设置；未修改时跟随 options 全局默认。
 
 import { createSignal, onMount, type JSX } from "solid-js";
 import { UI_LANG_LABELS, UI_LANGS, type UiLang } from "@/lib/languages";
-import { sendMessage } from "@/lib/messaging";
+import {
+  sendMessage,
+  type PageFeaturePrefs,
+  type PageFeatureStatus,
+} from "@/lib/messaging";
 import {
   resolveTargetLang,
-  setSettings,
   useSettings,
   type FullPageEngineId,
   type FullPageMode,
@@ -58,6 +61,23 @@ function modeOptions(t: TFn): SegmentOption<FullPageMode>[] {
 
 type ActionState = "idle" | "starting" | "restoring" | "retranslating";
 
+const DEFAULT_PAGE_FEATURE_STATUS: PageFeatureStatus = {
+  fullPageClickToShowOriginal: true,
+  hoverEnabled: true,
+  selectionEnabled: true,
+  hasFullPageClickToShowOriginalPref: false,
+  hasHoverEnabledPref: false,
+  hasSelectionEnabledPref: false,
+};
+
+function isMissingContentScriptError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return (
+    error.message.includes("Could not establish connection") ||
+    error.message.includes("Receiving end does not exist")
+  );
+}
+
 function App(): JSX.Element {
   const t = useT();
   const settings = useSettings();
@@ -70,6 +90,8 @@ function App(): JSX.Element {
   const [pageEngine, setPageEngine] = createSignal<FullPageEngineId>("google2");
   const [pageTarget, setPageTarget] = createSignal<PageTargetLang>("en");
   const [hasPagePrefs, setHasPagePrefs] = createSignal(false);
+  const [pageFeatureStatus, setPageFeatureStatus] =
+    createSignal<PageFeatureStatus>(DEFAULT_PAGE_FEATURE_STATUS);
 
   let actionSeq = 0;
   let lastCommandId = 0;
@@ -125,6 +147,21 @@ function App(): JSX.Element {
 
   const pageTargetValue = (): PageTargetLang =>
     hasPagePrefs() || immersiveActive() ? pageTarget() : defaultPageTarget();
+
+  const clickToShowOriginalValue = (): boolean =>
+    pageFeatureStatus().hasFullPageClickToShowOriginalPref
+      ? pageFeatureStatus().fullPageClickToShowOriginal
+      : settings().fullPageClickToShowOriginal;
+
+  const hoverEnabledValue = (): boolean =>
+    pageFeatureStatus().hasHoverEnabledPref
+      ? pageFeatureStatus().hoverEnabled
+      : settings().hoverEnabled;
+
+  const selectionEnabledValue = (): boolean =>
+    pageFeatureStatus().hasSelectionEnabledPref
+      ? pageFeatureStatus().selectionEnabled
+      : settings().selectionEnabled;
 
   const pageStateText = (): string =>
     immersiveActive()
@@ -201,6 +238,31 @@ function App(): JSX.Element {
       })
       .finally(() => {
         if (seq === actionSeq) setAction("idle");
+      });
+  };
+
+  // ─── 应用当前 tab 功能开关 ──────────────────────────────────
+
+  const applyPageFeaturePref = (patch: PageFeaturePrefs): void => {
+    setPageFeatureStatus((cur) => ({
+      ...cur,
+      ...patch,
+      hasFullPageClickToShowOriginalPref:
+        patch.fullPageClickToShowOriginal !== undefined
+          ? true
+          : cur.hasFullPageClickToShowOriginalPref,
+      hasHoverEnabledPref:
+        patch.hoverEnabled !== undefined ? true : cur.hasHoverEnabledPref,
+      hasSelectionEnabledPref:
+        patch.selectionEnabled !== undefined
+          ? true
+          : cur.hasSelectionEnabledPref,
+    }));
+    void sendMessage("setPageFeaturePrefs", patch)
+      .then(setPageFeatureStatus)
+      .catch((e) => {
+        if (isMissingContentScriptError(e)) return;
+        setErrorStatus(e);
       });
   };
 
@@ -288,6 +350,13 @@ function App(): JSX.Element {
           ) as PageTargetLang,
         );
         setHasPagePrefs(false);
+      }
+
+      try {
+        setPageFeatureStatus(await sendMessage("getPageFeatureStatus", {}));
+      } catch (e) {
+        if (!isMissingContentScriptError(e)) setErrorStatus(e);
+        setPageFeatureStatus(DEFAULT_PAGE_FEATURE_STATUS);
       }
     })().catch(() => {});
   });
@@ -385,10 +454,10 @@ function App(): JSX.Element {
         </Row>
         <Row label={t("section.clickToShowOriginal")}>
           <Switch
-            checked={settings().fullPageClickToShowOriginal}
+            checked={clickToShowOriginalValue()}
             label={t("section.clickToShowOriginal")}
             onChange={(fullPageClickToShowOriginal) =>
-              void setSettings({ fullPageClickToShowOriginal })
+              applyPageFeaturePref({ fullPageClickToShowOriginal })
             }
           />
         </Row>
@@ -398,32 +467,24 @@ function App(): JSX.Element {
         <h2>{t("popup.section.features")}</h2>
         <Row label={t("popup.row.hoverEnabled")}>
           <Switch
-            checked={settings().hoverEnabled}
+            checked={hoverEnabledValue()}
             label={t("popup.row.hoverEnabled")}
-            onChange={(hoverEnabled) => void setSettings({ hoverEnabled })}
+            onChange={(hoverEnabled) =>
+              applyPageFeaturePref({ hoverEnabled })
+            }
           />
         </Row>
         <Row label={t("popup.row.selectionEnabled")}>
           <Switch
-            checked={settings().selectionEnabled}
+            checked={selectionEnabledValue()}
             label={t("popup.row.selectionEnabled")}
             onChange={(selectionEnabled) =>
-              void setSettings({ selectionEnabled })
+              applyPageFeaturePref({ selectionEnabled })
             }
           />
         </Row>
       </section>
 
-      <footer class="popup-footer">
-        <button
-          class="footer-button"
-          onClick={openOptions}
-          type="button"
-        >
-          <IconSettings size={14} />
-          <span>{t("popup.button.openOptions")}</span>
-        </button>
-      </footer>
     </main>
   );
 }

@@ -44,6 +44,8 @@ interface TextHit {
 
 interface State {
   enabled: boolean;
+  settingsEnabled: boolean;
+  preferredEnabled: boolean | null;
   target: string;
   engine: string;
   granularity: HoverGranularity;
@@ -63,9 +65,13 @@ interface HoverTranslateRequest {
   engine: string;
 }
 
+let hoverState: State | null = null;
+
 export function initHover(): void {
   const state: State = {
-    enabled: false,
+    enabled: true,
+    settingsEnabled: true,
+    preferredEnabled: null,
     target: "zh",
     engine: "google",
     granularity: "word",
@@ -80,24 +86,25 @@ export function initHover(): void {
       granularity: "sentence",
     }),
   };
+  hoverState = state;
 
   void getSettings().then((s) => {
-    state.enabled = s.hoverEnabled;
+    state.settingsEnabled = s.hoverEnabled;
     state.target = resolveTargetLang(s.hoverTargetLang, s.uiLang);
     state.engine = s.engines.hover;
     state.granularity = s.hoverGranularity;
     state.fontSize = s.hoverFontSize;
     applyTooltipFontSize(state);
-    if (!state.enabled) dismiss(state);
+    applyEnabled(state);
   });
   watchSettings((s) => {
-    state.enabled = s.hoverEnabled;
+    state.settingsEnabled = s.hoverEnabled;
     state.target = resolveTargetLang(s.hoverTargetLang, s.uiLang);
     state.engine = s.engines.hover;
     state.granularity = s.hoverGranularity;
     state.fontSize = s.hoverFontSize;
     applyTooltipFontSize(state);
-    if (!state.enabled) dismiss(state);
+    applyEnabled(state);
   });
 
   document.addEventListener("mousemove", (e) => onMove(e, state), {
@@ -105,6 +112,34 @@ export function initHover(): void {
   });
   document.addEventListener("mouseleave", () => dismiss(state));
   document.addEventListener("scroll", () => dismiss(state), { passive: true });
+}
+
+export function getHoverEnabledStatus(): {
+  hoverEnabled: boolean;
+  hasHoverEnabledPref: boolean;
+} {
+  return {
+    hoverEnabled: hoverState?.enabled ?? true,
+    hasHoverEnabledPref:
+      hoverState !== null && hoverState.preferredEnabled !== null,
+  };
+}
+
+export function updateHoverEnabledPref(hoverEnabled: boolean): {
+  hoverEnabled: boolean;
+  hasHoverEnabledPref: boolean;
+} {
+  if (!hoverState) {
+    return { hoverEnabled, hasHoverEnabledPref: true };
+  }
+  hoverState.preferredEnabled = hoverEnabled;
+  applyEnabled(hoverState);
+  return getHoverEnabledStatus();
+}
+
+function applyEnabled(s: State): void {
+  s.enabled = s.preferredEnabled ?? s.settingsEnabled;
+  if (!s.enabled) dismiss(s);
 }
 
 function onMove(e: MouseEvent, s: State): void {

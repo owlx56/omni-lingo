@@ -22,6 +22,12 @@ export interface PageTranslatePrefs {
   mode?: "replace" | "bilingual";
 }
 
+export interface PageFeaturePrefs {
+  fullPageClickToShowOriginal?: boolean;
+  hoverEnabled?: boolean;
+  selectionEnabled?: boolean;
+}
+
 export interface PageControlCommand {
   commandId?: number;
 }
@@ -45,6 +51,15 @@ export interface PageTranslateStatus {
   mode?: "replace" | "bilingual";
   engine?: FullPageEngineId;
   target?: string;
+}
+
+export interface PageFeatureStatus {
+  fullPageClickToShowOriginal: boolean;
+  hoverEnabled: boolean;
+  selectionEnabled: boolean;
+  hasFullPageClickToShowOriginalPref: boolean;
+  hasHoverEnabledPref: boolean;
+  hasSelectionEnabledPref: boolean;
 }
 
 export interface ProtocolMap {
@@ -73,6 +88,14 @@ export interface ProtocolMap {
     input: PageTranslatePrefs;
     output: PageTranslateStatus;
   };
+  getPageFeatureStatus: {
+    input: Record<string, never>;
+    output: PageFeatureStatus;
+  };
+  setPageFeaturePrefs: {
+    input: PageFeaturePrefs;
+    output: PageFeatureStatus;
+  };
   runPageTranslate: {
     input: PageTranslateCommand;
     output: PageTranslateAck;
@@ -88,6 +111,14 @@ export interface ProtocolMap {
   updatePageTranslatePrefs: {
     input: PageTranslatePrefs;
     output: PageTranslateStatus;
+  };
+  readPageFeatureStatus: {
+    input: Record<string, never>;
+    output: PageFeatureStatus;
+  };
+  updatePageFeaturePrefs: {
+    input: PageFeaturePrefs;
+    output: PageFeatureStatus;
   };
   translateBatch: {
     input: {
