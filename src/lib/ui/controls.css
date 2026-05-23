@@ -46,7 +46,7 @@ select {
 
 :root,
 :root[data-theme="light"] {
-    --bg: #f7f5f1;
+    --bg: #f8f8f6;
     --surface: #ffffff;
     --surface-alt: #ece9e1;
     --surface-strong: #dfdcd2;
@@ -64,7 +64,7 @@ select {
 }
 
 :root[data-theme="dark"] {
-    --bg: #1c1c1c;
+    --bg: #1f1f1e;
     --surface: #232323;
     --surface-alt: #2c2c2b;
     --surface-strong: #353433;
