@@ -503,7 +503,6 @@ function App(): JSX.Element {
         <div class="service-row">
           <span class="service-label">{t("popup.label.service")}:</span>
           <span class="service-control">
-            <EngineMark engine={pageEngineValue()} />
             <Select
               label={t("popup.label.service")}
               onChange={(engine) =>
@@ -569,7 +568,6 @@ function App(): JSX.Element {
       </p>
 
       <section class="section popup-settings-section">
-        <h2>{t("popup.section.features")}</h2>
         <Row label={t("section.clickToShowOriginal")}>
           <Switch
             checked={clickToShowOriginalValue()}
@@ -579,7 +577,7 @@ function App(): JSX.Element {
             }
           />
         </Row>
-        <Row label={t("popup.row.hoverEnabled")}>
+<Row label={t("popup.row.hoverEnabled")}>
           <Switch
             checked={hoverEnabledValue()}
             label={t("popup.row.hoverEnabled")}

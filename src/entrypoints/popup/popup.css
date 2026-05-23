@@ -10,7 +10,7 @@ html {
 
 body {
     margin: 0;
-    min-width: 420px;
+    min-width: 360px;
     background: var(--bg);
 }
 
@@ -19,8 +19,8 @@ body {
 }
 
 .popup {
-    width: 420px;
-    padding: 12px;
+    width: 360px;
+    padding: 10px;
     background: var(--bg);
     color: var(--text);
     display: flex;
@@ -102,7 +102,7 @@ body {
 .translate-card .select-button {
     width: 100%;
     min-height: 34px;
-    justify-content: space-between;
+    justify-content: center;
     padding: 2px 0;
     border: none;
     background: transparent;
@@ -122,6 +122,7 @@ body {
 .source-language-button {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     cursor: default;
 }
@@ -157,7 +158,7 @@ body {
 }
 
 .service-label {
-    color: #4873ad;
+    color: var(--text);
     font-size: 15px;
     font-weight: 500;
     line-height: 1.35;
@@ -173,9 +174,10 @@ body {
 }
 
 .service-control .select-button {
-    justify-content: flex-start;
+    justify-content: center;
     gap: 8px;
     font-size: 15px;
+    color: #4873ad;
 }
 
 .engine-mark {
@@ -233,17 +235,17 @@ body {
 
 .popup-primary-actions {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
-    gap: 12px;
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 10px;
     align-items: stretch;
 }
 
 .mode-switch {
     display: grid;
-    min-height: 48px;
+    min-height: 40px;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 5px;
-    padding: 4px;
+    gap: 4px;
+    padding: 3px;
     border-radius: 10px;
     background: #eef1f6;
 }
@@ -276,8 +278,8 @@ body {
 }
 
 .mode-button svg {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
 }
 
 .mode-button:focus-visible,
@@ -288,17 +290,17 @@ body {
 
 .popup-cta {
     width: 100%;
-    min-height: 48px;
-    padding: 0 14px;
+    min-height: 40px;
+    padding: 0 12px;
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     background: var(--switch-on);
     color: #ffffff;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    font-size: 17px;
+    gap: 8px;
+    font-size: 15px;
     font-weight: 650;
     cursor: pointer;
     transition:
