@@ -6,6 +6,7 @@ const HI: PartialDict = {
   "sidebar.hover": "होवर अनुवाद",
   "sidebar.selection": "चयन अनुवाद",
   "sidebar.immersive": "इमर्सिव अनुवाद",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "परिचय",
   "section.profile": "प्रोफ़ाइल",
   "profile.avatar": "अवतार",
@@ -117,6 +118,19 @@ const HI: PartialDict = {
   "popup.status.restoring": "मूल पाठ दिखाया जा रहा है…",
   "popup.status.restored": "मूल पाठ दिखा दिया गया",
   "popup.status.error": "त्रुटि: {msg}",
+  "fileplus.section.open": "दस्तावेज़ खोलें",
+  "fileplus.openUrl": "दस्तावेज़ URL",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "खोलें",
+  "fileplus.localFile": "स्थानीय फ़ाइल",
+  "fileplus.chooseFile": "फ़ाइल चुनें",
+  "fileplus.format": "प्रारूप",
+  "fileplus.format.auto": "स्वतः",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "यहाँ PDF या EPUB ड्रॉप करें",
+  "fileplus.dropNote": "या ऊपर स्थानीय फ़ाइल खोलें या URL दर्ज करें",
+  "fileplus.closeDocument": "बंद करें",
 };
 
 export default HI;

@@ -41,6 +41,7 @@ import {
   IconSelection,
   IconSun,
   IconSystem,
+  IconFile,
 } from "./icons";
 import { IconLogo, IconSettings } from "@/lib/ui/icons";
 import {
@@ -54,9 +55,11 @@ import {
   type SegmentOption,
   type SelectOption,
 } from "@/lib/ui/controls";
+import { browser } from "wxt/browser";
+import { storeDocument } from "@/lib/document-store";
 
 
-type TabId = "account" | "hover" | "selection" | "immersive" | "about";
+type TabId = "account" | "hover" | "selection" | "immersive" | "fileplus" | "about";
 type OptionIcon = (props: { size?: number }) => JSX.Element;
 
 const VERSION = "0.0.0";
@@ -67,6 +70,7 @@ const TABS: { id: TabId; labelKey: MessageKey; icon: OptionIcon }[] = [
   { id: "hover", labelKey: "sidebar.hover", icon: IconHover },
   { id: "selection", labelKey: "sidebar.selection", icon: IconSelection },
   { id: "immersive", labelKey: "sidebar.immersive", icon: IconImmersive },
+  { id: "fileplus", labelKey: "sidebar.fileplus", icon: IconFile },
   { id: "about", labelKey: "sidebar.about", icon: IconInfo },
 ];
 
@@ -263,6 +267,18 @@ function parseFontSizeDraft(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+type ViewerFormat = "auto" | "pdf" | "epub";
+
+const ACCEPTED_FILES = ".pdf,.epub,application/pdf,application/epub+zip";
+
+function formatSegmentOptions(t: TFn): SegmentOption<ViewerFormat>[] {
+  return [
+    { value: "auto", label: t("fileplus.format.auto") },
+    { value: "pdf", label: t("fileplus.format.pdf") },
+    { value: "epub", label: t("fileplus.format.epub") },
+  ];
+}
+
 function App() {
   const settings = useSettings();
   const t = useT();
@@ -270,6 +286,12 @@ function App() {
   const [hoverFontSizeDraft, setHoverFontSizeDraft] = createSignal(
     formatPx(HOVER_FONT_SIZE_MIN),
   );
+
+  const [fpFormat, setFpFormat] = createSignal<ViewerFormat>("auto");
+  const [fpUrl, setFpUrl] = createSignal("");
+  const [fpBusy, setFpBusy] = createSignal(false);
+  let fpFileInput: HTMLInputElement | undefined;
+  let fpDropDepth = 0;
 
   createEffect(() => {
     setHoverFontSizeDraft(formatPx(settings().hoverFontSize));
@@ -601,6 +623,143 @@ function App() {
     </>
   );
 
+  const inferKind = (name: string, mime?: string): "pdf" | "epub" => {
+    const fmt = fpFormat();
+    if (fmt === "pdf") return "pdf";
+    if (fmt === "epub") return "epub";
+    const lower = name.split(/[?#]/)[0]?.toLowerCase() ?? "";
+    if (lower.endsWith(".pdf") || mime === "application/pdf") return "pdf";
+    return "epub";
+  };
+
+  const openFile = async (file: File): Promise<void> => {
+    const kind = inferKind(file.name, file.type);
+    setFpBusy(true);
+    try {
+      const data = await file.arrayBuffer();
+      const key = await storeDocument(data, kind, file.name);
+      const viewerUrl = browser.runtime.getURL(
+        `/viewer.html?key=${encodeURIComponent(key)}`,
+      );
+      await browser.tabs.create({ url: viewerUrl });
+    } finally {
+      setFpBusy(false);
+    }
+  };
+
+  const openUrl = async (): Promise<void> => {
+    const nextUrl = fpUrl().trim();
+    if (!nextUrl) return;
+    const kind = inferKind(nextUrl);
+    if (kind === "pdf") {
+      await browser.tabs.create({
+        url: browser.runtime.getURL(
+          `/viewer.html?url=${encodeURIComponent(nextUrl)}&format=pdf`,
+        ),
+      });
+    } else {
+      setFpBusy(true);
+      try {
+        const resp = await fetch(nextUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.arrayBuffer();
+        const key = await storeDocument(data, "epub", nextUrl);
+        const viewerUrl = browser.runtime.getURL(
+          `/viewer.html?key=${encodeURIComponent(key)}`,
+        );
+        await browser.tabs.create({ url: viewerUrl });
+      } finally {
+        setFpBusy(false);
+      }
+    }
+  };
+
+  const renderFilePlus = (): JSX.Element => (
+    <section
+      class="section fileplus-idle"
+      onDragEnter={(event) => {
+        event.preventDefault();
+        fpDropDepth++;
+        event.currentTarget.classList.add("dragging");
+      }}
+      onDragLeave={(event) => {
+        event.preventDefault();
+        fpDropDepth = Math.max(0, fpDropDepth - 1);
+        if (fpDropDepth === 0)
+          event.currentTarget.classList.remove("dragging");
+      }}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        fpDropDepth = 0;
+        event.currentTarget.classList.remove("dragging");
+        const file = event.dataTransfer?.files.item(0);
+        if (file) void openFile(file);
+      }}
+    >
+      <h2>{t("fileplus.section.open")}</h2>
+      <FullRow>
+        <div class="url-control">
+          <input
+            aria-label={t("fileplus.openUrl")}
+            class="url-input"
+            disabled={fpBusy()}
+            onInput={(event) => setFpUrl(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") void openUrl();
+            }}
+            placeholder={t("fileplus.urlPlaceholder")}
+            spellcheck={false}
+            type="url"
+            value={fpUrl()}
+          />
+          <button
+            class="primary-button"
+            disabled={fpBusy()}
+            onClick={() => void openUrl()}
+            type="button"
+          >
+            {t("fileplus.openButton")}
+          </button>
+        </div>
+      </FullRow>
+      <Row label={t("fileplus.localFile")}>
+        <button
+          class="secondary-button"
+          disabled={fpBusy()}
+          onClick={() => fpFileInput?.click()}
+          type="button"
+        >
+          {t("fileplus.chooseFile")}
+        </button>
+        <input
+          accept={ACCEPTED_FILES}
+          class="visually-hidden"
+          onChange={(event) => {
+            const file = event.currentTarget.files?.item(0);
+            if (file) void openFile(file);
+            event.currentTarget.value = "";
+          }}
+          ref={fpFileInput}
+          type="file"
+        />
+      </Row>
+      <Row label={t("fileplus.format")}>
+        <Segment
+          label={t("fileplus.format")}
+          onChange={setFpFormat}
+          options={formatSegmentOptions(t)}
+          value={fpFormat()}
+        />
+      </Row>
+
+      <div class="fileplus-dropzone">
+        <h2>{t("fileplus.dropTitle")}</h2>
+        <p>{t("fileplus.dropNote")}</p>
+      </div>
+    </section>
+  );
+
   const renderAbout = (): JSX.Element => (
     <section class="section">
       <h2>{t("section.about")}</h2>
@@ -623,6 +782,8 @@ function App() {
         return renderSelection();
       case "immersive":
         return renderImmersive();
+      case "fileplus":
+        return renderFilePlus();
       case "about":
         return renderAbout();
       case "account":

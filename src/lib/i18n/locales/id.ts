@@ -6,6 +6,7 @@ const ID: PartialDict = {
   "sidebar.hover": "Terjemahan saat hover",
   "sidebar.selection": "Terjemahan seleksi",
   "sidebar.immersive": "Terjemahan imersif",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "Tentang",
   "section.profile": "Profil",
   "profile.avatar": "Avatar",
@@ -117,6 +118,19 @@ const ID: PartialDict = {
   "popup.status.restoring": "Menampilkan teks asli…",
   "popup.status.restored": "Teks asli ditampilkan",
   "popup.status.error": "Kesalahan: {msg}",
+  "fileplus.section.open": "Buka dokumen",
+  "fileplus.openUrl": "URL dokumen",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "Buka",
+  "fileplus.localFile": "File lokal",
+  "fileplus.chooseFile": "Pilih file",
+  "fileplus.format": "Format",
+  "fileplus.format.auto": "Otomatis",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "Letakkan PDF atau EPUB di sini",
+  "fileplus.dropNote": "Atau buka file lokal atau masukkan URL di atas",
+  "fileplus.closeDocument": "Tutup",
 };
 
 export default ID;

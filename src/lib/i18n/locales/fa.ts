@@ -6,6 +6,7 @@ const FA: PartialDict = {
   "sidebar.hover": "ترجمه با نگه‌داشتن نشانگر",
   "sidebar.selection": "ترجمه متن انتخاب‌شده",
   "sidebar.immersive": "ترجمه فراگیر",
+  "sidebar.fileplus": "فایل پلاس",
   "sidebar.about": "درباره",
   "section.profile": "نمایه",
   "profile.avatar": "آواتار",
@@ -117,6 +118,19 @@ const FA: PartialDict = {
   "popup.status.restoring": "در حال نمایش متن اصلی…",
   "popup.status.restored": "متن اصلی نمایش داده شد",
   "popup.status.error": "خطا: {msg}",
+  "fileplus.section.open": "باز کردن سند",
+  "fileplus.openUrl": "آدرس سند",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "باز کردن",
+  "fileplus.localFile": "فایل محلی",
+  "fileplus.chooseFile": "انتخاب فایل",
+  "fileplus.format": "فرمت",
+  "fileplus.format.auto": "خودکار",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "یک PDF یا EPUB اینجا بکشید و رها کنید",
+  "fileplus.dropNote": "یا یک فایل محلی باز کنید یا آدرس بالا را وارد کنید",
+  "fileplus.closeDocument": "بستن",
 };
 
 export default FA;

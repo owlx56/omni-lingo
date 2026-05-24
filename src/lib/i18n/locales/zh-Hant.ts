@@ -6,6 +6,7 @@ const ZH_HANT: PartialDict = {
   "sidebar.hover": "懸停翻譯",
   "sidebar.selection": "劃詞翻譯",
   "sidebar.immersive": "沉浸翻譯",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "關於",
   "section.profile": "檔案",
   "profile.avatar": "頭像",
@@ -117,6 +118,19 @@ const ZH_HANT: PartialDict = {
   "popup.status.restoring": "正在顯示原文…",
   "popup.status.restored": "已顯示原文",
   "popup.status.error": "錯誤：{msg}",
+  "fileplus.section.open": "開啟文件",
+  "fileplus.openUrl": "文件 URL",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "開啟",
+  "fileplus.localFile": "本機檔案",
+  "fileplus.chooseFile": "選擇檔案",
+  "fileplus.format": "格式",
+  "fileplus.format.auto": "自動",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "將 PDF 或 EPUB 拖放到此處",
+  "fileplus.dropNote": "或從上方開啟本機檔案或輸入 URL",
+  "fileplus.closeDocument": "關閉",
 };
 
 export default ZH_HANT;

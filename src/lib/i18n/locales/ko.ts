@@ -6,6 +6,7 @@ const KO: PartialDict = {
   "sidebar.hover": "호버 번역",
   "sidebar.selection": "선택 번역",
   "sidebar.immersive": "몰입형 번역",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "정보",
   "section.profile": "프로필",
   "profile.avatar": "아바타",
@@ -117,6 +118,19 @@ const KO: PartialDict = {
   "popup.status.restoring": "원문을 표시하는 중…",
   "popup.status.restored": "원문을 표시했습니다",
   "popup.status.error": "오류: {msg}",
+  "fileplus.section.open": "문서 열기",
+  "fileplus.openUrl": "문서 URL",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "열기",
+  "fileplus.localFile": "로컬 파일",
+  "fileplus.chooseFile": "파일 선택",
+  "fileplus.format": "형식",
+  "fileplus.format.auto": "자동",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "PDF 또는 EPUB을 여기에 드롭",
+  "fileplus.dropNote": "또는 위에서 로컬 파일을 열거나 URL을 입력하세요",
+  "fileplus.closeDocument": "닫기",
 };
 
 export default KO;

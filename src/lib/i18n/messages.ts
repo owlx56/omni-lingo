@@ -10,6 +10,7 @@ export type MessageKey =
   | "sidebar.hover"
   | "sidebar.selection"
   | "sidebar.immersive"
+  | "sidebar.fileplus"
   | "sidebar.about"
   | "section.profile"
   | "profile.avatar"
@@ -169,7 +170,20 @@ export type MessageKey =
   | "viewer.source"
   | "viewer.sections"
   | "viewer.emptyTitle"
-  | "viewer.emptyNote";
+  | "viewer.emptyNote"
+  | "fileplus.section.open"
+  | "fileplus.openUrl"
+  | "fileplus.urlPlaceholder"
+  | "fileplus.openButton"
+  | "fileplus.localFile"
+  | "fileplus.chooseFile"
+  | "fileplus.format"
+  | "fileplus.format.auto"
+  | "fileplus.format.pdf"
+  | "fileplus.format.epub"
+  | "fileplus.dropTitle"
+  | "fileplus.dropNote"
+  | "fileplus.closeDocument";
 
 export type Dict = Record<MessageKey, string>;
 export type PartialDict = Partial<Dict>;

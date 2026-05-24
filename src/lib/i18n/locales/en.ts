@@ -7,6 +7,7 @@ const EN: Dict = {
   "sidebar.hover": "Hover translation",
   "sidebar.selection": "Selection translation",
   "sidebar.immersive": "Immersive translation",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "About",
   "section.profile": "Profile",
   "profile.avatar": "Avatar",
@@ -174,6 +175,19 @@ const EN: Dict = {
   "viewer.sections": "Sections",
   "viewer.emptyTitle": "Drop a PDF or EPUB here",
   "viewer.emptyNote": "Or open a local file / URL from the left panel.",
+  "fileplus.section.open": "Open document",
+  "fileplus.openUrl": "Document URL",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "Open",
+  "fileplus.localFile": "Local file",
+  "fileplus.chooseFile": "Choose file",
+  "fileplus.format": "Format",
+  "fileplus.format.auto": "Auto",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "Drop a PDF or EPUB here",
+  "fileplus.dropNote": "Or open a local file or enter a URL above.",
+  "fileplus.closeDocument": "Close",
 };
 
 export default EN;

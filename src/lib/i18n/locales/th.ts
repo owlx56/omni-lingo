@@ -6,6 +6,7 @@ const TH: PartialDict = {
   "sidebar.hover": "แปลเมื่อวางเมาส์",
   "sidebar.selection": "แปลข้อความที่เลือก",
   "sidebar.immersive": "แปลทั้งหน้า",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "เกี่ยวกับ",
   "section.profile": "โปรไฟล์",
   "profile.avatar": "อวาตาร์",
@@ -117,6 +118,19 @@ const TH: PartialDict = {
   "popup.status.restoring": "กำลังแสดงต้นฉบับ…",
   "popup.status.restored": "แสดงต้นฉบับแล้ว",
   "popup.status.error": "ข้อผิดพลาด: {msg}",
+  "fileplus.section.open": "เปิดเอกสาร",
+  "fileplus.openUrl": "URL เอกสาร",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "เปิด",
+  "fileplus.localFile": "ไฟล์ในเครื่อง",
+  "fileplus.chooseFile": "เลือกไฟล์",
+  "fileplus.format": "รูปแบบ",
+  "fileplus.format.auto": "อัตโนมัติ",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "วาง PDF หรือ EPUB ที่นี่",
+  "fileplus.dropNote": "หรือเปิดไฟล์ในเครื่องหรือป้อน URL ด้านบน",
+  "fileplus.closeDocument": "ปิด",
 };
 
 export default TH;

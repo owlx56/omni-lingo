@@ -1,457 +1,92 @@
-html {
-    min-height: 100%;
-    background: var(--bg);
-    scrollbar-gutter: stable;
-    --viewer-title-color: #302d28;
-    --reader-paper: #fffdf8;
-    --reader-paper-border: #e8e2d5;
-}
-
-html[data-viewer-mode="pdf"],
-html[data-viewer-mode="pdf"] body,
-html[data-viewer-mode="pdf"] #root {
+html, body {
+    margin: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-}
-
-html[data-theme="dark"] {
-    --viewer-title-color: #d8d1c4;
-    --reader-paper: #242321;
-    --reader-paper-border: #3a3832;
-}
-
-body {
-    margin: 0;
-    min-width: 320px;
     background: var(--bg);
 }
 
-.viewer-page {
-    width: min(1180px, calc(100vw - 40px));
-    margin: 0 auto;
-    padding: 30px 0 54px;
-}
-
-.viewer-page.pdf-mode,
-html[data-viewer-mode="pdf"] .viewer-page {
-    width: 100vw;
-    height: 100vh;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
-}
-
-.viewer-page.dragging .reader-panel {
-    outline: 2px solid var(--switch-on);
-    outline-offset: 4px;
-}
-
-html[data-viewer-mode="pdf"] .viewer-page.dragging {
-    outline: 2px solid var(--switch-on);
-    outline-offset: -2px;
-}
-
-.viewer-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 24px;
-    padding-bottom: 22px;
-    border-bottom: 1px solid var(--border);
-}
-
-.viewer-title-block {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    min-width: 0;
-}
-
-h1,
-h2,
-h3,
-p {
-    margin: 0;
-    letter-spacing: 0;
-}
-
-h1 {
-    color: var(--viewer-title-color);
-    font-family:
-        Georgia, "Times New Roman", "Source Han Serif SC", "Noto Serif CJK SC",
-        "Songti SC", SimSun, serif;
-    font-size: 34px;
-    font-weight: 600;
-    line-height: 1.08;
-}
-
-.scope {
-    display: block;
-    margin-top: 4px;
-    color: var(--text-muted);
-    font-size: 13px;
-}
-
-.plain-icon-button,
-.primary-button,
-.secondary-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 32px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-family:
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-    font-size: 13px;
-    line-height: 1.2;
-    transition:
-        background-color 120ms ease,
-        color 120ms ease,
-        transform 120ms ease;
-}
-
-.plain-icon-button {
-    gap: 8px;
-    padding: 0 10px;
-    background: transparent;
-    color: var(--text);
-}
-
-.plain-icon-button:hover,
-.secondary-button:hover {
-    background: var(--surface-alt);
-}
-
-.primary-button:active,
-.secondary-button:active,
-.plain-icon-button:active {
-    transform: scale(0.97);
-}
-
-.primary-button {
-    padding: 0 14px;
-    background: var(--accent);
-    color: var(--bg);
-}
-
-.secondary-button {
-    padding: 0 12px;
-    background: transparent;
-    color: var(--text);
-}
-
-.primary-button:disabled,
-.secondary-button:disabled {
-    cursor: default;
-    opacity: 0.55;
-    transform: none;
-}
-
-.viewer-shell {
-    display: grid;
-    grid-template-columns: 300px minmax(0, 1fr);
-    gap: 34px;
-    padding-top: 28px;
-}
-
-.viewer-sidebar {
-    position: sticky;
-    top: 22px;
-    align-self: start;
-}
-
-.section {
-    padding: 26px 0 0;
-}
-
-.viewer-sidebar > .section:first-child {
-    padding-top: 0;
-}
-
-.section > h2 {
-    color: var(--text);
-    font-size: 14px;
-    font-weight: 700;
-    line-height: 1.3;
-    margin-bottom: 12px;
-}
-
-.section .row {
-    border-top: none;
-    padding: 15px 0;
-}
-
-.section .row + .row {
-    border-top: 1px solid var(--border);
-}
-
-.url-control {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 8px;
+#root {
     width: 100%;
+    height: 100%;
 }
 
-.url-input {
-    min-width: 0;
-    height: 34px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--text);
-    font-family:
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-    font-size: 13px;
-    line-height: 34px;
-    padding: 0 10px;
+.viewer-root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
 }
 
-.url-input:focus {
-    border-color: var(--switch-on);
-    outline: none;
-    box-shadow: 0 0 0 1px var(--switch-on);
+.viewer-pdf-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: none;
+    flex: 1;
 }
 
-.status-error {
+.viewer-loading,
+.viewer-error {
+    display: grid;
+    place-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 15px;
+}
+
+.viewer-error {
     color: var(--danger);
 }
 
-.reader-panel {
-    min-width: 0;
-}
-
-.reader-empty {
-    display: grid;
-    min-height: 520px;
-    place-content: center;
-    gap: 8px;
-    border: 1px dashed var(--border-strong);
-    border-radius: 8px;
-    color: var(--text-muted);
-    text-align: center;
-}
-
-.reader-empty h2 {
-    color: var(--text);
-    font-size: 18px;
-    line-height: 1.3;
-}
-
-.reader-empty p {
-    max-width: 360px;
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-.reader-flow {
-    min-height: 640px;
-    padding: 44px min(7vw, 76px);
-    border: 1px solid var(--reader-paper-border);
-    border-radius: 8px;
-    background: var(--reader-paper);
-    color: var(--text);
-    box-shadow: var(--shadow-soft);
-}
-
-.document-heading {
-    padding-bottom: 24px;
+.epub-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
     border-bottom: 1px solid var(--border);
-}
-
-.document-kind {
-    display: inline-flex;
-    margin-bottom: 10px;
-    color: var(--text-muted);
-    font-family:
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0;
-}
-
-.document-heading h2 {
-    color: var(--text);
-    font-size: 34px;
-    font-weight: 600;
-    line-height: 1.18;
-}
-
-.document-heading p {
-    margin-top: 12px;
-    color: var(--text-muted);
-    font-family:
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-    font-size: 13px;
-    line-height: 1.45;
-}
-
-.reader-section {
-    padding-top: 28px;
-}
-
-.reader-section + .reader-section {
-    margin-top: 18px;
-    border-top: 1px solid var(--border);
-}
-
-.reader-section h3 {
-    margin-bottom: 14px;
-    color: var(--text-muted);
-    font-family:
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 1.35;
-}
-
-.reader-section :where(p, li, blockquote, td, th) {
-    font-size: 17px;
-    line-height: 1.72;
-}
-
-.reader-section p + p {
-    margin-top: 1em;
-}
-
-.reader-section :where(h1, h2, h3, h4, h5, h6) {
-    margin: 1.2em 0 0.55em;
-    color: var(--text);
-    line-height: 1.25;
-}
-
-.reader-section :where(ul, ol) {
-    padding-left: 1.4em;
-}
-
-.reader-section blockquote {
-    margin: 1.1em 0;
-    padding-left: 1em;
-    border-left: 3px solid var(--border-strong);
-    color: var(--text-muted);
-}
-
-.reader-section img {
-    display: block;
-    max-width: 100%;
-    height: auto;
-    margin: 1em auto;
-}
-
-.pdf-reader-stage,
-.pdf-reader-frame {
-    display: block;
-    width: 100%;
-    height: 100%;
-}
-
-.pdf-reader-stage {
-    background: var(--surface-alt);
-}
-
-.pdf-reader-frame {
-    border: none;
     background: var(--surface);
+    flex-shrink: 0;
 }
 
-.reader-section table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 1em 0;
-}
-
-.reader-section :where(td, th) {
-    padding: 8px;
-    border: 1px solid var(--border);
-    vertical-align: top;
-}
-
-.visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
+.epub-toolbar-title {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
     overflow: hidden;
-    clip: rect(0 0 0 0);
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-@media (max-width: 860px) {
-    .viewer-page {
-        width: min(100% - 24px, 1180px);
-        padding-top: 22px;
-    }
-
-    .viewer-header {
-        align-items: flex-start;
-        flex-direction: column;
-        gap: 14px;
-    }
-
-    .viewer-shell {
-        grid-template-columns: 1fr;
-        gap: 24px;
-    }
-
-    .viewer-sidebar {
-        position: static;
-    }
-
-    .row {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 10px;
-    }
-
-    .row-control {
-        justify-content: flex-start;
-    }
-
-    .reader-flow {
-        padding: 30px 22px;
-    }
+.epub-toolbar-location {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
 }
 
-@media (max-width: 520px) {
-    .url-control {
-        grid-template-columns: 1fr;
-    }
+.epub-nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
 
-    .viewer-title-block {
-        align-items: flex-start;
-    }
+.epub-nav-button:hover {
+    background: var(--surface-alt);
+}
 
-    h1 {
-        font-size: 30px;
-    }
-
-    .document-heading h2 {
-        font-size: 28px;
-    }
+.epub-render-area {
+    flex: 1;
+    min-height: 0;
+    background: var(--surface);
 }

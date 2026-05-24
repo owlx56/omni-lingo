@@ -6,6 +6,7 @@ const VI: PartialDict = {
   "sidebar.hover": "Dịch khi rê chuột",
   "sidebar.selection": "Dịch vùng chọn",
   "sidebar.immersive": "Dịch toàn trang",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "Giới thiệu",
   "section.profile": "Hồ sơ",
   "profile.avatar": "Ảnh đại diện",
@@ -117,6 +118,19 @@ const VI: PartialDict = {
   "popup.status.restoring": "Đang hiện bản gốc…",
   "popup.status.restored": "Đã hiện bản gốc",
   "popup.status.error": "Lỗi: {msg}",
+  "fileplus.section.open": "Mở tài liệu",
+  "fileplus.openUrl": "URL tài liệu",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "Mở",
+  "fileplus.localFile": "Tệp cục bộ",
+  "fileplus.chooseFile": "Chọn tệp",
+  "fileplus.format": "Định dạng",
+  "fileplus.format.auto": "Tự động",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "Thả PDF hoặc EPUB vào đây",
+  "fileplus.dropNote": "Hoặc mở tệp cục bộ hoặc nhập URL ở trên",
+  "fileplus.closeDocument": "Đóng",
 };
 
 export default VI;

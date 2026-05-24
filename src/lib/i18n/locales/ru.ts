@@ -6,6 +6,7 @@ const RU: PartialDict = {
   "sidebar.hover": "Перевод по наведению",
   "sidebar.selection": "Перевод выделения",
   "sidebar.immersive": "Иммерсивный перевод",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "О программе",
   "section.profile": "Профиль",
   "profile.avatar": "Аватар",
@@ -117,6 +118,19 @@ const RU: PartialDict = {
   "popup.status.restoring": "Показ оригинала…",
   "popup.status.restored": "Оригинал показан",
   "popup.status.error": "Ошибка: {msg}",
+  "fileplus.section.open": "Открыть документ",
+  "fileplus.openUrl": "URL документа",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "Открыть",
+  "fileplus.localFile": "Локальный файл",
+  "fileplus.chooseFile": "Выбрать файл",
+  "fileplus.format": "Формат",
+  "fileplus.format.auto": "Авто",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "Перетащите PDF или EPUB сюда",
+  "fileplus.dropNote": "Или откройте локальный файл или введите URL выше",
+  "fileplus.closeDocument": "Закрыть",
 };
 
 export default RU;

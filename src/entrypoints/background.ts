@@ -148,15 +148,18 @@ async function removeContextMenu(id: string): Promise<void> {
 
 function openDocumentViewer(url: string): Promise<unknown> {
   const format = inferViewerFormat(url);
-  const viewerUrl =
-    format === "pdf"
-      ? browser.runtime.getURL(
-          `/pdf/web/viewer.html?file=${encodeURIComponent(url)}`,
-        )
-      : browser.runtime.getURL(
-          `/viewer.html?url=${encodeURIComponent(url)}&format=${format}`,
-        );
-  return browser.tabs.create({ url: viewerUrl });
+  if (format === "pdf") {
+    return browser.tabs.create({
+      url: browser.runtime.getURL(
+        `/viewer.html?url=${encodeURIComponent(url)}&format=pdf`,
+      ),
+    });
+  }
+  return browser.tabs.create({
+    url: browser.runtime.getURL(
+      `/viewer.html?url=${encodeURIComponent(url)}&format=${format}`,
+    ),
+  });
 }
 
 function inferViewerFormat(url: string): "auto" | "pdf" | "epub" {

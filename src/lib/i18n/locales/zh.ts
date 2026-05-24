@@ -7,6 +7,7 @@ const ZH: Dict = {
   "sidebar.hover": "悬停翻译",
   "sidebar.selection": "划词翻译",
   "sidebar.immersive": "沉浸翻译",
+  "sidebar.fileplus": "文件增强",
   "sidebar.about": "关于",
   "section.profile": "档案",
   "profile.avatar": "头像",
@@ -169,6 +170,19 @@ const ZH: Dict = {
   "viewer.sections": "章节",
   "viewer.emptyTitle": "把 PDF 或 EPUB 拖到这里",
   "viewer.emptyNote": "也可以从左侧打开本地文件或 URL。",
+  "fileplus.section.open": "打开文档",
+  "fileplus.openUrl": "文档 URL",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "打开",
+  "fileplus.localFile": "本地文件",
+  "fileplus.chooseFile": "选择文件",
+  "fileplus.format": "格式",
+  "fileplus.format.auto": "自动",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "把 PDF 或 EPUB 拖到这里",
+  "fileplus.dropNote": "也可以从上方打开本地文件或输入 URL。",
+  "fileplus.closeDocument": "关闭",
 };
 
 export default ZH;

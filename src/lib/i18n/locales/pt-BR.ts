@@ -6,6 +6,7 @@ const PT_BR: PartialDict = {
   "sidebar.hover": "Tradução ao passar o mouse",
   "sidebar.selection": "Tradução da seleção",
   "sidebar.immersive": "Tradução imersiva",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "Sobre",
   "section.profile": "Perfil",
   "profile.avatar": "Avatar",
@@ -117,6 +118,19 @@ const PT_BR: PartialDict = {
   "popup.status.restoring": "Mostrando o original…",
   "popup.status.restored": "Original exibido",
   "popup.status.error": "Erro: {msg}",
+  "fileplus.section.open": "Abrir documento",
+  "fileplus.openUrl": "URL do documento",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "Abrir",
+  "fileplus.localFile": "Arquivo local",
+  "fileplus.chooseFile": "Escolher arquivo",
+  "fileplus.format": "Formato",
+  "fileplus.format.auto": "Automático",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "Solte um PDF ou EPUB aqui",
+  "fileplus.dropNote": "Ou abra um arquivo local ou insira uma URL acima",
+  "fileplus.closeDocument": "Fechar",
 };
 
 export default PT_BR;

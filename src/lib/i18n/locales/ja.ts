@@ -6,6 +6,7 @@ const JA: PartialDict = {
   "sidebar.hover": "ホバー翻訳",
   "sidebar.selection": "選択翻訳",
   "sidebar.immersive": "没入翻訳",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "情報",
   "section.profile": "プロフィール",
   "profile.avatar": "アバター",
@@ -117,6 +118,19 @@ const JA: PartialDict = {
   "popup.status.restoring": "原文を表示しています…",
   "popup.status.restored": "原文を表示しました",
   "popup.status.error": "エラー：{msg}",
+  "fileplus.section.open": "ドキュメントを開く",
+  "fileplus.openUrl": "ドキュメント URL",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "開く",
+  "fileplus.localFile": "ローカルファイル",
+  "fileplus.chooseFile": "ファイルを選択",
+  "fileplus.format": "形式",
+  "fileplus.format.auto": "自動",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "PDF または EPUB をここにドロップ",
+  "fileplus.dropNote": "または上記からローカルファイルを開くか URL を入力してください",
+  "fileplus.closeDocument": "閉じる",
 };
 
 export default JA;

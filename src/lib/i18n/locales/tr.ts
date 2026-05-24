@@ -6,6 +6,7 @@ const TR: PartialDict = {
   "sidebar.hover": "Üzerine gelince çeviri",
   "sidebar.selection": "Seçim çevirisi",
   "sidebar.immersive": "Sürükleyici çeviri",
+  "sidebar.fileplus": "File Plus",
   "sidebar.about": "Hakkında",
   "section.profile": "Profil",
   "profile.avatar": "Avatar",
@@ -117,6 +118,19 @@ const TR: PartialDict = {
   "popup.status.restoring": "Orijinal gösteriliyor…",
   "popup.status.restored": "Orijinal gösterildi",
   "popup.status.error": "Hata: {msg}",
+  "fileplus.section.open": "Belge aç",
+  "fileplus.openUrl": "Belge URL'si",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "Aç",
+  "fileplus.localFile": "Yerel dosya",
+  "fileplus.chooseFile": "Dosya seç",
+  "fileplus.format": "Biçim",
+  "fileplus.format.auto": "Otomatik",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "PDF veya EPUB'u buraya sürükleyin",
+  "fileplus.dropNote": "Veya yukarıdan yerel dosya açın veya URL girin",
+  "fileplus.closeDocument": "Kapat",
 };
 
 export default TR;

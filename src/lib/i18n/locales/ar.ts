@@ -6,6 +6,7 @@ const AR: PartialDict = {
   "sidebar.hover": "ترجمة التمرير",
   "sidebar.selection": "ترجمة التحديد",
   "sidebar.immersive": "الترجمة الغامرة",
+  "sidebar.fileplus": "ملف بلس",
   "sidebar.about": "حول",
   "section.profile": "الملف الشخصي",
   "profile.avatar": "الصورة الرمزية",
@@ -117,6 +118,19 @@ const AR: PartialDict = {
   "popup.status.restoring": "جارٍ إظهار النص الأصلي…",
   "popup.status.restored": "تم إظهار النص الأصلي",
   "popup.status.error": "خطأ: {msg}",
+  "fileplus.section.open": "فتح مستند",
+  "fileplus.openUrl": "رابط المستند",
+  "fileplus.urlPlaceholder": "https://example.com/book.epub",
+  "fileplus.openButton": "فتح",
+  "fileplus.localFile": "ملف محلي",
+  "fileplus.chooseFile": "اختر ملفًا",
+  "fileplus.format": "التنسيق",
+  "fileplus.format.auto": "تلقائي",
+  "fileplus.format.pdf": "PDF",
+  "fileplus.format.epub": "EPUB",
+  "fileplus.dropTitle": "اسحب ملف PDF أو EPUB هنا",
+  "fileplus.dropNote": "أو افتح ملفًا محليًا أو أدخل رابطًا أعلاه",
+  "fileplus.closeDocument": "إغلاق",
 };
 
 export default AR;

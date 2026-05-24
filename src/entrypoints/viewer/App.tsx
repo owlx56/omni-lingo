@@ -1,383 +1,213 @@
 import {
-  For,
-  Show,
-  createEffect,
-  createMemo,
   createSignal,
   onCleanup,
   onMount,
+  Show,
   type JSX,
 } from "solid-js";
 import { browser } from "wxt/browser";
-import {
-  inferDocumentKind,
-  inferDocumentKindFromName,
-  parseReaderDocument,
-  sourceFromFile,
-  sourceFromUrl,
-  type DocumentKind,
-  type DocumentSource,
-  type ReaderDocument,
-  type ViewerFormat,
-} from "@/features/document-viewer";
-import { useT, type TFn } from "@/lib/i18n";
-import { FullRow, Row, Segment, type SegmentOption } from "@/lib/ui/controls";
-import { IconExternalLink, IconLogo } from "@/lib/ui/icons";
+import ePub from "epubjs";
+import type { Book, Rendition } from "epubjs";
+import { loadDocument, storeDocument } from "@/lib/document-store";
+import { useT } from "@/lib/i18n";
 
-type LoadState = "idle" | "loading" | "ready" | "error";
-
-const ACCEPTED_FILES = ".pdf,.epub,application/pdf,application/epub+zip";
-const READER_UI_ATTR = "data-onelingo-reader-ui";
-
-function formatOptions(t: TFn): SegmentOption<ViewerFormat>[] {
-  return [
-    { value: "auto", label: t("viewer.format.auto") },
-    { value: "pdf", label: t("viewer.format.pdf") },
-    { value: "epub", label: t("viewer.format.epub") },
-  ];
-}
+type DocFormat = "pdf" | "epub";
+type ViewState = "loading" | "ready" | "error";
 
 function App(): JSX.Element {
   const t = useT();
-  const [format, setFormat] = createSignal<ViewerFormat>("auto");
-  const [url, setUrl] = createSignal("");
-  const [state, setState] = createSignal<LoadState>("idle");
-  const [doc, setDoc] = createSignal<ReaderDocument | null>(null);
+  const [state, setState] = createSignal<ViewState>("loading");
   const [error, setError] = createSignal("");
-  const pdfDoc = createMemo(() => {
-    const loaded = doc();
-    return loaded?.kind === "pdf" && loaded.viewerUrl ? loaded : null;
-  });
-  let fileInput: HTMLInputElement | undefined;
-  let dropDepth = 0;
+  const [docTitle, setDocTitle] = createSignal("");
+  const [docFormat, setDocFormat] = createSignal<DocFormat>("epub");
+  const [currentLocation, setCurrentLocation] = createSignal("");
 
-  const cleanupCurrentDocument = (): void => {
-    doc()?.cleanup?.();
-    setDoc(null);
-  };
+  let bookRef: Book | undefined;
+  let renditionRef: Rendition | undefined;
 
-  onCleanup(cleanupCurrentDocument);
+  const pdfViewerUrl = (fileUrl: string): string =>
+    `${browser.runtime.getURL("/pdf/web/viewer.html")}?file=${encodeURIComponent(fileUrl)}`;
 
-  createEffect(() => {
-    document.documentElement.dataset.viewerMode = pdfDoc() ? "pdf" : "reader";
+  onMount(() => {
+    void init();
   });
 
   onCleanup(() => {
-    document.documentElement.removeAttribute("data-viewer-mode");
+    renditionRef?.destroy();
+    bookRef?.destroy();
   });
 
-  onMount(() => {
+  const init = async (): Promise<void> => {
     const params = new URLSearchParams(location.search);
-    const incomingUrl = params.get("url");
-    const incomingFormat = params.get("format");
-    if (
-      incomingFormat === "pdf" ||
-      incomingFormat === "epub" ||
-      incomingFormat === "auto"
-    ) {
-      setFormat(incomingFormat);
-    }
-    if (incomingUrl) {
-      setUrl(incomingUrl);
-      void loadUrl(incomingUrl);
-    }
-  });
+    const key = params.get("key");
+    const url = params.get("url");
 
-  const loadSource = async (source: DocumentSource): Promise<void> => {
-    cleanupCurrentDocument();
-    setError("");
-    setState("loading");
+    if (key) {
+      await loadFromStore(key);
+    } else if (url) {
+      const format = (params.get("format") ?? "auto") as DocFormat | "auto";
+      await loadFromUrl(url, format);
+    } else {
+      setError("No document specified.");
+      setState("error");
+    }
+  };
+
+  const loadFromStore = async (key: string): Promise<void> => {
     try {
-      const kind = inferDocumentKind(source, format());
-      if (kind === "pdf") {
-        setDoc(createPdfDocumentFromBytes(source));
-        setState("ready");
+      const doc = await loadDocument(key);
+      if (!doc) {
+        setError("Document not found in storage. It may have been cleared.");
+        setState("error");
         return;
       }
-      const next = await parseReaderDocument(source, format());
-      setDoc(next);
-      setState("ready");
+      setDocTitle(doc.name.replace(/\.(pdf|epub)$/i, "") || "Document");
+      setDocFormat(doc.format);
+      if (doc.format === "pdf") {
+        renderPdf(doc.data);
+      } else {
+        await renderEpub(doc.data);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setState("error");
     }
   };
 
-  const loadUrl = async (rawUrl = url()): Promise<void> => {
-    const nextUrl = rawUrl.trim();
-    if (!nextUrl) return;
-    setUrl(nextUrl);
-    cleanupCurrentDocument();
-    setState("loading");
-    setError("");
+  const loadFromUrl = async (
+    url: string,
+    formatHint: DocFormat | "auto",
+  ): Promise<void> => {
     try {
-      const kind = inferDocumentKindFromName(nextUrl, undefined, format());
-      if (kind === "pdf") {
-        location.replace(pdfViewerUrl(nextUrl));
+      const format =
+        formatHint !== "auto"
+          ? formatHint
+          : inferFormat(url);
+      setDocFormat(format);
+      setDocTitle(
+        decodeURIComponent(
+          url
+            .split(/[\\/]/)
+            .pop()
+            ?.replace(/\.(pdf|epub)$/i, "") ?? "Document",
+        ),
+      );
+
+      if (format === "pdf") {
+        location.replace(pdfViewerUrl(url));
         return;
       }
-      await loadSource(await sourceFromUrl(nextUrl));
+
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.arrayBuffer();
+      const key = await storeDocument(data, "epub", docTitle());
+      const viewerUrl = browser.runtime.getURL(
+        `/viewer.html?key=${encodeURIComponent(key)}`,
+      );
+      history.replaceState(null, "", viewerUrl);
+      await renderEpub(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setState("error");
     }
   };
 
-  const loadFile = async (file: File): Promise<void> => {
-    setUrl("");
-    cleanupCurrentDocument();
-    setError("");
-    setState("loading");
-    const kind = inferDocumentKindFromName(file.name, file.type, format());
-    if (kind === "pdf") {
-      setDoc(createPdfDocumentFromFile(file));
-      setState("ready");
-      return;
-    }
-    await loadSource(await sourceFromFile(file));
-  };
-
-  const openOptions = (): void => {
-    void browser.runtime.openOptionsPage().catch((err: unknown) => {
-      console.warn("[OneLingo] failed to open options:", err);
+  const renderPdf = (data: ArrayBuffer): void => {
+    const blob = new Blob([data], { type: "application/pdf" });
+    const objectUrl = URL.createObjectURL(blob);
+    setState("ready");
+    requestAnimationFrame(() => {
+      const iframe = document.getElementById(
+        "pdf-frame",
+      ) as HTMLIFrameElement | null;
+      if (iframe) iframe.src = pdfViewerUrl(objectUrl);
     });
   };
 
-  const onDrop: JSX.EventHandlerUnion<HTMLElement, DragEvent> = (event) => {
-    event.preventDefault();
-    dropDepth = 0;
-    event.currentTarget.classList.remove("dragging");
-    const file = event.dataTransfer?.files.item(0);
-    if (file) void loadFile(file);
+  const renderEpub = async (data: ArrayBuffer): Promise<void> => {
+    const book = ePub(data);
+    bookRef = book;
+    await book.ready;
+
+    const metadata = await book.loaded.metadata;
+    if (metadata.title) setDocTitle(metadata.title);
+
+    setDocFormat("epub");
+    setState("ready");
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+    const el = document.getElementById("epub-render");
+    if (!el) {
+      setError("Viewer element not found.");
+      setState("error");
+      return;
+    }
+
+    const rendition = book.renderTo(el, {
+      width: "100%",
+      height: "100%",
+      spread: "none",
+      flow: "paginated",
+    });
+    renditionRef = rendition;
+
+    rendition.on("relocated", (loc: { start: { label: string } }) => {
+      setCurrentLocation(loc.start.label);
+    });
+
+    await rendition.display();
   };
 
-  const renderStatus = (): JSX.Element => {
-    if (state() === "loading") return <span>{t("viewer.status.loading")}</span>;
-    if (state() === "error") {
-      return <span class="status-error">{t("viewer.status.error", { msg: error() })}</span>;
-    }
-    if (doc()) return <span>{t("viewer.status.ready")}</span>;
-    return <span>{t("viewer.status.idle")}</span>;
+  const goPrev = (): void => {
+    renditionRef?.prev();
+  };
+
+  const goNext = (): void => {
+    renditionRef?.next();
   };
 
   return (
-    <main
-      class="viewer-page"
-      onDragEnter={(event) => {
-        event.preventDefault();
-        dropDepth++;
-        event.currentTarget.classList.add("dragging");
-      }}
-      onDragLeave={(event) => {
-        event.preventDefault();
-        dropDepth = Math.max(0, dropDepth - 1);
-        if (dropDepth === 0) event.currentTarget.classList.remove("dragging");
-      }}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={onDrop}
-    >
-      <Show when={pdfDoc()} fallback={renderReaderShell()}>
-        {(loaded) => (
-          <section class="pdf-reader-stage" aria-label={loaded().title}>
-            <iframe
-              class="pdf-reader-frame"
-              src={loaded().viewerUrl ?? ""}
-              title={loaded().title}
-            />
-          </section>
-        )}
+    <main class="viewer-root">
+      <Show when={state() === "error"}>
+        <div class="viewer-error">
+          <p>{error()}</p>
+        </div>
+      </Show>
+
+      <Show when={state() === "loading"}>
+        <div class="viewer-loading">{t("viewer.status.loading")}</div>
+      </Show>
+
+      <Show when={state() === "ready" && docFormat() === "pdf"}>
+        <iframe
+          class="viewer-pdf-frame"
+          id="pdf-frame"
+          title={docTitle()}
+        />
+      </Show>
+
+      <Show when={state() === "ready" && docFormat() === "epub"}>
+        <header class="epub-toolbar">
+          <button class="epub-nav-button" onClick={goPrev} type="button">
+            ‹
+          </button>
+          <span class="epub-toolbar-title">{docTitle()}</span>
+          <span class="epub-toolbar-location">{currentLocation()}</span>
+          <button class="epub-nav-button" onClick={goNext} type="button">
+            ›
+          </button>
+        </header>
+        <div class="epub-render-area" id="epub-render" />
       </Show>
     </main>
   );
+}
 
-  function renderReaderShell(): JSX.Element {
-    return (
-      <>
-        <header class="viewer-header" {...{ [READER_UI_ATTR]: "" }}>
-          <div class="viewer-title-block">
-            <span aria-hidden="true" class="avatar">
-              <IconLogo size={22} />
-            </span>
-            <div>
-              <h1>{t("viewer.title")}</h1>
-              <span class="scope">{t("viewer.scope")}</span>
-            </div>
-          </div>
-          <button class="plain-icon-button" onClick={openOptions} type="button">
-            <IconExternalLink size={15} />
-            <span>{t("viewer.openOptions")}</span>
-          </button>
-        </header>
-
-        <div class="viewer-shell">
-          <aside class="viewer-sidebar" {...{ [READER_UI_ATTR]: "" }}>
-            <section class="section">
-              <h2>{t("viewer.section.open")}</h2>
-              <FullRow>
-                <div class="url-control">
-                  <input
-                    aria-label={t("viewer.openUrl")}
-                    class="url-input"
-                    onInput={(event) => setUrl(event.currentTarget.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") void loadUrl();
-                    }}
-                    placeholder={t("viewer.urlPlaceholder")}
-                    spellcheck={false}
-                    type="url"
-                    value={url()}
-                  />
-                  <button
-                    class="primary-button"
-                    disabled={state() === "loading"}
-                    onClick={() => void loadUrl()}
-                    type="button"
-                  >
-                    {t("viewer.openButton")}
-                  </button>
-                </div>
-              </FullRow>
-              <Row label={t("viewer.localFile")}>
-                <button
-                  class="secondary-button"
-                  disabled={state() === "loading"}
-                  onClick={() => fileInput?.click()}
-                  type="button"
-                >
-                  {t("viewer.chooseFile")}
-                </button>
-                <input
-                  accept={ACCEPTED_FILES}
-                  class="visually-hidden"
-                  onChange={(event) => {
-                    const file = event.currentTarget.files?.item(0);
-                    if (file) void loadFile(file);
-                    event.currentTarget.value = "";
-                  }}
-                  ref={fileInput}
-                  type="file"
-                />
-              </Row>
-              <Row label={t("viewer.format")}>
-                <Segment
-                  label={t("viewer.format")}
-                  onChange={setFormat}
-                  options={formatOptions(t)}
-                  value={format()}
-                />
-              </Row>
-            </section>
-
-            <section class="section">
-              <h2>{t("viewer.section.document")}</h2>
-              <Row label={t("viewer.status")}>{renderStatus()}</Row>
-              <Show when={doc()}>
-                {(loaded) => (
-                  <>
-                    <Row label={t("viewer.documentTitle")}>
-                      <span class="row-static">{loaded().title}</span>
-                    </Row>
-                    <Row label={t("viewer.source")}>
-                      <span class="row-static">{loaded().sourceName}</span>
-                    </Row>
-                    <Row label={t("viewer.sections")}>
-                      <span class="row-static">{loaded().sections.length}</span>
-                    </Row>
-                  </>
-                )}
-              </Show>
-            </section>
-          </aside>
-
-          <section class="reader-panel">
-            <Show
-              when={doc()}
-              fallback={
-                <div class="reader-empty" {...{ [READER_UI_ATTR]: "" }}>
-                  <h2>{t("viewer.emptyTitle")}</h2>
-                  <p>{t("viewer.emptyNote")}</p>
-                </div>
-              }
-            >
-              {(loaded) => (
-                <article class="reader-flow" aria-label={loaded().title}>
-                  <header class="document-heading">
-                    <span class="document-kind">
-                      {loaded().kind.toUpperCase()}
-                    </span>
-                    <h2>{loaded().title}</h2>
-                    <Show when={loaded().warnings.length > 0}>
-                      <p>{loaded().warnings.join(" ")}</p>
-                    </Show>
-                  </header>
-                  <For each={loaded().sections}>
-                    {(section) => (
-                      <section class="reader-section" id={section.id}>
-                        <Show when={section.title}>
-                          <h3>{section.title}</h3>
-                        </Show>
-                        <div innerHTML={section.html} />
-                      </section>
-                    )}
-                  </For>
-                </article>
-              )}
-            </Show>
-          </section>
-        </div>
-      </>
-    );
-  }
+function inferFormat(url: string): DocFormat {
+  const lower = url.split(/[?#]/)[0]?.toLowerCase() ?? "";
+  if (lower.endsWith(".pdf")) return "pdf";
+  return "epub";
 }
 
 export default App;
-
-function createPdfDocumentFromFile(file: File): ReaderDocument {
-  const objectUrl = URL.createObjectURL(file);
-  return createPdfDocument({
-    cleanup: () => URL.revokeObjectURL(objectUrl),
-    sourceName: file.name,
-    title: titleFromSource(file.name),
-    viewerFileUrl: objectUrl,
-  });
-}
-
-function createPdfDocumentFromBytes(source: DocumentSource): ReaderDocument {
-  const objectUrl = URL.createObjectURL(
-    new Blob([source.bytes], { type: source.mimeType ?? "application/pdf" }),
-  );
-  return createPdfDocument({
-    cleanup: () => URL.revokeObjectURL(objectUrl),
-    sourceName: source.name,
-    title: titleFromSource(source.name),
-    viewerFileUrl: objectUrl,
-  });
-}
-
-function createPdfDocument(input: {
-  cleanup: (() => void) | undefined;
-  sourceName: string;
-  title: string;
-  viewerFileUrl: string;
-}): ReaderDocument {
-  const viewerUrl = pdfViewerUrl(input.viewerFileUrl);
-  return {
-    cleanup: input.cleanup,
-    kind: "pdf",
-    sections: [],
-    sourceName: input.sourceName,
-    title: input.title,
-    viewerUrl,
-    warnings: [],
-  };
-}
-
-function pdfViewerUrl(fileUrl: string): string {
-  return `${browser.runtime.getURL("/pdf/web/viewer.html")}?file=${encodeURIComponent(fileUrl)}`;
-}
-
-function titleFromSource(source: string): string {
-  const clean = source.split(/[?#]/)[0] ?? source;
-  const last = clean.split(/[\\/]/).filter(Boolean).pop() ?? clean;
-  return decodeURIComponent(last).replace(/\.(pdf|epub)$/i, "") || "Document";
-}
