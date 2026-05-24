@@ -84,7 +84,7 @@ function initPdfTranslation(): void {
     hoverEngine: "google",
     selectionEngine: "google",
     hoverGranularity: "word",
-    hoverFontSize: 13,
+    hoverFontSize: 14,
     hoverSeq: 0,
     hoverTimer: null,
     lastHoverText: "",

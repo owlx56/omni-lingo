@@ -101,10 +101,10 @@ const DEFAULTS: Settings = {
   theme: "system",
   engines: { hover: "google", selection: "google", fullPage: "google2" },
   hoverGranularity: "word",
-  hoverFontSize: HOVER_FONT_SIZE_MIN,
+  hoverFontSize: 14,
   fullPageMode: "replace",
   fullPageClickToShowOriginal: true,
-  documentLinkSniffEnabled: false,
+  documentLinkSniffEnabled: true,
   documentLinkSniffKeepOriginal: false,
   documentLinkSniffStandalone: false,
   translationStyle: {
