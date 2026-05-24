@@ -271,7 +271,7 @@ type ViewerFormat = "auto" | "pdf" | "epub";
 
 const ACCEPTED_FILES = ".pdf,.epub,application/pdf,application/epub+zip";
 
-function formatSegmentOptions(t: TFn): SegmentOption<ViewerFormat>[] {
+function formatSelectOptions(t: TFn): SelectOption<ViewerFormat>[] {
   return [
     { value: "auto", label: t("fileplus.format.auto") },
     { value: "pdf", label: t("fileplus.format.pdf") },
@@ -745,10 +745,10 @@ function App() {
         />
       </Row>
       <Row label={t("fileplus.format")}>
-        <Segment
+        <Select
           label={t("fileplus.format")}
           onChange={setFpFormat}
-          options={formatSegmentOptions(t)}
+          options={formatSelectOptions(t)}
           value={fpFormat()}
         />
       </Row>
