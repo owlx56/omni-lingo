@@ -11,6 +11,7 @@ html {
     scrollbar-gutter: stable;
     overflow-y: scroll;
     --settings-title-color: #302d28;
+    --settings-divider: rgba(31, 30, 29, 0.045);
     --sidebar-item-color: #1f1f1f;
     --sidebar-item-hover-bg: #f7f6f3;
     --sidebar-item-active-bg: #efeeeb;
@@ -23,6 +24,7 @@ html {
 
 html[data-theme="dark"] {
     --settings-title-color: #d8d1c4;
+    --settings-divider: rgba(255, 255, 255, 0.045);
     --sidebar-item-color: var(--text);
     --sidebar-item-hover-bg: var(--surface-alt);
     --sidebar-item-active-bg: #121212;
@@ -53,7 +55,7 @@ body {
     justify-content: space-between;
     gap: 24px;
     padding-bottom: 24px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--settings-divider);
 }
 
 h1,
@@ -153,7 +155,7 @@ h1 {
 }
 
 .section .row + .row {
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--settings-divider);
 }
 
 .hover-font-size-control {
