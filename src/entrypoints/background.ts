@@ -1,4 +1,4 @@
-import { onMessage, sendTabMessage } from "@/lib/messaging";
+import { onMessage, sendTabMessage, sendMessage } from "@/lib/messaging";
 import { DEFAULT_ENGINE_ID, getEngine } from "@/engines/registry";
 import {
   peekTranslateMemoryCache,
@@ -95,7 +95,14 @@ export default defineBackground(() => {
     if (typeof tab?.id !== "number") {
       throw new Error("当前没有活动标签页");
     }
-    return sendTabMessage(tab.id, "readPageFeatureStatus", {});
+    try {
+      return await sendTabMessage(tab.id, "readPageFeatureStatus", {});
+    } catch {
+      if (tab.url?.startsWith(browser.runtime.getURL("/"))) {
+        return await sendMessage("readPageFeatureStatus", {});
+      }
+      throw new Error("当前页面不支持功能偏好设置");
+    }
   });
 
   onMessage("setPageFeaturePrefs", async (input) => {
@@ -106,7 +113,14 @@ export default defineBackground(() => {
     if (typeof tab?.id !== "number") {
       throw new Error("当前没有活动标签页");
     }
-    return sendTabMessage(tab.id, "updatePageFeaturePrefs", input);
+    try {
+      return await sendTabMessage(tab.id, "updatePageFeaturePrefs", input);
+    } catch {
+      if (tab.url?.startsWith(browser.runtime.getURL("/"))) {
+        return await sendMessage("updatePageFeaturePrefs", input);
+      }
+      throw new Error("当前页面不支持功能偏好设置");
+    }
   });
 });
 

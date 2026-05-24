@@ -10,6 +10,7 @@ import ePub from "epubjs";
 import type { Book, Rendition } from "epubjs";
 import { loadDocument, storeDocument } from "@/lib/document-store";
 import { useT } from "@/lib/i18n";
+import { initEpubBridge } from "./epub-bridge";
 
 type DocFormat = "pdf" | "epub";
 type ViewState = "loading" | "ready" | "error";
@@ -151,6 +152,8 @@ function App(): JSX.Element {
       flow: "paginated",
     });
     renditionRef = rendition;
+
+    initEpubBridge(rendition);
 
     rendition.on("relocated", (loc: { start: { label: string } }) => {
       setCurrentLocation(loc.start.label);

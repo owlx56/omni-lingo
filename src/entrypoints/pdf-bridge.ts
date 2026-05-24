@@ -1,4 +1,4 @@
-import { sendMessage } from "@/lib/messaging";
+import { onMessage, sendMessage, type PageFeatureStatus } from "@/lib/messaging";
 import { shouldSkipSameLanguageText } from "@/lib/lang-detect";
 import {
   getSettings,
@@ -7,6 +7,7 @@ import {
   type HoverGranularity,
 } from "@/lib/storage/settings";
 import { initTheme } from "@/lib/theme";
+import { browser } from "wxt/browser";
 
 const READER_UI_ATTR = "data-onelingo-reader-ui";
 const HIGHLIGHT_NAME = "onelingo-pdf-hover";
@@ -30,6 +31,8 @@ interface PdfTextHit {
 interface PdfBridgeState {
   hoverEnabled: boolean;
   selectionEnabled: boolean;
+  hoverPreferredEnabled: boolean | null;
+  selectionPreferredEnabled: boolean | null;
   hoverTarget: string;
   selectionTarget: string;
   hoverEngine: string;
@@ -74,6 +77,8 @@ function initPdfTranslation(): void {
   const state: PdfBridgeState = {
     hoverEnabled: true,
     selectionEnabled: true,
+    hoverPreferredEnabled: null,
+    selectionPreferredEnabled: null,
     hoverTarget: "zh",
     selectionTarget: "zh",
     hoverEngine: "google",
@@ -98,9 +103,11 @@ function initPdfTranslation(): void {
     watchSettings((settings) => {
       applySettings(state, settings);
     });
-  } catch (err) {
+  } catch (err: unknown) {
     console.warn("[OneLingo] failed to watch PDF reader settings:", err);
   }
+
+  registerViewerMessageHandlers(state);
 
   document.addEventListener("mousemove", (event) => onPdfMouseMove(event, state), {
     passive: true,
@@ -132,8 +139,11 @@ function applySettings(
   state: PdfBridgeState,
   settings: Awaited<ReturnType<typeof getSettings>>,
 ): void {
-  state.hoverEnabled = settings.hoverEnabled;
-  state.selectionEnabled = settings.selectionEnabled;
+  const prevHover = state.hoverEnabled;
+  const prevSelection = state.selectionEnabled;
+  state.hoverEnabled = state.hoverPreferredEnabled ?? settings.hoverEnabled;
+  state.selectionEnabled =
+    state.selectionPreferredEnabled ?? settings.selectionEnabled;
   state.hoverTarget = resolveTargetLang(settings.hoverTargetLang, settings.uiLang);
   state.selectionTarget = resolveTargetLang(
     settings.selectionTargetLang,
@@ -143,8 +153,34 @@ function applySettings(
   state.selectionEngine = settings.engines.selection;
   state.hoverGranularity = settings.hoverGranularity;
   state.hoverFontSize = settings.hoverFontSize;
-  if (!state.hoverEnabled) dismissHover(state);
-  if (!state.selectionEnabled) hideSelectionCard(state);
+  if (prevHover && !state.hoverEnabled) dismissHover(state);
+  if (prevSelection && !state.selectionEnabled) hideSelectionCard(state);
+}
+
+function registerViewerMessageHandlers(state: PdfBridgeState): void {
+  const readFeatureStatus = (): PageFeatureStatus => ({
+    fullPageClickToShowOriginal: false,
+    hoverEnabled: state.hoverEnabled,
+    selectionEnabled: state.selectionEnabled,
+    hasFullPageClickToShowOriginalPref: false,
+    hasHoverEnabledPref: state.hoverPreferredEnabled !== null,
+    hasSelectionEnabledPref: state.selectionPreferredEnabled !== null,
+  });
+
+  onMessage("readPageFeatureStatus", () => readFeatureStatus());
+  onMessage("updatePageFeaturePrefs", (input) => {
+    if (input.hoverEnabled !== undefined) {
+      state.hoverPreferredEnabled = input.hoverEnabled;
+      state.hoverEnabled = input.hoverEnabled;
+      if (!state.hoverEnabled) dismissHover(state);
+    }
+    if (input.selectionEnabled !== undefined) {
+      state.selectionPreferredEnabled = input.selectionEnabled;
+      state.selectionEnabled = input.selectionEnabled;
+      if (!state.selectionEnabled) hideSelectionCard(state);
+    }
+    return readFeatureStatus();
+  });
 }
 
 function onPdfMouseMove(event: MouseEvent, state: PdfBridgeState): void {
