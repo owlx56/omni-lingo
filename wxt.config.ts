@@ -32,7 +32,7 @@ export default defineConfig({
   manifest: {
     name: "OneLingo",
     description: "跨平台翻译拓展",
-    permissions: ["storage", "unlimitedStorage"],
+    permissions: ["storage", "unlimitedStorage", "contextMenus"],
     host_permissions: ["<all_urls>"],
     options_ui: {
       page: "options.html",

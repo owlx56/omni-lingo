@@ -10,13 +10,14 @@ OneLingo 是一个浏览器翻译拓展，目标是提供悬停翻译、划词�
 - 划词翻译：`src/features/selection/`
 - 全文翻译：`src/features/immersive/`
 - popup / options UI：`src/entrypoints/popup/`、`src/entrypoints/options/`
+- PDF / EPUB 阅读器：`src/entrypoints/viewer/`、`src/features/document-viewer/`
 - 翻译引擎：Google、Google2、Microsoft
 - 类型安全消息通道：`src/lib/messaging/`
 - 翻译缓存：内存 LRU + IndexedDB
 - 设置与语言：`src/lib/storage/settings.ts`、`src/lib/languages.ts`
 - options / popup 界面 i18n：18 种语言，文案按语言拆在 `src/lib/i18n/locales/`
 
-还未落地的能力不要提前创建目录，PDF 阅读器、文件翻译、字幕翻译、独立站点 adapter 等功能等到实现时再长出来。
+还未落地的能力不要提前创建目录，文件翻译、字幕翻译、独立站点 adapter 等功能等到实现时再长出来。
 
 ## 快速开始
 
@@ -75,11 +76,13 @@ src/
     content.ts          # content script bootstrap
     popup/              # popup UI
     options/            # options UI
+    viewer/             # PDF / EPUB 阅读器页面
 
   features/
     hover/              # 悬停识别、分词、Highlight API 下划线
     selection/          # 划词交互和翻译卡片触发
     immersive/          # 全文翻译
+    document-viewer/    # 文档加载、EPUB 解析、PDF 文本面提取
 
   engines/              # 翻译引擎适配
   lib/

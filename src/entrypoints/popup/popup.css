@@ -151,13 +151,18 @@ body {
 }
 
 .service-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+    gap: 10px;
     align-items: center;
-    gap: 8px;
     min-width: 0;
 }
 
 .service-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     color: var(--text);
     font-size: 15px;
     font-weight: 500;
@@ -165,9 +170,15 @@ body {
     white-space: nowrap;
 }
 
+.service-label-spacer {
+    width: 16px;
+    visibility: hidden;
+}
+
 .service-control {
-    display: inline-flex;
-    flex: 1 1 auto;
+    display: flex;
+    justify-content: center;
+    grid-column: 2 / -1;
     align-items: center;
     gap: 8px;
     min-width: 0;

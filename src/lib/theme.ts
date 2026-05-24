@@ -21,14 +21,22 @@ export function initTheme(): void {
   };
   mq.addEventListener("change", onSystemChange);
 
-  void getSettings().then((s) => {
-    currentPreference = s.theme;
-    applyEffective(resolveEffective(currentPreference));
-  });
-  watchSettings((s) => {
-    currentPreference = s.theme;
-    applyEffective(resolveEffective(currentPreference));
-  });
+  void getSettings()
+    .then((s) => {
+      currentPreference = s.theme;
+      applyEffective(resolveEffective(currentPreference));
+    })
+    .catch((err: unknown) => {
+      console.warn("[OneLingo] failed to read theme settings:", err);
+    });
+  try {
+    watchSettings((s) => {
+      currentPreference = s.theme;
+      applyEffective(resolveEffective(currentPreference));
+    });
+  } catch (err) {
+    console.warn("[OneLingo] failed to watch theme settings:", err);
+  }
 }
 
 function resolveEffective(pref: ThemePreference): EffectiveTheme {

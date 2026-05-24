@@ -501,7 +501,10 @@ function App(): JSX.Element {
         </div>
 
         <div class="service-row">
-          <span class="service-label">{t("popup.label.service")}:</span>
+          <span class="service-label">
+            {t("popup.label.service")}:
+            <span class="service-label-spacer"></span>
+          </span>
           <span class="service-control">
             <Select
               label={t("popup.label.service")}

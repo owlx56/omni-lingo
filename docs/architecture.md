@@ -18,11 +18,13 @@ src/entrypoints/
   content.ts     -> content script bootstrap
   popup/         -> popup UI
   options/       -> options UI
+  viewer/        -> PDF / EPUB 阅读器页面
 
 src/features/
   hover/         -> 悬停识别、Highlight API 下划线、Minimal tooltip 流程
   selection/     -> 划词交互和卡片触发
   immersive/     -> 全文翻译
+  document-viewer/ -> PDF / EPUB 文档加载和可翻译文本面解析
 
 src/lib/
   messaging/     -> 类型安全的 background/content/options 消息

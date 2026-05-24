@@ -19,6 +19,7 @@ import {
 
 const TRANSLATE_DELAY_MS = 10;
 const TOOLTIP_ATTR = "data-onelingo-tooltip";
+const READER_UI_ATTR = "data-onelingo-reader-ui";
 const HIGHLIGHT_NAME = "onelingo-hover";
 
 type CaretDoc = Document & {
@@ -28,6 +29,11 @@ type CaretDoc = Document & {
   ): { offsetNode: Node; offset: number } | null;
   caretRangeFromPoint?(x: number, y: number): Range | null;
 };
+
+interface CaretHit {
+  node: Text;
+  offset: number | null;
+}
 
 type HighlightCtor = new (range: Range) => unknown;
 type HighlightRegistry = {
@@ -88,30 +94,40 @@ export function initHover(): void {
   };
   hoverState = state;
 
-  void getSettings().then((s) => {
-    state.settingsEnabled = s.hoverEnabled;
-    state.target = resolveTargetLang(s.hoverTargetLang, s.uiLang);
-    state.engine = s.engines.hover;
-    state.granularity = s.hoverGranularity;
-    state.fontSize = s.hoverFontSize;
-    applyTooltipFontSize(state);
-    applyEnabled(state);
-  });
-  watchSettings((s) => {
-    state.settingsEnabled = s.hoverEnabled;
-    state.target = resolveTargetLang(s.hoverTargetLang, s.uiLang);
-    state.engine = s.engines.hover;
-    state.granularity = s.hoverGranularity;
-    state.fontSize = s.hoverFontSize;
-    applyTooltipFontSize(state);
-    applyEnabled(state);
-  });
+  void getSettings()
+    .then((s) => {
+      applyHoverSettings(state, s);
+    })
+    .catch((err: unknown) => {
+      console.warn("[OneLingo] failed to read hover settings:", err);
+      applyEnabled(state);
+    });
+  try {
+    watchSettings((s) => {
+      applyHoverSettings(state, s);
+    });
+  } catch (err) {
+    console.warn("[OneLingo] failed to watch hover settings:", err);
+  }
 
   document.addEventListener("mousemove", (e) => onMove(e, state), {
     passive: true,
   });
   document.addEventListener("mouseleave", () => dismiss(state));
   document.addEventListener("scroll", () => dismiss(state), { passive: true });
+}
+
+function applyHoverSettings(
+  state: State,
+  s: Awaited<ReturnType<typeof getSettings>>,
+): void {
+  state.settingsEnabled = s.hoverEnabled;
+  state.target = resolveTargetLang(s.hoverTargetLang, s.uiLang);
+  state.engine = s.engines.hover;
+  state.granularity = s.hoverGranularity;
+  state.fontSize = s.hoverFontSize;
+  applyTooltipFontSize(state);
+  applyEnabled(state);
 }
 
 export function getHoverEnabledStatus(): {
@@ -217,24 +233,9 @@ function hitAt(
   granularity: HoverGranularity,
 ): TextHit | null {
   // 1. caret API 找文本节点 + offset
-  const doc = document as CaretDoc;
-  let node: Node | null = null;
-  let offset = 0;
-  if (doc.caretPositionFromPoint) {
-    const p = doc.caretPositionFromPoint(x, y);
-    if (p) {
-      node = p.offsetNode;
-      offset = p.offset;
-    }
-  } else if (doc.caretRangeFromPoint) {
-    const r = doc.caretRangeFromPoint(x, y);
-    if (r) {
-      node = r.startContainer;
-      offset = r.startOffset;
-    }
-  }
-  if (!node || node.nodeType !== Node.TEXT_NODE) return null;
-  const textNode = node as Text;
+  const caret = caretHitAt(x, y) ?? textLayerHitAt(x, y);
+  if (!caret) return null;
+  const textNode = caret.node;
   const text = textNode.nodeValue ?? "";
   if (!text.trim()) return null;
 
@@ -248,7 +249,6 @@ function hitAt(
     if (!w.isWordLike) continue;
     const ws = w.index;
     const we = ws + w.segment.length;
-    if (offset < ws || offset > we) continue;
 
     const wr = document.createRange();
     wr.setStart(textNode, ws);
@@ -265,7 +265,6 @@ function hitAt(
         break;
       }
     }
-    break;
   }
   if (wordStart === -1 || !hitRect) return null;
 
@@ -292,6 +291,38 @@ function hitAt(
 
   // 3c. 段落模式：找最近 block 祖先，取 innerText
   return paragraphHit(textNode, hitRect);
+}
+
+function caretHitAt(x: number, y: number): CaretHit | null {
+  const doc = document as CaretDoc;
+  if (doc.caretPositionFromPoint) {
+    const p = doc.caretPositionFromPoint(x, y);
+    if (p?.offsetNode.nodeType === Node.TEXT_NODE) {
+      return { node: p.offsetNode as Text, offset: p.offset };
+    }
+  }
+  if (doc.caretRangeFromPoint) {
+    const r = doc.caretRangeFromPoint(x, y);
+    if (r?.startContainer.nodeType === Node.TEXT_NODE) {
+      return { node: r.startContainer as Text, offset: r.startOffset };
+    }
+  }
+  return null;
+}
+
+function textLayerHitAt(x: number, y: number): CaretHit | null {
+  const el = document.elementFromPoint(x, y);
+  const textLayerNode = el?.closest?.(".textLayer span, .textLayer");
+  if (!textLayerNode) return null;
+  const walker = document.createTreeWalker(textLayerNode, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if ((node.nodeValue ?? "").trim()) {
+      return { node: node as Text, offset: null };
+    }
+    node = walker.nextNode();
+  }
+  return null;
 }
 
 // block-level display 值判断（不含 inline-*）
@@ -408,7 +439,9 @@ function isEditable(t: EventTarget | null): boolean {
 
 function isOurUi(t: EventTarget | null): boolean {
   if (!(t instanceof Element)) return false;
-  return !!t.closest("[data-onelingo-tooltip],[data-onelingo-host]");
+  return !!t.closest(
+    `[data-onelingo-tooltip],[data-onelingo-host],[${READER_UI_ATTR}]`,
+  );
 }
 
 // ─── CSS Custom Highlight ─────────────────────────────

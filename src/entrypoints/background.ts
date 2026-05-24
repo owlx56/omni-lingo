@@ -6,8 +6,15 @@ import {
   translateCachedBatch,
 } from "@/lib/cache/translate";
 
+const OPEN_LINK_IN_VIEWER_MENU = "onelingo-open-link-in-viewer";
+const OPEN_PAGE_IN_VIEWER_MENU = "onelingo-open-page-in-viewer";
+const OPEN_IN_VIEWER_TITLE = "Open in OneLingo Reader";
+
 export default defineBackground(() => {
   console.log("[OneLingo] background ready");
+  void initDocumentViewerMenus().catch((err: unknown) => {
+    console.warn("[OneLingo] failed to initialize reader context menus:", err);
+  });
 
   onMessage("ping", (input) => ({ echo: input.text, at: Date.now() }));
 
@@ -102,3 +109,59 @@ export default defineBackground(() => {
     return sendTabMessage(tab.id, "updatePageFeaturePrefs", input);
   });
 });
+
+async function initDocumentViewerMenus(): Promise<void> {
+  if (!browser.contextMenus) return;
+
+  await removeContextMenu(OPEN_LINK_IN_VIEWER_MENU);
+  await removeContextMenu(OPEN_PAGE_IN_VIEWER_MENU);
+  browser.contextMenus.create({
+    contexts: ["link"],
+    id: OPEN_LINK_IN_VIEWER_MENU,
+    title: OPEN_IN_VIEWER_TITLE,
+  });
+  browser.contextMenus.create({
+    contexts: ["page"],
+    id: OPEN_PAGE_IN_VIEWER_MENU,
+    title: OPEN_IN_VIEWER_TITLE,
+  });
+
+  browser.contextMenus.onClicked.addListener((info) => {
+    if (
+      info.menuItemId !== OPEN_LINK_IN_VIEWER_MENU &&
+      info.menuItemId !== OPEN_PAGE_IN_VIEWER_MENU
+    ) {
+      return;
+    }
+    const url = info.linkUrl ?? info.pageUrl;
+    if (url) void openDocumentViewer(url);
+  });
+}
+
+async function removeContextMenu(id: string): Promise<void> {
+  try {
+    await browser.contextMenus.remove(id);
+  } catch {
+    // Missing menus are fine after service worker restarts.
+  }
+}
+
+function openDocumentViewer(url: string): Promise<unknown> {
+  const format = inferViewerFormat(url);
+  const viewerUrl =
+    format === "pdf"
+      ? browser.runtime.getURL(
+          `/pdf/web/viewer.html?file=${encodeURIComponent(url)}`,
+        )
+      : browser.runtime.getURL(
+          `/viewer.html?url=${encodeURIComponent(url)}&format=${format}`,
+        );
+  return browser.tabs.create({ url: viewerUrl });
+}
+
+function inferViewerFormat(url: string): "auto" | "pdf" | "epub" {
+  const lower = url.split(/[?#]/)[0]?.toLowerCase() ?? "";
+  if (lower.endsWith(".pdf")) return "pdf";
+  if (lower.endsWith(".epub")) return "epub";
+  return "auto";
+}

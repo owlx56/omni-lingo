@@ -145,7 +145,31 @@ export type MessageKey =
   | "popup.status.engineSwitched"
   | "popup.status.restoring"
   | "popup.status.restored"
-  | "popup.status.error";
+  | "popup.status.error"
+  | "viewer.title"
+  | "viewer.scope"
+  | "viewer.openOptions"
+  | "viewer.section.open"
+  | "viewer.openUrl"
+  | "viewer.urlPlaceholder"
+  | "viewer.openButton"
+  | "viewer.localFile"
+  | "viewer.chooseFile"
+  | "viewer.format"
+  | "viewer.format.auto"
+  | "viewer.format.pdf"
+  | "viewer.format.epub"
+  | "viewer.section.document"
+  | "viewer.status"
+  | "viewer.status.idle"
+  | "viewer.status.loading"
+  | "viewer.status.ready"
+  | "viewer.status.error"
+  | "viewer.documentTitle"
+  | "viewer.source"
+  | "viewer.sections"
+  | "viewer.emptyTitle"
+  | "viewer.emptyNote";
 
 export type Dict = Record<MessageKey, string>;
 export type PartialDict = Partial<Dict>;

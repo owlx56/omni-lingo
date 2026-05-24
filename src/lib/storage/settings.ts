@@ -274,8 +274,13 @@ export function watchSettings(cb: (s: Settings) => void): () => void {
 // Solid 侧订阅入口：返回一个只读 signal，自动在 onCleanup 时解绑。
 export function useSettings(): Accessor<Settings> {
   const [s, setS] = createSignal<Settings>(DEFAULTS);
-  void getSettings().then(setS);
-  const stop = watchSettings(setS);
+  void getSettings().then(setS).catch(() => {});
+  let stop = (): void => {};
+  try {
+    stop = watchSettings(setS);
+  } catch {
+    stop = () => {};
+  }
   onCleanup(stop);
   return s;
 }

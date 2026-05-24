@@ -21,6 +21,7 @@ import { setSelText, setSelTarget, setSelResult } from "./card-store";
 
 const LOGO_ATTR = "data-onelingo-logo";
 const CARD_ATTR = "data-onelingo-selcard";
+const READER_UI_ATTR = "data-onelingo-reader-ui";
 const LOGO_SIZE = 30; // 与 Saladict SaladBowl 保持一致
 const LOGO_OFFSET_X = 6;
 const LOGO_OFFSET_Y = -(LOGO_SIZE + 4);
@@ -69,22 +70,21 @@ export function initSelection(): void {
   };
   selectionState = s;
 
-  void getSettings().then((cfg) => {
-    s.settingsEnabled = cfg.selectionEnabled;
-    const target = resolveTargetLang(cfg.selectionTargetLang, cfg.uiLang);
-    s.target = target;
-    s.engine = cfg.engines.selection;
-    setSelTarget(target);
-    applyEnabled(s);
-  });
-  watchSettings((cfg) => {
-    s.settingsEnabled = cfg.selectionEnabled;
-    const target = resolveTargetLang(cfg.selectionTargetLang, cfg.uiLang);
-    s.target = target;
-    s.engine = cfg.engines.selection;
-    setSelTarget(target);
-    applyEnabled(s);
-  });
+  void getSettings()
+    .then((cfg) => {
+      applySelectionSettings(s, cfg);
+    })
+    .catch((err: unknown) => {
+      console.warn("[OneLingo] failed to read selection settings:", err);
+      applyEnabled(s);
+    });
+  try {
+    watchSettings((cfg) => {
+      applySelectionSettings(s, cfg);
+    });
+  } catch (err) {
+    console.warn("[OneLingo] failed to watch selection settings:", err);
+  }
 
   // ★ 关键修复：shadow DOM 内的 mouseup retarget 到 host，
   //   必须在这里拦截，否则会把卡片内选文当成新划词、或让 logo 跳位。
@@ -107,6 +107,18 @@ export function initSelection(): void {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") hide(s);
   });
+}
+
+function applySelectionSettings(
+  s: State,
+  cfg: Awaited<ReturnType<typeof getSettings>>,
+): void {
+  s.settingsEnabled = cfg.selectionEnabled;
+  const target = resolveTargetLang(cfg.selectionTargetLang, cfg.uiLang);
+  s.target = target;
+  s.engine = cfg.engines.selection;
+  setSelTarget(target);
+  applyEnabled(s);
 }
 
 export function getSelectionEnabledStatus(): {
@@ -141,6 +153,7 @@ function applyEnabled(s: State): void {
 
 function onMouseUp(e: MouseEvent, s: State): void {
   if (!s.enabled) return;
+  if (isReaderUi(e.target)) return;
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const text = sel.toString().trim();
@@ -436,4 +449,8 @@ function isInEditable(n: Node | null): boolean {
     cur = cur.parentNode;
   }
   return false;
+}
+
+function isReaderUi(t: EventTarget | null): boolean {
+  return t instanceof Element && !!t.closest(`[${READER_UI_ATTR}]`);
 }
