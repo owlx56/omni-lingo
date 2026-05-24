@@ -713,6 +713,10 @@ function App() {
           type="file"
         />
       </Row>
+      <div class="fileplus-dropzone">
+        <h2>{t("fileplus.dropTitle")}</h2>
+        <p>{t("fileplus.dropNote")}</p>
+      </div>
       <Row
         description={t("fileplus.sniffLinks.desc")}
         label={t("fileplus.sniffLinks")}
@@ -751,10 +755,6 @@ function App() {
           }
         />
       </Row>
-      <div class="fileplus-dropzone">
-        <h2>{t("fileplus.dropTitle")}</h2>
-        <p>{t("fileplus.dropNote")}</p>
-      </div>
     </section>
   );
 
