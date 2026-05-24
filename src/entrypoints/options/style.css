@@ -14,6 +14,11 @@ html {
     --sidebar-item-color: #1f1f1f;
     --sidebar-item-hover-bg: #f7f6f3;
     --sidebar-item-active-bg: #efeeeb;
+    --fileplus-button-bg: #ffffff;
+    --fileplus-button-text: #0f0f0f;
+    --fileplus-button-border: #e5e7eb;
+    --fileplus-button-hover-bg: #f3f4f6;
+    --fileplus-button-shadow: 0 1px 2px rgba(31, 30, 29, 0.06);
 }
 
 html[data-theme="dark"] {
@@ -21,6 +26,11 @@ html[data-theme="dark"] {
     --sidebar-item-color: var(--text);
     --sidebar-item-hover-bg: var(--surface-alt);
     --sidebar-item-active-bg: #121212;
+    --fileplus-button-bg: #2c2c2b;
+    --fileplus-button-text: #ececec;
+    --fileplus-button-border: #3f3f46;
+    --fileplus-button-hover-bg: #343433;
+    --fileplus-button-shadow: none;
 }
 
 body {
@@ -199,12 +209,17 @@ h1 {
 
 .primary-button,
 .secondary-button {
+    appearance: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     min-height: 34px;
-    border: none;
+    padding: 6px 14px;
+    border: 1px solid var(--fileplus-button-border);
     border-radius: 8px;
+    background: var(--fileplus-button-bg);
+    color: var(--fileplus-button-text);
+    box-shadow: var(--fileplus-button-shadow);
     cursor: pointer;
     font-family:
         ui-sans-serif,
@@ -213,36 +228,31 @@ h1 {
         BlinkMacSystemFont,
         "Segoe UI",
         sans-serif;
-    font-size: 13px;
-    line-height: 1.2;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.5;
+    outline: none;
     transition:
         background-color 120ms ease,
+        border-color 120ms ease,
+        box-shadow 120ms ease,
         transform 120ms ease;
 }
 
-.primary-button {
-    padding: 0 14px;
-    background: var(--switch-on);
-    color: #fff;
-}
-
-.primary-button:hover {
-    filter: brightness(1.06);
-}
-
-.secondary-button {
-    padding: 0 12px;
-    background: transparent;
-    color: var(--text);
-}
-
+.primary-button:hover,
 .secondary-button:hover {
-    background: var(--surface-alt);
+    background: var(--fileplus-button-hover-bg);
 }
 
 .primary-button:active,
 .secondary-button:active {
-    transform: scale(0.97);
+    transform: scale(0.98);
+}
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible {
+    outline: 2px solid var(--switch-on);
+    outline-offset: 2px;
 }
 
 .primary-button:disabled,
