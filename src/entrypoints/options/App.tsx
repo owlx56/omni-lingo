@@ -267,17 +267,7 @@ function parseFontSizeDraft(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-type ViewerFormat = "auto" | "pdf" | "epub";
-
 const ACCEPTED_FILES = ".pdf,.epub,application/pdf,application/epub+zip";
-
-function formatSelectOptions(t: TFn): SelectOption<ViewerFormat>[] {
-  return [
-    { value: "auto", label: t("fileplus.format.auto") },
-    { value: "pdf", label: t("fileplus.format.pdf") },
-    { value: "epub", label: t("fileplus.format.epub") },
-  ];
-}
 
 function App() {
   const settings = useSettings();
@@ -287,7 +277,6 @@ function App() {
     formatPx(HOVER_FONT_SIZE_MIN),
   );
 
-  const [fpFormat, setFpFormat] = createSignal<ViewerFormat>("auto");
   const [fpUrl, setFpUrl] = createSignal("");
   const [fpBusy, setFpBusy] = createSignal(false);
   let fpFileInput: HTMLInputElement | undefined;
@@ -624,9 +613,6 @@ function App() {
   );
 
   const inferKind = (name: string, mime?: string): "pdf" | "epub" => {
-    const fmt = fpFormat();
-    if (fmt === "pdf") return "pdf";
-    if (fmt === "epub") return "epub";
     const lower = name.split(/[?#]/)[0]?.toLowerCase() ?? "";
     if (lower.endsWith(".pdf") || mime === "application/pdf") return "pdf";
     return "epub";
@@ -650,28 +636,11 @@ function App() {
   const openUrl = async (): Promise<void> => {
     const nextUrl = fpUrl().trim();
     if (!nextUrl) return;
-    const kind = inferKind(nextUrl);
-    if (kind === "pdf") {
-      await browser.tabs.create({
-        url: browser.runtime.getURL(
-          `/viewer.html?url=${encodeURIComponent(nextUrl)}&format=pdf`,
-        ),
-      });
-    } else {
-      setFpBusy(true);
-      try {
-        const resp = await fetch(nextUrl);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.arrayBuffer();
-        const key = await storeDocument(data, "epub", nextUrl);
-        const viewerUrl = browser.runtime.getURL(
-          `/viewer.html?key=${encodeURIComponent(key)}`,
-        );
-        await browser.tabs.create({ url: viewerUrl });
-      } finally {
-        setFpBusy(false);
-      }
-    }
+    await browser.tabs.create({
+      url: browser.runtime.getURL(
+        `/viewer.html?url=${encodeURIComponent(nextUrl)}&format=auto`,
+      ),
+    });
   };
 
   const renderFilePlus = (): JSX.Element => (
@@ -744,15 +713,44 @@ function App() {
           type="file"
         />
       </Row>
-      <Row label={t("fileplus.format")}>
-        <Select
-          label={t("fileplus.format")}
-          onChange={setFpFormat}
-          options={formatSelectOptions(t)}
-          value={fpFormat()}
+      <Row
+        description={t("fileplus.sniffLinks.desc")}
+        label={t("fileplus.sniffLinks")}
+      >
+        <Switch
+          checked={settings().documentLinkSniffEnabled}
+          label={t("fileplus.sniffLinks")}
+          onChange={(documentLinkSniffEnabled) =>
+            void setSettings({ documentLinkSniffEnabled })
+          }
         />
       </Row>
-
+      <Row
+        description={t("fileplus.keepOriginal.desc")}
+        label={t("fileplus.keepOriginal")}
+      >
+        <Switch
+          checked={settings().documentLinkSniffKeepOriginal}
+          disabled={!settings().documentLinkSniffEnabled}
+          label={t("fileplus.keepOriginal")}
+          onChange={(documentLinkSniffKeepOriginal) =>
+            void setSettings({ documentLinkSniffKeepOriginal })
+          }
+        />
+      </Row>
+      <Row
+        description={t("fileplus.standalone.desc")}
+        label={t("fileplus.standalone")}
+      >
+        <Switch
+          checked={settings().documentLinkSniffStandalone}
+          disabled={!settings().documentLinkSniffEnabled}
+          label={t("fileplus.standalone")}
+          onChange={(documentLinkSniffStandalone) =>
+            void setSettings({ documentLinkSniffStandalone })
+          }
+        />
+      </Row>
       <div class="fileplus-dropzone">
         <h2>{t("fileplus.dropTitle")}</h2>
         <p>{t("fileplus.dropNote")}</p>

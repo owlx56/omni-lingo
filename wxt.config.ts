@@ -26,14 +26,110 @@ function ensureScriptSrcOrigin(
   return `${parts.join("; ")};`;
 }
 
+type MutableManifest = {
+  content_security_policy?:
+    | string
+    | {
+        extension_pages?: string;
+        sandbox?: string;
+      };
+  host_permissions?: string[];
+  options_ui?: {
+    open_in_tab?: boolean;
+    page?: string;
+  };
+  permissions?: string[];
+  web_accessible_resources?: string[] | WebAccessibleResourceEntry[];
+};
+
+type WebAccessibleResourceEntry = {
+  matches?: string[];
+  resources?: string[];
+};
+
+const DOCUMENT_VIEWER_WEB_ACCESSIBLE_RESOURCES = [
+  "viewer.html",
+  "chunks/*",
+  "assets/*",
+  "pdf/*",
+  "pdf-bridge.js",
+];
+
+function withUnique(list: string[] | undefined, value: string): string[] {
+  const next = list ?? [];
+  return next.includes(value) ? next : [...next, value];
+}
+
+function without(list: string[] | undefined, value: string): string[] {
+  return (list ?? []).filter((item) => item !== value);
+}
+
+function normalizeWebAccessibleResources(
+  entries: MutableManifest["web_accessible_resources"],
+): WebAccessibleResourceEntry[] {
+  if (!entries) return [];
+  if (entries.every((entry) => typeof entry === "string")) {
+    return [{ resources: [...entries], matches: ["<all_urls>"] }];
+  }
+  return entries.filter(
+    (entry): entry is WebAccessibleResourceEntry =>
+      typeof entry === "object" && entry !== null,
+  );
+}
+
+function ensureDocumentViewerManifestAccess(manifest: MutableManifest): void {
+  manifest.permissions = without(manifest.permissions, "declarativeNetRequest");
+  for (const permission of [
+    "tabs",
+    "webRequest",
+    "declarativeNetRequestWithHostAccess",
+  ]) {
+    manifest.permissions = withUnique(manifest.permissions, permission);
+  }
+
+  manifest.host_permissions = withUnique(manifest.host_permissions, "<all_urls>");
+  manifest.host_permissions = withUnique(manifest.host_permissions, "file://*/*");
+
+  const resources = new Set(DOCUMENT_VIEWER_WEB_ACCESSIBLE_RESOURCES);
+  const webAccessible = normalizeWebAccessibleResources(
+    manifest.web_accessible_resources,
+  );
+  const existing = webAccessible.find((entry) =>
+    entry.matches?.includes("<all_urls>"),
+  );
+  if (existing) {
+    for (const resource of existing.resources ?? []) resources.add(resource);
+    existing.resources = [...resources];
+  } else {
+    webAccessible.push({
+      resources: [...resources],
+      matches: ["<all_urls>"],
+    });
+  }
+  manifest.web_accessible_resources = webAccessible;
+}
+
 export default defineConfig({
   srcDir: "src",
   modules: ["@wxt-dev/module-solid"],
   manifest: {
     name: "OneLingo",
     description: "跨平台翻译拓展",
-    permissions: ["storage", "unlimitedStorage", "contextMenus"],
-    host_permissions: ["<all_urls>"],
+    permissions: [
+      "storage",
+      "unlimitedStorage",
+      "contextMenus",
+      "tabs",
+      "webRequest",
+      "declarativeNetRequestWithHostAccess",
+    ],
+    host_permissions: ["<all_urls>", "file://*/*"],
+    web_accessible_resources: [
+      {
+        resources: DOCUMENT_VIEWER_WEB_ACCESSIBLE_RESOURCES,
+        matches: ["<all_urls>"],
+      },
+    ],
     options_ui: {
       page: "options.html",
       open_in_tab: true,
@@ -56,6 +152,7 @@ export default defineConfig({
         page: "options.html",
         open_in_tab: true,
       };
+      ensureDocumentViewerManifestAccess(manifest);
 
       const csp = manifest.content_security_policy;
       if (!csp || typeof csp === "string") return;

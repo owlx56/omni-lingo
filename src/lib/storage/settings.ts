@@ -69,6 +69,9 @@ export interface Settings {
   hoverFontSize: number; // px, [HOVER_FONT_SIZE_MIN, HOVER_FONT_SIZE_MAX]
   fullPageMode: FullPageMode;
   fullPageClickToShowOriginal: boolean;
+  documentLinkSniffEnabled: boolean;
+  documentLinkSniffKeepOriginal: boolean;
+  documentLinkSniffStandalone: boolean;
   translationStyle: TranslationStyle;
 }
 
@@ -101,6 +104,9 @@ const DEFAULTS: Settings = {
   hoverFontSize: HOVER_FONT_SIZE_MIN,
   fullPageMode: "replace",
   fullPageClickToShowOriginal: true,
+  documentLinkSniffEnabled: false,
+  documentLinkSniffKeepOriginal: false,
+  documentLinkSniffStandalone: false,
   translationStyle: {
     underlineStyle: "none",
     fontFamily: "inherit",
@@ -148,6 +154,18 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
   const selectionTargetLang = normalizeTargetLang(legacy?.selectionTargetLang);
   const immersiveTargetLang = normalizeTargetLang(legacy?.immersiveTargetLang);
   const theme = normalizeTheme(legacy?.theme);
+  const documentLinkSniffEnabled = normalizeBoolean(
+    legacy?.documentLinkSniffEnabled,
+    DEFAULTS.documentLinkSniffEnabled,
+  );
+  const documentLinkSniffKeepOriginal = normalizeBoolean(
+    legacy?.documentLinkSniffKeepOriginal,
+    DEFAULTS.documentLinkSniffKeepOriginal,
+  );
+  const documentLinkSniffStandalone = normalizeBoolean(
+    legacy?.documentLinkSniffStandalone,
+    DEFAULTS.documentLinkSniffStandalone,
+  );
   // 所有 normalize 过的字段必须在 return 末尾显式覆盖，否则 raw 里的脏值会绕开守门。
   return {
     ...DEFAULTS,
@@ -162,6 +180,9 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     selectionTargetLang,
     immersiveTargetLang,
     theme,
+    documentLinkSniffEnabled,
+    documentLinkSniffKeepOriginal,
+    documentLinkSniffStandalone,
   };
 }
 

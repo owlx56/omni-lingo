@@ -180,6 +180,15 @@ const ZH: Dict = {
   "fileplus.format.auto": "自动",
   "fileplus.format.pdf": "PDF",
   "fileplus.format.epub": "EPUB",
+  "fileplus.sniffLinks": "嗅探文件链接",
+  "fileplus.sniffLinks.desc":
+    "开启后 PDF / EPUB 链接将自动跳转到本扩展打开；本地文件需要在扩展管理页面允许访问文件网址。",
+  "fileplus.keepOriginal": "保留原 PDF 页面",
+  "fileplus.keepOriginal.desc":
+    "保留原 PDF / EPUB 页面打开，同时在新标签页中打开 OneLingo 阅读器。",
+  "fileplus.standalone": "独立窗口",
+  "fileplus.standalone.desc":
+    "在独立窗口中打开 PDF 阅读器。独立窗口只有标题栏，占用更少空间，但不能复制链接等操作。",
   "fileplus.dropTitle": "把 PDF 或 EPUB 拖到这里",
   "fileplus.dropNote": "也可以从上方打开本地文件或输入 URL。",
   "fileplus.closeDocument": "关闭",

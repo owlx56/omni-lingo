@@ -185,6 +185,15 @@ const EN: Dict = {
   "fileplus.format.auto": "Auto",
   "fileplus.format.pdf": "PDF",
   "fileplus.format.epub": "EPUB",
+  "fileplus.sniffLinks": "Sniff document links",
+  "fileplus.sniffLinks.desc":
+    "When enabled, PDF / EPUB links open in OneLingo Reader automatically. Local files require file URL access in the extension management page.",
+  "fileplus.keepOriginal": "Keep original PDF page",
+  "fileplus.keepOriginal.desc":
+    "Keep the original PDF / EPUB page open and open OneLingo Reader in a new tab.",
+  "fileplus.standalone": "Standalone window",
+  "fileplus.standalone.desc":
+    "Open the PDF reader in a standalone window. It only has a title bar and uses less space, but browser actions like copying the URL are unavailable.",
   "fileplus.dropTitle": "Drop a PDF or EPUB here",
   "fileplus.dropNote": "Or open a local file or enter a URL above.",
   "fileplus.closeDocument": "Close",

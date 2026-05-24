@@ -18,6 +18,7 @@ import {
   initFullPage,
   updateFullPageClickToShowOriginalPref,
 } from "@/features/immersive";
+import { initDocumentLinkSniffer } from "@/features/document-sniffer";
 
 export default defineContentScript({
   matches: ["<all_urls>"],
@@ -32,6 +33,7 @@ export default defineContentScript({
     initFullPage();
     initHover();
     initSelection();
+    initDocumentLinkSniffer();
 
     const readFeatureStatus = (): PageFeatureStatus => ({
       ...getFullPageClickToShowOriginalStatus(),

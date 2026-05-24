@@ -7,7 +7,7 @@ import type {
   TranslateResponse,
 } from "@/engines/types";
 import type { FullPageEngineId } from "@/lib/storage/settings";
-import { browser } from "wxt/browser";
+import { browser, type Browser } from "wxt/browser";
 
 export interface PageTranslateCommand {
   target: string;
@@ -60,6 +60,18 @@ export interface PageFeatureStatus {
   hasFullPageClickToShowOriginalPref: boolean;
   hasHoverEnabledPref: boolean;
   hasSelectionEnabledPref: boolean;
+}
+
+export interface OpenDocumentLinkInput {
+  keepOriginal?: boolean;
+  standalone?: boolean;
+  sourceTabId?: number;
+  url: string;
+}
+
+export interface SniffedDocumentOpen {
+  action: "open" | "bypass" | "handled";
+  url?: string;
 }
 
 export interface ProtocolMap {
@@ -120,6 +132,14 @@ export interface ProtocolMap {
     input: PageFeaturePrefs;
     output: PageFeatureStatus;
   };
+  openDocumentLink: {
+    input: OpenDocumentLinkInput;
+    output: { opened: boolean };
+  };
+  consumeSniffedDocument: {
+    input: Record<string, never>;
+    output: SniffedDocumentOpen | null;
+  };
   translateBatch: {
     input: {
       texts: string[];
@@ -140,6 +160,7 @@ type Envelope<K extends keyof ProtocolMap = keyof ProtocolMap> = {
 
 type Handler<K extends keyof ProtocolMap> = (
   input: ProtocolMap[K]["input"],
+  sender: Browser.runtime.MessageSender,
 ) => ProtocolMap[K]["output"] | Promise<ProtocolMap[K]["output"]>;
 
 function isEnvelope(raw: unknown): raw is Envelope {
@@ -198,9 +219,12 @@ export function onMessage<K extends keyof ProtocolMap>(
   if (!browser.runtime?.onMessage) {
     return () => {};
   }
-  const listener = (raw: unknown): Promise<unknown> | undefined => {
+  const listener = (
+    raw: unknown,
+    sender: Browser.runtime.MessageSender,
+  ): Promise<unknown> | undefined => {
     if (!isEnvelope(raw) || raw.type !== type) return undefined;
-    return Promise.resolve(handler(raw.input as ProtocolMap[K]["input"]));
+    return Promise.resolve(handler(raw.input as ProtocolMap[K]["input"], sender));
   };
   browser.runtime.onMessage.addListener(listener);
   return () => browser.runtime.onMessage.removeListener(listener);

@@ -181,6 +181,12 @@ export type MessageKey =
   | "fileplus.format.auto"
   | "fileplus.format.pdf"
   | "fileplus.format.epub"
+  | "fileplus.sniffLinks"
+  | "fileplus.sniffLinks.desc"
+  | "fileplus.keepOriginal"
+  | "fileplus.keepOriginal.desc"
+  | "fileplus.standalone"
+  | "fileplus.standalone.desc"
   | "fileplus.dropTitle"
   | "fileplus.dropNote"
   | "fileplus.closeDocument";
