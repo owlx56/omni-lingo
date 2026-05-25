@@ -1,29 +1,37 @@
 import { defineConfig } from "wxt";
 
-function ensureScriptSrcOrigin(
+function ensureCspDirectiveSource(
   csp: string | undefined,
+  directive: string,
   origin: string,
 ): string {
   const parts = (csp ?? "")
     .split(";")
     .map((part) => part.trim())
     .filter(Boolean);
-  let foundScriptSrc = false;
+  let foundDirective = false;
 
   for (let i = 0; i < parts.length; i++) {
     const tokens = parts[i]?.split(/\s+/).filter(Boolean) ?? [];
-    if (tokens[0] !== "script-src") continue;
-    foundScriptSrc = true;
+    if (tokens[0] !== directive) continue;
+    foundDirective = true;
     if (!tokens.includes(origin)) tokens.push(origin);
     parts[i] = tokens.join(" ");
   }
 
-  if (!foundScriptSrc) parts.push(`script-src 'self' ${origin}`);
-  if (!parts.some((part) => part.startsWith("object-src "))) {
-    parts.push("object-src 'self'");
-  }
+  if (!foundDirective) parts.push(`${directive} 'self' ${origin}`);
 
   return `${parts.join("; ")};`;
+}
+
+function ensureExtensionPageCsp(csp: string | undefined, origin: string): string {
+  let next = ensureCspDirectiveSource(csp, "script-src", origin);
+  next = ensureCspDirectiveSource(next, "font-src", origin);
+  if (!next.split(";").some((part) => part.trim().startsWith("object-src "))) {
+    next = `${next.replace(/;\s*$/, "")}; object-src 'self';`;
+  }
+
+  return next;
 }
 
 type MutableManifest = {
@@ -156,11 +164,11 @@ export default defineConfig({
 
       const csp = manifest.content_security_policy;
       if (!csp || typeof csp === "string") return;
-      csp.extension_pages = ensureScriptSrcOrigin(
+      csp.extension_pages = ensureExtensionPageCsp(
         csp.extension_pages,
         "http://localhost:3000",
       );
-      csp.sandbox = ensureScriptSrcOrigin(csp.sandbox, "http://localhost:3000");
+      csp.sandbox = ensureExtensionPageCsp(csp.sandbox, "http://localhost:3000");
     },
   },
   webExt: {
