@@ -6,13 +6,16 @@ import {
   watchSettings,
   type HoverGranularity,
 } from "@/lib/storage/settings";
+import {
+  getSelectionEnabledStatus,
+  initSelection,
+  updateSelectionEnabledPref,
+} from "@/features/selection";
 import { initTheme } from "@/lib/theme";
-import { browser } from "wxt/browser";
 
 const READER_UI_ATTR = "data-onelingo-reader-ui";
 const HIGHLIGHT_NAME = "onelingo-pdf-hover";
 const HOVER_DELAY_MS = 10;
-const SELECTION_CARD_ATTR = "data-onelingo-pdf-selection-card";
 const TOOLTIP_ATTR = "data-onelingo-pdf-tooltip";
 
 type HighlightCtor = new (range: Range) => unknown;
@@ -30,20 +33,15 @@ interface PdfTextHit {
 
 interface PdfBridgeState {
   hoverEnabled: boolean;
-  selectionEnabled: boolean;
   hoverPreferredEnabled: boolean | null;
-  selectionPreferredEnabled: boolean | null;
   hoverTarget: string;
-  selectionTarget: string;
   hoverEngine: string;
-  selectionEngine: string;
   hoverGranularity: HoverGranularity;
   hoverFontSize: number;
   hoverSeq: number;
   hoverTimer: number | null;
   lastHoverText: string;
   tooltip: HTMLDivElement | null;
-  selectionCard: HTMLDivElement | null;
 }
 
 export default defineUnlistedScript(() => {
@@ -76,21 +74,18 @@ function markPdfChrome(): void {
 function initPdfTranslation(): void {
   const state: PdfBridgeState = {
     hoverEnabled: true,
-    selectionEnabled: true,
     hoverPreferredEnabled: null,
-    selectionPreferredEnabled: null,
     hoverTarget: "zh",
-    selectionTarget: "zh",
     hoverEngine: "google",
-    selectionEngine: "google",
     hoverGranularity: "word",
     hoverFontSize: 14,
     hoverSeq: 0,
     hoverTimer: null,
     lastHoverText: "",
     tooltip: null,
-    selectionCard: null,
   };
+
+  initSelection();
 
   void getSettings()
     .then((settings) => {
@@ -117,20 +112,9 @@ function initPdfTranslation(): void {
     capture: true,
     passive: true,
   });
-  document.addEventListener("mouseup", (event) => {
-    window.setTimeout(() => onPdfMouseUp(event, state), 0);
-  });
-  document.addEventListener(
-    "mousedown",
-    (event) => {
-      if (!isReaderUi(event.target)) hideSelectionCard(state);
-    },
-    { capture: true },
-  );
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       dismissHover(state);
-      hideSelectionCard(state);
     }
   });
 }
@@ -140,31 +124,21 @@ function applySettings(
   settings: Awaited<ReturnType<typeof getSettings>>,
 ): void {
   const prevHover = state.hoverEnabled;
-  const prevSelection = state.selectionEnabled;
   state.hoverEnabled = state.hoverPreferredEnabled ?? settings.hoverEnabled;
-  state.selectionEnabled =
-    state.selectionPreferredEnabled ?? settings.selectionEnabled;
   state.hoverTarget = resolveTargetLang(settings.hoverTargetLang, settings.uiLang);
-  state.selectionTarget = resolveTargetLang(
-    settings.selectionTargetLang,
-    settings.uiLang,
-  );
   state.hoverEngine = settings.engines.hover;
-  state.selectionEngine = settings.engines.selection;
   state.hoverGranularity = settings.hoverGranularity;
   state.hoverFontSize = settings.hoverFontSize;
   if (prevHover && !state.hoverEnabled) dismissHover(state);
-  if (prevSelection && !state.selectionEnabled) hideSelectionCard(state);
 }
 
 function registerViewerMessageHandlers(state: PdfBridgeState): void {
   const readFeatureStatus = (): PageFeatureStatus => ({
     fullPageClickToShowOriginal: false,
     hoverEnabled: state.hoverEnabled,
-    selectionEnabled: state.selectionEnabled,
+    ...getSelectionEnabledStatus(),
     hasFullPageClickToShowOriginalPref: false,
     hasHoverEnabledPref: state.hoverPreferredEnabled !== null,
-    hasSelectionEnabledPref: state.selectionPreferredEnabled !== null,
   });
 
   onMessage("readPageFeatureStatus", () => readFeatureStatus());
@@ -175,9 +149,7 @@ function registerViewerMessageHandlers(state: PdfBridgeState): void {
       if (!state.hoverEnabled) dismissHover(state);
     }
     if (input.selectionEnabled !== undefined) {
-      state.selectionPreferredEnabled = input.selectionEnabled;
-      state.selectionEnabled = input.selectionEnabled;
-      if (!state.selectionEnabled) hideSelectionCard(state);
+      updateSelectionEnabledPref(input.selectionEnabled);
     }
     return readFeatureStatus();
   });
@@ -216,29 +188,6 @@ function onPdfMouseMove(event: MouseEvent, state: PdfBridgeState): void {
         if (seq === state.hoverSeq) dismissHover(state);
       });
   }, HOVER_DELAY_MS);
-}
-
-function onPdfMouseUp(event: MouseEvent, state: PdfBridgeState): void {
-  if (!state.selectionEnabled || isReaderUi(event.target)) return;
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
-  const text = selection.toString().trim();
-  if (!text || shouldSkipSameLanguageText(text, state.selectionTarget)) return;
-  const range = selection.getRangeAt(0);
-  if (rangeIntersectsReaderUi(range)) return;
-  const rect = firstUsefulRect(range) ?? pointRect(event.clientX, event.clientY);
-
-  showSelectionCard(state, "翻译中...", rect);
-  void sendMessage("translate", {
-    engine: state.selectionEngine,
-    target: state.selectionTarget,
-    text,
-  })
-    .then((res) => showSelectionCard(state, res.text, rect))
-    .catch((err: unknown) => {
-      console.warn("[OneLingo] PDF selection translate failed:", err);
-      hideSelectionCard(state);
-    });
 }
 
 function pdfTextHitAt(
@@ -345,10 +294,6 @@ function pointInRect(x: number, y: number, rect: DOMRect): boolean {
   return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 }
 
-function pointRect(x: number, y: number): DOMRect {
-  return new DOMRect(x, y, 1, 1);
-}
-
 function showHoverTooltip(
   state: PdfBridgeState,
   translation: string,
@@ -384,40 +329,6 @@ function showHoverTooltip(
   tooltip.style.visibility = "visible";
 }
 
-function showSelectionCard(
-  state: PdfBridgeState,
-  text: string,
-  anchor: DOMRect,
-): void {
-  let card = state.selectionCard;
-  if (!card) {
-    card = document.createElement("div");
-    card.setAttribute(SELECTION_CARD_ATTR, "");
-    card.style.cssText = [
-      "position:fixed",
-      "z-index:2147483647",
-      "max-width:420px",
-      "min-width:96px",
-      "padding:10px 12px",
-      "border:1px solid #e2dfd5",
-      "border-radius:8px",
-      "background:#fff",
-      "color:#1f1e1d",
-      "font:13px/1.5 system-ui,sans-serif",
-      "white-space:pre-wrap",
-      "word-break:break-word",
-      "box-shadow:0 8px 26px rgba(31,30,29,.16)",
-    ].join(";");
-    document.body.appendChild(card);
-    state.selectionCard = card;
-  }
-  card.textContent = text;
-  card.style.visibility = "hidden";
-  card.style.display = "block";
-  positionFloating(card, anchor, 8);
-  card.style.visibility = "visible";
-}
-
 function positionFloating(el: HTMLElement, anchor: DOMRect, margin: number): void {
   const width = el.offsetWidth;
   const height = el.offsetHeight;
@@ -441,22 +352,11 @@ function dismissHover(state: PdfBridgeState): void {
   if (state.tooltip) state.tooltip.style.display = "none";
 }
 
-function hideSelectionCard(state: PdfBridgeState): void {
-  if (state.selectionCard) state.selectionCard.style.display = "none";
-}
-
 function clearHoverTimer(state: PdfBridgeState): void {
   if (state.hoverTimer !== null) {
     clearTimeout(state.hoverTimer);
     state.hoverTimer = null;
   }
-}
-
-function rangeIntersectsReaderUi(range: Range): boolean {
-  const common = range.commonAncestorContainer;
-  const element =
-    common instanceof Element ? common : common.parentElement;
-  return !!element?.closest(`[${READER_UI_ATTR}]`);
 }
 
 function isReaderUi(target: EventTarget | null): boolean {

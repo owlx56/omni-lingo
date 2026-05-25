@@ -6,17 +6,20 @@ import {
   watchSettings,
   type HoverGranularity,
 } from "@/lib/storage/settings";
+import {
+  getSelectionEnabledStatus,
+  hideSelectionUi,
+  initSelection,
+  showSelectionFromReader,
+  updateSelectionEnabledPref,
+} from "@/features/selection";
 import type { Rendition } from "epubjs";
 
 interface EpubBridgeState {
   hoverEnabled: boolean;
-  selectionEnabled: boolean;
   hoverPreferredEnabled: boolean | null;
-  selectionPreferredEnabled: boolean | null;
   hoverTarget: string;
-  selectionTarget: string;
   hoverEngine: string;
-  selectionEngine: string;
   hoverGranularity: HoverGranularity;
   hoverFontSize: number;
   hoverSeq: number;
@@ -24,12 +27,10 @@ interface EpubBridgeState {
   lastHoverText: string;
   hoverHighlightDoc: Document | null;
   tooltip: HTMLDivElement | null;
-  selectionCard: HTMLDivElement | null;
 }
 
 const HOVER_DELAY_MS = 10;
 const TOOLTIP_ATTR = "data-onelingo-epub-tooltip";
-const SELECTION_CARD_ATTR = "data-onelingo-epub-selection-card";
 const HIGHLIGHT_NAME = "onelingo-epub-hover";
 
 type CaretDoc = Document & {
@@ -72,13 +73,9 @@ const boundEpubContents = new WeakSet<object>();
 export function initEpubBridge(rendition: Rendition): void {
   const state: EpubBridgeState = {
     hoverEnabled: true,
-    selectionEnabled: true,
     hoverPreferredEnabled: null,
-    selectionPreferredEnabled: null,
     hoverTarget: "zh",
-    selectionTarget: "zh",
     hoverEngine: "google",
-    selectionEngine: "google",
     hoverGranularity: "word",
     hoverFontSize: 14,
     hoverSeq: 0,
@@ -86,8 +83,9 @@ export function initEpubBridge(rendition: Rendition): void {
     lastHoverText: "",
     hoverHighlightDoc: null,
     tooltip: null,
-    selectionCard: null,
   };
+
+  initSelection({ captureDocumentSelection: false });
 
   void getSettings()
     .then((settings) => {
@@ -105,6 +103,9 @@ export function initEpubBridge(rendition: Rendition): void {
   }
 
   registerEpubMessageHandlers(state);
+  window.addEventListener("scroll", hideSelectionUi, {
+    passive: true,
+  });
 
   bindRenditionEvents(rendition, state);
   rendition.hooks.content.register((contents: unknown) => {
@@ -135,11 +136,11 @@ function bindRenditionEvents(
     const doc = documentFromContents(contents) ?? documentFromEvent(event);
     if (mouse && doc) window.setTimeout(() => onEpubMouseUp(mouse, doc, state), 40);
   });
-  source.on("mousedown", () => hideEpubSelectionCard(state));
+  source.on("mousedown", () => hideSelectionUi());
   source.on("keydown", (event) => {
     if (keyboardEventLike(event)?.key === "Escape") {
       dismissEpubHover(state);
-      hideEpubSelectionCard(state);
+      hideSelectionUi();
     }
   });
 }
@@ -199,13 +200,13 @@ function bindEpubContents(
   });
   doc.addEventListener(
     "mousedown",
-    () => hideEpubSelectionCard(state),
+    () => hideSelectionUi(),
     { capture: true },
   );
   doc.addEventListener("keydown", (event: Event) => {
     if (keyboardEventLike(event)?.key === "Escape") {
       dismissEpubHover(state);
-      hideEpubSelectionCard(state);
+      hideSelectionUi();
     }
   });
 }
@@ -307,31 +308,21 @@ function applyEpubSettings(
   settings: Awaited<ReturnType<typeof getSettings>>,
 ): void {
   const prevHover = state.hoverEnabled;
-  const prevSelection = state.selectionEnabled;
   state.hoverEnabled = state.hoverPreferredEnabled ?? settings.hoverEnabled;
-  state.selectionEnabled =
-    state.selectionPreferredEnabled ?? settings.selectionEnabled;
   state.hoverTarget = resolveTargetLang(settings.hoverTargetLang, settings.uiLang);
-  state.selectionTarget = resolveTargetLang(
-    settings.selectionTargetLang,
-    settings.uiLang,
-  );
   state.hoverEngine = settings.engines.hover;
-  state.selectionEngine = settings.engines.selection;
   state.hoverGranularity = settings.hoverGranularity;
   state.hoverFontSize = settings.hoverFontSize;
   if (prevHover && !state.hoverEnabled) dismissEpubHover(state);
-  if (prevSelection && !state.selectionEnabled) hideEpubSelectionCard(state);
 }
 
 function registerEpubMessageHandlers(state: EpubBridgeState): void {
   const readFeatureStatus = (): PageFeatureStatus => ({
     fullPageClickToShowOriginal: false,
     hoverEnabled: state.hoverEnabled,
-    selectionEnabled: state.selectionEnabled,
+    ...getSelectionEnabledStatus(),
     hasFullPageClickToShowOriginalPref: false,
     hasHoverEnabledPref: state.hoverPreferredEnabled !== null,
-    hasSelectionEnabledPref: state.selectionPreferredEnabled !== null,
   });
 
   onMessage("readPageFeatureStatus", () => readFeatureStatus());
@@ -342,9 +333,7 @@ function registerEpubMessageHandlers(state: EpubBridgeState): void {
       if (!state.hoverEnabled) dismissEpubHover(state);
     }
     if (input.selectionEnabled !== undefined) {
-      state.selectionPreferredEnabled = input.selectionEnabled;
-      state.selectionEnabled = input.selectionEnabled;
-      if (!state.selectionEnabled) hideEpubSelectionCard(state);
+      updateSelectionEnabledPref(input.selectionEnabled);
     }
     return readFeatureStatus();
   });
@@ -396,25 +385,18 @@ function onEpubMouseUp(
   doc: Document,
   state: EpubBridgeState,
 ): void {
-  if (!state.selectionEnabled) return;
   const sel = doc.getSelection?.() ?? doc.defaultView?.getSelection();
   if (!sel || sel.rangeCount === 0) return;
   const text = sel.toString().trim();
-  if (!text || shouldSkipSameLanguageText(text, state.selectionTarget)) return;
+  if (!text) return;
   const rect =
     toParentRect(doc, firstUsefulRect(sel.getRangeAt(0)) ?? pointRect(event.clientX, event.clientY));
 
-  showEpubSelectionCard(state, "\u7FFB\u8BD1\u4E2D...", rect);
-  void sendMessage("translate", {
-    engine: state.selectionEngine,
-    target: state.selectionTarget,
+  showSelectionFromReader({
+    clientX: rect.right,
+    clientY: rect.top,
     text,
-  })
-    .then((res) => showEpubSelectionCard(state, res.text, rect))
-    .catch((err: unknown) => {
-      console.warn("[OneLingo] EPUB selection translate failed:", err);
-      hideEpubSelectionCard(state);
-    });
+  });
 }
 
 function onEpubSelectedRange(
@@ -422,22 +404,15 @@ function onEpubSelectedRange(
   doc: Document,
   state: EpubBridgeState,
 ): void {
-  if (!state.selectionEnabled) return;
   const text = range.toString().trim();
-  if (!text || shouldSkipSameLanguageText(text, state.selectionTarget)) return;
+  if (!text) return;
   const rect = toParentRect(doc, firstUsefulRect(range) ?? pointRect(8, 8));
 
-  showEpubSelectionCard(state, "\u7FFB\u8BD1\u4E2D...", rect);
-  void sendMessage("translate", {
-    engine: state.selectionEngine,
-    target: state.selectionTarget,
+  showSelectionFromReader({
+    clientX: rect.right,
+    clientY: rect.top,
     text,
-  })
-    .then((res) => showEpubSelectionCard(state, res.text, rect))
-    .catch((err: unknown) => {
-      console.warn("[OneLingo] EPUB selection translate failed:", err);
-      hideEpubSelectionCard(state);
-    });
+  });
 }
 
 function epubTextHitAt(
@@ -688,40 +663,6 @@ function showEpubHoverTooltip(
   tooltip.style.visibility = "visible";
 }
 
-function showEpubSelectionCard(
-  state: EpubBridgeState,
-  text: string,
-  anchor: DOMRect,
-): void {
-  let card = state.selectionCard;
-  if (!card) {
-    card = document.createElement("div");
-    card.setAttribute(SELECTION_CARD_ATTR, "");
-    card.style.cssText = [
-      "position:fixed",
-      "z-index:2147483647",
-      "max-width:420px",
-      "min-width:96px",
-      "padding:10px 12px",
-      "border:1px solid #e2dfd5",
-      "border-radius:8px",
-      "background:#fff",
-      "color:#1f1e1d",
-      "font:13px/1.5 system-ui,sans-serif",
-      "white-space:pre-wrap",
-      "word-break:break-word",
-      "box-shadow:0 8px 26px rgba(31,30,29,.16)",
-    ].join(";");
-    document.body.appendChild(card);
-    state.selectionCard = card;
-  }
-  card.textContent = text;
-  card.style.visibility = "hidden";
-  card.style.display = "block";
-  positionFloating(card, anchor, 8);
-  card.style.visibility = "visible";
-}
-
 function positionFloating(el: HTMLElement, anchor: DOMRect, margin: number): void {
   const width = el.offsetWidth;
   const height = el.offsetHeight;
@@ -743,10 +684,6 @@ function dismissEpubHover(state: EpubBridgeState): void {
   state.lastHoverText = "";
   clearEpubHighlight(state);
   if (state.tooltip) state.tooltip.style.display = "none";
-}
-
-function hideEpubSelectionCard(state: EpubBridgeState): void {
-  if (state.selectionCard) state.selectionCard.style.display = "none";
 }
 
 function clearEpubHoverTimer(state: EpubBridgeState): void {

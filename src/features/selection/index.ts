@@ -47,9 +47,75 @@ interface State {
   logoTop: number;
 }
 
-let selectionState: State | null = null;
+export interface InitSelectionOptions {
+  captureDocumentSelection?: boolean;
+}
 
-export function initSelection(): void {
+export interface ReaderSelectionInput {
+  clientX: number;
+  clientY: number;
+  text: string;
+}
+
+let selectionState: State | null = null;
+let selectionSettingsStarted = false;
+let selectionMouseupStarted = false;
+let selectionDismissStarted = false;
+
+export function initSelection(options: InitSelectionOptions = {}): void {
+  const s = ensureSelectionState();
+  const captureDocumentSelection = options.captureDocumentSelection ?? true;
+
+  if (!selectionSettingsStarted) {
+    selectionSettingsStarted = true;
+    void getSettings()
+      .then((cfg) => {
+        applySelectionSettings(s, cfg);
+      })
+      .catch((err: unknown) => {
+        console.warn("[OneLingo] failed to read selection settings:", err);
+        applyEnabled(s);
+      });
+    try {
+      watchSettings((cfg) => {
+        applySelectionSettings(s, cfg);
+      });
+    } catch (err) {
+      console.warn("[OneLingo] failed to watch selection settings:", err);
+    }
+  }
+
+  if (captureDocumentSelection && !selectionMouseupStarted) {
+    selectionMouseupStarted = true;
+    // ★ 关键修复：shadow DOM 内的 mouseup retarget 到 host，
+    //   必须在这里拦截，否则会把卡片内选文当成新划词、或让 logo 跳位。
+    document.addEventListener("mouseup", (e) => {
+      const h = getHost();
+      if (h && e.target === h) return;
+      window.setTimeout(() => onMouseUp(e, s), 0);
+    });
+  }
+
+  if (!selectionDismissStarted) {
+    selectionDismissStarted = true;
+    document.addEventListener(
+      "mousedown",
+      (e) => {
+        const h = getHost();
+        if (h && e.target === h) return;
+        hide(s);
+      },
+      { capture: true },
+    );
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hide(s);
+    });
+  }
+}
+
+function ensureSelectionState(): State {
+  if (selectionState) return selectionState;
   const s: State = {
     enabled: true,
     settingsEnabled: true,
@@ -69,44 +135,7 @@ export function initSelection(): void {
     logoTop: 0,
   };
   selectionState = s;
-
-  void getSettings()
-    .then((cfg) => {
-      applySelectionSettings(s, cfg);
-    })
-    .catch((err: unknown) => {
-      console.warn("[OneLingo] failed to read selection settings:", err);
-      applyEnabled(s);
-    });
-  try {
-    watchSettings((cfg) => {
-      applySelectionSettings(s, cfg);
-    });
-  } catch (err) {
-    console.warn("[OneLingo] failed to watch selection settings:", err);
-  }
-
-  // ★ 关键修复：shadow DOM 内的 mouseup retarget 到 host，
-  //   必须在这里拦截，否则会把卡片内选文当成新划词、或让 logo 跳位。
-  document.addEventListener("mouseup", (e) => {
-    const h = getHost();
-    if (h && e.target === h) return;
-    window.setTimeout(() => onMouseUp(e, s), 0);
-  });
-
-  document.addEventListener(
-    "mousedown",
-    (e) => {
-      const h = getHost();
-      if (h && e.target === h) return;
-      hide(s);
-    },
-    { capture: true },
-  );
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") hide(s);
-  });
+  return s;
 }
 
 function applySelectionSettings(
@@ -159,6 +188,29 @@ function onMouseUp(e: MouseEvent, s: State): void {
   const text = sel.toString().trim();
   if (!text || isInEditable(sel.anchorNode)) return;
 
+  startSelection(s, text, e.clientX, e.clientY);
+}
+
+export function showSelectionFromReader(input: ReaderSelectionInput): boolean {
+  initSelection({ captureDocumentSelection: false });
+  const s = ensureSelectionState();
+  if (!s.enabled) return false;
+  const text = input.text.trim();
+  if (!text) return false;
+  startSelection(s, text, input.clientX, input.clientY);
+  return true;
+}
+
+export function hideSelectionUi(): void {
+  if (selectionState) hide(selectionState);
+}
+
+function startSelection(
+  s: State,
+  text: string,
+  clientX: number,
+  clientY: number,
+): void {
   s.seq++;
   s.result = null;
   s.lastText = text;
@@ -181,7 +233,7 @@ function onMouseUp(e: MouseEvent, s: State): void {
       console.warn("[OneLingo] selection translate failed:", err);
     });
 
-  showLogo(s, e.clientX, e.clientY);
+  showLogo(s, clientX, clientY);
 }
 
 // ─── Logo ─────────────────────────────────────────────
