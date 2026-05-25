@@ -16,6 +16,7 @@ type PublicAssetFile =
 const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
 const PDFJS_DIST_DIR = join(ROOT_DIR, "node_modules", "pdfjs-dist");
 const PDF_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "pdf-viewer");
+const INTER_FONT_DIR = join(ROOT_DIR, "src", "assets", "fonts", "inter");
 
 function toPublicPath(path: string): string {
   return path.replaceAll("\\", "/");
@@ -87,6 +88,7 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
     join(PDFJS_DIST_DIR, "web", "images"),
     "pdf/web/images",
   );
+  await addDirectoryAssets(files, INTER_FONT_DIR, "pdf/web/fonts/inter");
 
   for (const file of [
     "viewer.html",

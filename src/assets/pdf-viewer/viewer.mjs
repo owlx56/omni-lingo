@@ -1,8 +1,11 @@
-import { getDocument, GlobalWorkerOptions } from "../build/pdf.mjs";
+import {
+  AnnotationEditorType,
+  getDocument,
+  GlobalWorkerOptions,
+} from "../build/pdf.mjs";
 import {
   EventBus,
   FindState,
-  GenericL10n,
   LinkTarget,
   PDFFindController,
   PDFHistory,
@@ -25,6 +28,8 @@ const SCALE_STEP = 1.1;
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 5;
 const THUMBNAIL_WIDTH = 96;
+const DEFAULT_UI_LANG = "zh";
+const SETTINGS_STORAGE_KEY = "sync:settings";
 
 const SCROLL_MODES = {
   horizontal: ScrollMode.HORIZONTAL,
@@ -37,10 +42,337 @@ const SPREAD_MODES = {
   none: SpreadMode.NONE,
   odd: SpreadMode.ODD,
 };
+const EDITOR_MODES = {
+  freeText: AnnotationEditorType.FREETEXT,
+  highlight: AnnotationEditorType.HIGHLIGHT,
+  ink: AnnotationEditorType.INK,
+  stamp: AnnotationEditorType.STAMP,
+};
+const RTL_LANGS = new Set(["ar", "fa"]);
+const SUPPORTED_UI_LANGS = new Set([
+  "en",
+  "zh",
+  "zh-Hant",
+  "ja",
+  "ko",
+  "ar",
+  "tr",
+  "ru",
+  "vi",
+  "th",
+  "de",
+  "es",
+  "fr",
+  "pt-BR",
+  "hi",
+  "it",
+  "id",
+  "fa",
+]);
+const UI_LOCALES = {
+  en: {
+    addImage: "Add or edit images",
+    annotationUnavailable: "Annotation editing is not available for this document.",
+    attachment: "Attachment",
+    attachments: "Attachments",
+    close: "Close",
+    closeFindbar: "Close find bar",
+    currentPage: "Current page",
+    documentProperties: "Document properties...",
+    draw: "Draw",
+    evenSpreads: "Book view",
+    fileName: "File name",
+    find: "Find",
+    findInDocument: "Find in document",
+    findNext: "Find next",
+    findPrevious: "Find previous",
+    firstPage: "Go to first page",
+    handTool: "Hand tool",
+    highlight: "Highlight",
+    highlightAll: "Highlight all",
+    horizontalScrolling: "Horizontal scrolling",
+    keywords: "Keywords",
+    lastPage: "Go to last page",
+    loadingError: "An error occurred while loading the PDF.",
+    managePages: "Manage pages",
+    matchCase: "Match case",
+    matchDiacritics: "Match diacritics",
+    missingFile: "No PDF file was specified.",
+    modificationDate: "Modification date",
+    nextPage: "Next page",
+    noAttachments: "No attachments available.",
+    noOutline: "No outline available.",
+    noPreview: "Preview unavailable",
+    noSpreads: "Single page view",
+    oddSpreads: "Two page view",
+    openFile: "Open file",
+    outline: "Outline",
+    page: "Page",
+    pageCount: "Page count",
+    pageScrolling: "Page scrolling",
+    pageTitle: "Page {page}",
+    pages: "Pages",
+    pdfProducer: "PDF producer",
+    pdfVersion: "PDF version",
+    presentationMode: "Presentation mode",
+    previousPage: "Previous page",
+    print: "Print",
+    rotateCcw: "Rotate counterclockwise",
+    rotateCw: "Rotate clockwise",
+    save: "Save",
+    scaleAuto: "Automatic zoom",
+    scalePageFit: "Page fit",
+    scalePageWidth: "Page width",
+    searching: "Searching...",
+    searchNotFound: "Phrase not found",
+    subject: "Subject",
+    text: "Text",
+    textSelectTool: "Text selection tool",
+    title: "Title",
+    tools: "Tools",
+    unableAttachments: "Unable to load attachments.",
+    unableOutline: "Unable to load outline.",
+    untitled: "Untitled",
+    verticalScrolling: "Vertical scrolling",
+    wholeWords: "Whole words",
+    wrappedBottom: "Reached end, continued from top",
+    wrappedScrolling: "Wrapped scrolling",
+    wrappedTop: "Reached top, continued from bottom",
+    zoom: "Zoom",
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    author: "Author",
+    creationDate: "Creation date",
+    creator: "Creator",
+  },
+  zh: {
+    addImage: "添加或编辑图像",
+    annotationUnavailable: "此文档无法使用批注编辑。",
+    attachment: "附件",
+    attachments: "附件",
+    author: "作者",
+    close: "关闭",
+    closeFindbar: "关闭查找栏",
+    creationDate: "创建日期",
+    creator: "创建工具",
+    currentPage: "当前页面",
+    documentProperties: "文档属性...",
+    draw: "绘图",
+    evenSpreads: "书籍视图",
+    fileName: "文件名",
+    find: "查找",
+    findInDocument: "在文档中查找",
+    findNext: "查找下一个",
+    findPrevious: "查找上一个",
+    firstPage: "转到第一页",
+    handTool: "手形工具",
+    highlight: "高亮",
+    highlightAll: "全部高亮",
+    horizontalScrolling: "水平滚动",
+    keywords: "关键词",
+    lastPage: "转到最后一页",
+    loadingError: "加载 PDF 时出错。",
+    managePages: "管理页面",
+    matchCase: "区分大小写",
+    matchDiacritics: "匹配变音符号",
+    missingFile: "没有指定 PDF 文件。",
+    modificationDate: "修改日期",
+    nextPage: "下一页",
+    noAttachments: "没有可用附件。",
+    noOutline: "没有可用大纲。",
+    noPreview: "预览不可用",
+    noSpreads: "单页视图",
+    oddSpreads: "双页视图",
+    openFile: "打开文件",
+    outline: "大纲",
+    page: "页码",
+    pageCount: "页数",
+    pageScrolling: "页面滚动",
+    pageTitle: "第 {page} 页",
+    pages: "页面",
+    pdfProducer: "PDF 生成器",
+    pdfVersion: "PDF 版本",
+    presentationMode: "演示模式",
+    previousPage: "上一页",
+    print: "打印",
+    rotateCcw: "逆时针旋转",
+    rotateCw: "顺时针旋转",
+    save: "保存",
+    scaleAuto: "自动缩放",
+    scalePageFit: "适合页面",
+    scalePageWidth: "页宽",
+    searching: "正在搜索...",
+    searchNotFound: "找不到短语",
+    subject: "主题",
+    text: "文本",
+    textSelectTool: "文本选择工具",
+    title: "标题",
+    tools: "工具",
+    unableAttachments: "无法加载附件。",
+    unableOutline: "无法加载大纲。",
+    untitled: "无标题",
+    verticalScrolling: "垂直滚动",
+    wholeWords: "全字匹配",
+    wrappedBottom: "已到达文档末尾，从开头继续",
+    wrappedScrolling: "平铺滚动",
+    wrappedTop: "已到达文档开头，从末尾继续",
+    zoom: "缩放",
+    zoomIn: "放大",
+    zoomOut: "缩小",
+  },
+};
+UI_LOCALES["zh-Hant"] = {
+  ...UI_LOCALES.zh,
+  addImage: "新增或編輯影像",
+  attachment: "附件",
+  attachments: "附件",
+  close: "關閉",
+  closeFindbar: "關閉搜尋列",
+  currentPage: "目前頁面",
+  documentProperties: "文件內容...",
+  draw: "繪圖",
+  fileName: "檔案名稱",
+  find: "搜尋",
+  findInDocument: "在文件中搜尋",
+  findNext: "搜尋下一個",
+  findPrevious: "搜尋上一個",
+  firstPage: "前往第一頁",
+  handTool: "手形工具",
+  lastPage: "前往最後一頁",
+  managePages: "管理頁面",
+  nextPage: "下一頁",
+  noSpreads: "單頁檢視",
+  openFile: "開啟檔案",
+  page: "頁碼",
+  pageTitle: "第 {page} 頁",
+  previousPage: "上一頁",
+  save: "儲存",
+  scaleAuto: "自動縮放",
+  scalePageFit: "符合頁面",
+  scalePageWidth: "頁寬",
+  textSelectTool: "文字選取工具",
+  tools: "工具",
+  zoomIn: "放大",
+  zoomOut: "縮小",
+};
+const PDFJS_L10N = {
+  en: {
+    "pdfjs-editor-highlight-editor": { "aria-label": "Highlight editor" },
+    "pdfjs-editor-ink-editor": { "aria-label": "Drawing editor" },
+    "pdfjs-editor-stamp-editor": { "aria-label": "Image editor" },
+    "pdfjs-free-text2": {
+      "aria-label": "Text editor",
+      "default-content": "Start typing...",
+    },
+    "pdfjs-page-landmark": { "aria-label": "Page {page}" },
+  },
+  zh: {
+    "pdfjs-editor-highlight-editor": { "aria-label": "高亮编辑器" },
+    "pdfjs-editor-ink-editor": { "aria-label": "绘图编辑器" },
+    "pdfjs-editor-stamp-editor": { "aria-label": "图像编辑器" },
+    "pdfjs-free-text2": {
+      "aria-label": "文本编辑器",
+      "default-content": "开始输入...",
+    },
+    "pdfjs-page-landmark": { "aria-label": "第 {page} 页" },
+  },
+};
+PDFJS_L10N["zh-Hant"] = {
+  "pdfjs-editor-highlight-editor": { "aria-label": "高亮編輯器" },
+  "pdfjs-editor-ink-editor": { "aria-label": "繪圖編輯器" },
+  "pdfjs-editor-stamp-editor": { "aria-label": "影像編輯器" },
+  "pdfjs-free-text2": {
+    "aria-label": "文字編輯器",
+    "default-content": "開始輸入...",
+  },
+  "pdfjs-page-landmark": { "aria-label": "第 {page} 頁" },
+};
+
+class OneLingoPdfL10n {
+  constructor(lang) {
+    this.lang = normalizeUiLang(lang);
+  }
+
+  setLanguage(lang) {
+    this.lang = normalizeUiLang(lang);
+  }
+
+  getLanguage() {
+    return this.lang === "zh" ? "zh-cn" : this.lang.toLowerCase();
+  }
+
+  getDirection() {
+    return RTL_LANGS.has(this.lang) ? "rtl" : "ltr";
+  }
+
+  async get(ids, args = null, fallback = "") {
+    if (Array.isArray(ids)) {
+      return ids.map(({ id, args: itemArgs }) => this.lookup(id, itemArgs));
+    }
+    return this.lookup(ids, args, fallback);
+  }
+
+  async translate(element) {
+    await this.translateOnce(element);
+  }
+
+  async translateOnce(element) {
+    for (const node of element.querySelectorAll?.("[data-l10n-id]") ?? []) {
+      const id = node.getAttribute("data-l10n-id");
+      const args = parseL10nArgs(node.getAttribute("data-l10n-args"));
+      const message = this.lookupMessage(id, args);
+      if (typeof message === "string") {
+        node.textContent = message;
+      } else if (message) {
+        for (const [attr, value] of Object.entries(message)) {
+          node.setAttribute(attr, value);
+        }
+      }
+    }
+  }
+
+  pause() {}
+  resume() {}
+  async destroy() {}
+
+  lookup(id, args = null, fallback = "") {
+    const message = this.lookupMessage(id, args);
+    if (typeof message === "string") return message;
+    if (message?.value) return message.value;
+    if (message?.["aria-label"]) return message["aria-label"];
+    return fallback || id;
+  }
+
+  lookupMessage(id, args = null) {
+    const messages = PDFJS_L10N[this.lang] ?? PDFJS_L10N.en;
+    const message = messages[id] ?? PDFJS_L10N.en[id];
+    if (!message) return null;
+    if (typeof message === "string") return format(message, args);
+    return Object.fromEntries(
+      Object.entries(message).map(([key, value]) => [key, format(value, args)]),
+    );
+  }
+}
+
+function parseL10nArgs(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
 
 const elements = {
   attachmentsView: mustGetElement("attachmentsView"),
+  currentPage: mustGetElement("currentPage"),
+  cursorHandTool: mustGetElement("cursorHandTool"),
+  cursorSelectTool: mustGetElement("cursorSelectTool"),
   downloadButton: mustGetElement("download"),
+  editorFreeText: mustGetElement("editorFreeText"),
+  editorHighlight: mustGetElement("editorHighlight"),
+  editorInk: mustGetElement("editorInk"),
+  editorStamp: mustGetElement("editorStamp"),
   errorMessage: mustGetElement("errorMessage"),
   errorWrapper: mustGetElement("errorWrapper"),
   fileInput: mustGetElement("fileInput"),
@@ -65,7 +397,9 @@ const elements = {
   openFileButton: mustGetElement("openFile"),
   outlineView: mustGetElement("outlineView"),
   pageNumber: mustGetElement("pageNumber"),
+  presentationMode: mustGetElement("presentationMode"),
   previousButton: mustGetElement("previous"),
+  printButton: mustGetElement("print"),
   propertiesDialog: mustGetElement("propertiesDialog"),
   propertiesList: mustGetElement("propertiesList"),
   rotateCcw: mustGetElement("rotateCcw"),
@@ -86,6 +420,7 @@ const elements = {
 
 GlobalWorkerOptions.workerSrc = ASSET_PATHS.workerSrc;
 
+const l10n = new OneLingoPdfL10n(DEFAULT_UI_LANG);
 const eventBus = new EventBus();
 const linkService = new PDFLinkService({
   eventBus,
@@ -93,26 +428,35 @@ const linkService = new PDFLinkService({
 });
 const findController = new PDFFindController({ eventBus, linkService });
 const pdfViewer = new PDFViewer({
+  annotationEditorMode: AnnotationEditorType.NONE,
   container: elements.viewerContainer,
+  enableHighlightFloatingButton: true,
+  enableUpdatedAddImage: true,
   eventBus,
   findController,
   imageResourcesPath: ASSET_PATHS.imageResourcesPath,
   linkService,
-  l10n: new GenericL10n(navigator.language || "en-US"),
+  l10n,
   viewer: elements.viewer,
 });
 const pdfHistory = new PDFHistory({ eventBus, linkService });
 
+let currentUiLang = DEFAULT_UI_LANG;
 let pdfDocument = null;
 let loadingTask = null;
 let currentFileUrl = null;
 let currentObjectUrl = null;
 let thumbnailObserver = null;
 let activeSidebarView = "thumbnails";
+let cursorTool = "select";
+let handToolState = null;
 
 linkService.setViewer(pdfViewer);
 linkService.setHistory(pdfHistory);
 
+applyLocale(DEFAULT_UI_LANG);
+void loadUiLanguage();
+watchUiLanguage();
 wireToolbar();
 wireFindbar();
 wireSidebar();
@@ -123,13 +467,27 @@ void loadInitialDocument();
 async function loadInitialDocument() {
   const file = new URLSearchParams(location.search).get("file");
   if (!file) {
-    showError("No PDF file was specified.");
+    showError(t("missingFile"));
     return;
   }
   await loadPdf(file);
 }
 
 function wireToolbar() {
+  elements.sidebarToggle.addEventListener("click", () => {
+    if (elements.sidebarContainer.hidden) {
+      openSidebar();
+    } else {
+      closeSidebar();
+    }
+  });
+  elements.findToggle.addEventListener("click", () => {
+    if (elements.findbar.hidden) {
+      openFindbar();
+    } else {
+      closeFindbar();
+    }
+  });
   elements.previousButton.addEventListener("click", () => {
     pdfViewer.previousPage();
   });
@@ -153,6 +511,7 @@ function wireToolbar() {
     pdfViewer.currentScale = clamp(pdfViewer.currentScale * SCALE_STEP);
   });
   elements.downloadButton.addEventListener("click", () => downloadCurrentFile());
+  elements.printButton.addEventListener("click", printDocument);
   elements.openFileButton.addEventListener("click", () => elements.fileInput.click());
   elements.fileInput.addEventListener("change", () => {
     const file = elements.fileInput.files?.[0];
@@ -163,14 +522,32 @@ function wireToolbar() {
     history.replaceState(null, "", `?file=${encodeURIComponent(currentObjectUrl)}`);
     void loadPdf(currentObjectUrl);
   });
+  for (const button of [
+    elements.editorHighlight,
+    elements.editorFreeText,
+    elements.editorInk,
+    elements.editorStamp,
+  ]) {
+    button.addEventListener("click", () => {
+      setAnnotationEditorMode(button.dataset.editorMode);
+    });
+  }
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
       event.preventDefault();
       openFindbar();
       return;
     }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "p") {
+      event.preventDefault();
+      printDocument();
+      return;
+    }
     if (event.key === "Escape") {
       closeSecondaryToolbar();
+      if (pdfViewer.annotationEditorMode !== AnnotationEditorType.DISABLE) {
+        setAnnotationEditorMode("none");
+      }
       if (!elements.findbar.hidden) {
         closeFindbar();
         return;
@@ -193,13 +570,6 @@ function wireToolbar() {
 }
 
 function wireFindbar() {
-  elements.findToggle.addEventListener("click", () => {
-    if (elements.findbar.hidden) {
-      openFindbar();
-    } else {
-      closeFindbar();
-    }
-  });
   elements.findClose.addEventListener("click", closeFindbar);
   elements.findInput.addEventListener("input", () => dispatchFind(""));
   elements.findInput.addEventListener("keydown", (event) => {
@@ -231,13 +601,6 @@ function wireFindbar() {
 }
 
 function wireSidebar() {
-  elements.sidebarToggle.addEventListener("click", () => {
-    if (elements.sidebarContainer.hidden) {
-      openSidebar();
-    } else {
-      closeSidebar();
-    }
-  });
   for (const tab of document.querySelectorAll("[data-sidebar-view]")) {
     tab.addEventListener("click", () => {
       setSidebarView(tab.dataset.sidebarView);
@@ -269,6 +632,14 @@ function wireSecondaryToolbar() {
   elements.rotateCcw.addEventListener("click", () => {
     pdfViewer.pagesRotation = (pdfViewer.pagesRotation - 90 + 360) % 360;
   });
+  elements.presentationMode.addEventListener("click", () => {
+    closeSecondaryToolbar();
+    void enterPresentationMode();
+  });
+  elements.currentPage.addEventListener("click", () => {
+    closeSecondaryToolbar();
+    void copyCurrentPageUrl();
+  });
   elements.secondaryDownload.addEventListener("click", () => {
     downloadCurrentFile();
     closeSecondaryToolbar();
@@ -281,6 +652,13 @@ function wireSecondaryToolbar() {
     closeSecondaryToolbar();
     void showDocumentProperties();
   });
+  for (const button of document.querySelectorAll("[data-cursor-tool]")) {
+    button.addEventListener("click", () => {
+      setCursorTool(button.dataset.cursorTool);
+      updateSecondaryToolbarState();
+      closeSecondaryToolbar();
+    });
+  }
   for (const button of document.querySelectorAll("[data-scroll-mode]")) {
     button.addEventListener("click", () => {
       const mode = SCROLL_MODES[button.dataset.scrollMode];
@@ -306,6 +684,7 @@ function wireEvents() {
     elements.numPages.textContent = `/ ${pdfViewer.pagesCount}`;
     pdfViewer.currentScaleValue = "auto";
     updatePageControls();
+    updateAnnotationEditorState();
     updateSecondaryToolbarState();
     hideLoading();
     elements.viewerContainer.focus();
@@ -327,6 +706,12 @@ function wireEvents() {
   });
   eventBus.on("scrollmodechanged", updateSecondaryToolbarState);
   eventBus.on("spreadmodechanged", updateSecondaryToolbarState);
+  eventBus.on("annotationeditormodechanged", ({ mode }) => {
+    updateAnnotationEditorState(mode);
+  });
+  eventBus.on("printingallowed", ({ isAllowed }) => {
+    elements.printButton.disabled = !isAllowed;
+  });
   eventBus.on("updatefindmatchescount", ({ matchesCount }) => {
     updateFindMatchesCount(matchesCount);
   });
@@ -340,6 +725,7 @@ async function loadPdf(fileUrl) {
   hideError();
   showLoading(0);
   closeSecondaryToolbar();
+  setAnnotationEditorMode("none");
   currentFileUrl = fileUrl;
   document.title = `${nameFromUrl(fileUrl)} - OneLingo`;
 
@@ -381,7 +767,7 @@ async function loadPdf(fileUrl) {
     });
   } catch (error) {
     hideLoading();
-    showError(error instanceof Error ? error.message : String(error));
+    showError(error instanceof Error ? error.message : t("loadingError"));
   }
 }
 
@@ -452,15 +838,15 @@ function resetFindbar() {
 function updateFindStatus(state, previous) {
   switch (state) {
     case FindState.PENDING:
-      elements.findMsg.textContent = "Searching…";
+      elements.findMsg.textContent = t("searching");
       break;
     case FindState.NOT_FOUND:
-      elements.findMsg.textContent = "Phrase not found";
+      elements.findMsg.textContent = t("searchNotFound");
       break;
     case FindState.WRAPPED:
       elements.findMsg.textContent = previous
-        ? "Reached top, continued from bottom"
-        : "Reached end, continued from top";
+        ? t("wrappedTop")
+        : t("wrappedBottom");
       break;
     default:
       elements.findMsg.textContent = "";
@@ -544,11 +930,13 @@ async function buildThumbnails() {
     item.className = "thumbnailItem";
     item.type = "button";
     item.dataset.pageNumber = String(pageNumber);
-    item.title = `Page ${pageNumber}`;
-    item.innerHTML = `
-      <span class="thumbnailCanvasSlot"></span>
-      <span class="thumbnailLabel">Page ${pageNumber}</span>
-    `;
+    item.title = format(t("pageTitle"), { page: pageNumber });
+    const slot = document.createElement("span");
+    slot.className = "thumbnailCanvasSlot";
+    const label = document.createElement("span");
+    label.className = "thumbnailLabel";
+    label.textContent = format(t("pageTitle"), { page: pageNumber });
+    item.append(slot, label);
     item.addEventListener("click", () => {
       pdfViewer.currentPageNumber = pageNumber;
     });
@@ -584,7 +972,9 @@ async function renderThumbnail(item) {
     item.querySelector(".thumbnailCanvasSlot")?.replaceChildren(canvas);
   } catch (error) {
     console.warn("[OneLingo] failed to render PDF thumbnail:", error);
-    item.querySelector(".thumbnailCanvasSlot")?.classList.add("thumbnailError");
+    const slot = item.querySelector(".thumbnailCanvasSlot");
+    slot?.classList.add("thumbnailError");
+    if (slot) slot.dataset.error = t("noPreview");
   }
 }
 
@@ -615,13 +1005,13 @@ async function buildOutline() {
   try {
     const outline = await pdfDocument.getOutline();
     if (!outline?.length) {
-      renderEmptySidebar(elements.outlineView, "No outline available.");
+      renderEmptySidebar(elements.outlineView, "noOutline");
       return;
     }
     elements.outlineView.append(renderOutlineItems(outline));
   } catch (error) {
     console.warn("[OneLingo] failed to read PDF outline:", error);
-    renderEmptySidebar(elements.outlineView, "Unable to load outline.");
+    renderEmptySidebar(elements.outlineView, "unableOutline");
   }
 }
 
@@ -633,7 +1023,7 @@ function renderOutlineItems(items) {
     const button = document.createElement("button");
     button.className = "outlineItem";
     button.type = "button";
-    button.textContent = item.title || "Untitled";
+    button.textContent = item.title || t("untitled");
     button.addEventListener("click", () => {
       if (item.url) {
         window.open(item.url, "_blank", "noopener");
@@ -655,15 +1045,15 @@ async function buildAttachments() {
     const attachments = await pdfDocument.getAttachments();
     const entries = Object.entries(attachments || {});
     if (entries.length === 0) {
-      renderEmptySidebar(elements.attachmentsView, "No attachments available.");
+      renderEmptySidebar(elements.attachmentsView, "noAttachments");
       return;
     }
     for (const [, attachment] of entries) {
       const button = document.createElement("button");
       button.className = "attachmentItem";
       button.type = "button";
-      button.textContent = attachment.filename || "Attachment";
-      button.title = attachment.description || attachment.filename || "Attachment";
+      button.textContent = attachment.filename || t("attachment");
+      button.title = attachment.description || attachment.filename || t("attachment");
       button.addEventListener("click", () => downloadBytes(
         attachment.content,
         attachment.filename || "attachment",
@@ -673,14 +1063,15 @@ async function buildAttachments() {
     }
   } catch (error) {
     console.warn("[OneLingo] failed to read PDF attachments:", error);
-    renderEmptySidebar(elements.attachmentsView, "Unable to load attachments.");
+    renderEmptySidebar(elements.attachmentsView, "unableAttachments");
   }
 }
 
-function renderEmptySidebar(container, message) {
+function renderEmptySidebar(container, messageKey) {
   const empty = document.createElement("p");
   empty.className = "sidebarEmpty";
-  empty.textContent = message;
+  empty.dataset.l10nKey = messageKey;
+  empty.textContent = t(messageKey);
   container.replaceChildren(empty);
 }
 
@@ -695,7 +1086,115 @@ function closeSecondaryToolbar() {
   elements.secondaryToolbarToggle.setAttribute("aria-expanded", "false");
 }
 
+function setAnnotationEditorMode(kind) {
+  const mode = kind === "none" ? AnnotationEditorType.NONE : EDITOR_MODES[kind];
+  if (mode === undefined) return;
+  if (pdfViewer.annotationEditorMode === AnnotationEditorType.DISABLE) {
+    if (mode !== AnnotationEditorType.NONE) showError(t("annotationUnavailable"));
+    updateAnnotationEditorState(AnnotationEditorType.DISABLE);
+    return;
+  }
+  const nextMode = pdfViewer.annotationEditorMode === mode ? AnnotationEditorType.NONE : mode;
+  try {
+    pdfViewer.annotationEditorMode = { mode: nextMode };
+    updateAnnotationEditorState(nextMode);
+  } catch (error) {
+    console.warn("[OneLingo] failed to switch PDF annotation mode:", error);
+    if (mode !== AnnotationEditorType.NONE) showError(t("annotationUnavailable"));
+  }
+}
+
+function updateAnnotationEditorState(mode = pdfViewer.annotationEditorMode) {
+  const disabled = mode === AnnotationEditorType.DISABLE;
+  for (const button of [
+    elements.editorHighlight,
+    elements.editorFreeText,
+    elements.editorInk,
+    elements.editorStamp,
+  ]) {
+    const activeMode = EDITOR_MODES[button.dataset.editorMode];
+    const pressed = !disabled && activeMode === mode;
+    button.disabled = disabled;
+    button.classList.toggle("toggled", pressed);
+    button.setAttribute("aria-pressed", String(pressed));
+  }
+}
+
+function setCursorTool(tool) {
+  cursorTool = tool === "hand" ? "hand" : "select";
+  document.documentElement.classList.toggle("handTool", cursorTool === "hand");
+  if (cursorTool === "hand") {
+    enableHandTool();
+  } else {
+    disableHandTool();
+  }
+}
+
+function enableHandTool() {
+  if (handToolState) return;
+  handToolState = {
+    active: false,
+    lastX: 0,
+    lastY: 0,
+    pointerId: null,
+  };
+  elements.viewerContainer.addEventListener("pointerdown", onHandToolPointerDown);
+  elements.viewerContainer.addEventListener("pointermove", onHandToolPointerMove);
+  elements.viewerContainer.addEventListener("pointerup", onHandToolPointerUp);
+  elements.viewerContainer.addEventListener("pointercancel", onHandToolPointerUp);
+}
+
+function disableHandTool() {
+  if (!handToolState) return;
+  elements.viewerContainer.removeEventListener("pointerdown", onHandToolPointerDown);
+  elements.viewerContainer.removeEventListener("pointermove", onHandToolPointerMove);
+  elements.viewerContainer.removeEventListener("pointerup", onHandToolPointerUp);
+  elements.viewerContainer.removeEventListener("pointercancel", onHandToolPointerUp);
+  elements.viewerContainer.classList.remove("handToolActive");
+  handToolState = null;
+}
+
+function onHandToolPointerDown(event) {
+  if (!handToolState || event.button !== 0) return;
+  if (event.target instanceof Element && event.target.closest("[data-onelingo-reader-ui]")) {
+    return;
+  }
+  const selectedText = getSelection()?.toString();
+  if (selectedText) return;
+  event.preventDefault();
+  handToolState.active = true;
+  handToolState.pointerId = event.pointerId;
+  handToolState.lastX = event.clientX;
+  handToolState.lastY = event.clientY;
+  elements.viewerContainer.classList.add("handToolActive");
+  elements.viewerContainer.setPointerCapture?.(event.pointerId);
+}
+
+function onHandToolPointerMove(event) {
+  if (!handToolState?.active || handToolState.pointerId !== event.pointerId) return;
+  event.preventDefault();
+  const dx = event.clientX - handToolState.lastX;
+  const dy = event.clientY - handToolState.lastY;
+  handToolState.lastX = event.clientX;
+  handToolState.lastY = event.clientY;
+  elements.viewerContainer.scrollLeft -= dx;
+  elements.viewerContainer.scrollTop -= dy;
+}
+
+function onHandToolPointerUp(event) {
+  if (!handToolState || handToolState.pointerId !== event.pointerId) return;
+  handToolState.active = false;
+  handToolState.pointerId = null;
+  elements.viewerContainer.classList.remove("handToolActive");
+  elements.viewerContainer.releasePointerCapture?.(event.pointerId);
+}
+
 function updateSecondaryToolbarState() {
+  for (const button of document.querySelectorAll("[data-cursor-tool]")) {
+    const checked = button.dataset.cursorTool === cursorTool;
+    button.setAttribute("aria-checked", String(checked));
+    button.classList.toggle("checked", checked);
+  }
   for (const button of document.querySelectorAll("[data-scroll-mode]")) {
     const checked = SCROLL_MODES[button.dataset.scrollMode] === pdfViewer.scrollMode;
     button.setAttribute("aria-checked", String(checked));
@@ -713,17 +1212,17 @@ async function showDocumentProperties() {
   const metadata = await pdfDocument.getMetadata().catch(() => null);
   const info = metadata?.info || {};
   const rows = [
-    ["File name", nameFromUrl(currentFileUrl || "")],
-    ["Title", info.Title],
-    ["Author", info.Author],
-    ["Subject", info.Subject],
-    ["Keywords", info.Keywords],
-    ["Creator", info.Creator],
-    ["Producer", info.Producer],
-    ["PDF version", info.PDFFormatVersion],
-    ["Page count", String(pdfDocument.numPages || "")],
-    ["Creation date", formatPdfDate(info.CreationDate)],
-    ["Modification date", formatPdfDate(info.ModDate)],
+    [t("fileName"), nameFromUrl(currentFileUrl || "")],
+    [t("title"), info.Title],
+    [t("author"), info.Author],
+    [t("subject"), info.Subject],
+    [t("keywords"), info.Keywords],
+    [t("creator"), info.Creator],
+    [t("pdfProducer"), info.Producer],
+    [t("pdfVersion"), info.PDFFormatVersion],
+    [t("pageCount"), String(pdfDocument.numPages || "")],
+    [t("creationDate"), formatPdfDate(info.CreationDate)],
+    [t("modificationDate"), formatPdfDate(info.ModDate)],
   ].filter(([, value]) => value);
 
   const fragment = document.createDocumentFragment();
@@ -738,13 +1237,47 @@ async function showDocumentProperties() {
   elements.propertiesDialog.showModal();
 }
 
-function downloadCurrentFile() {
-  if (!currentFileUrl) return;
+async function enterPresentationMode() {
+  const target = elements.viewerContainer;
+  if (!document.fullscreenElement && target.requestFullscreen) {
+    await target.requestFullscreen().catch((error) => {
+      console.warn("[OneLingo] failed to enter PDF presentation mode:", error);
+    });
+  }
+}
+
+async function copyCurrentPageUrl() {
+  const url = new URL(location.href);
+  url.hash = `page=${pdfViewer.currentPageNumber || 1}`;
+  history.replaceState(null, "", url);
+  await navigator.clipboard?.writeText(url.href).catch(() => {});
+}
+
+function printDocument() {
+  if (!pdfDocument || elements.printButton.disabled) return;
+  window.print();
+}
+
+async function downloadCurrentFile() {
+  if (!currentFileUrl && !pdfDocument) return;
+  let url = currentFileUrl;
+  let revoke = false;
+  if (pdfDocument?.annotationStorage?.size > 0) {
+    try {
+      const data = await pdfDocument.saveDocument();
+      url = URL.createObjectURL(new Blob([data], { type: "application/pdf" }));
+      revoke = true;
+    } catch (error) {
+      console.warn("[OneLingo] failed to save annotated PDF, downloading original:", error);
+    }
+  }
+  if (!url) return;
   const link = document.createElement("a");
-  link.href = currentFileUrl;
-  link.download = nameFromUrl(currentFileUrl);
+  link.href = url;
+  link.download = nameFromUrl(currentFileUrl || url);
   link.rel = "noopener";
   link.click();
+  if (revoke) setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function downloadBytes(bytes, filename, contentType) {
@@ -769,9 +1302,13 @@ function hideLoading() {
 function showError(message) {
   elements.errorMessage.textContent = message;
   elements.errorWrapper.hidden = false;
+  window.clearTimeout(showError.timeoutId);
+  showError.timeoutId = window.setTimeout(hideError, 5000);
 }
+showError.timeoutId = 0;
 
 function hideError() {
+  window.clearTimeout(showError.timeoutId);
   elements.errorWrapper.hidden = true;
   elements.errorMessage.textContent = "";
 }
@@ -807,6 +1344,110 @@ function formatPdfDate(value) {
     Number(second),
   );
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+async function loadUiLanguage() {
+  const lang = await readStoredUiLang();
+  applyLocale(lang);
+}
+
+function watchUiLanguage() {
+  getExtensionStorage()?.onChanged?.addListener?.((changes, areaName) => {
+    if (areaName && areaName !== "sync") return;
+    const next = changes[SETTINGS_STORAGE_KEY]?.newValue?.uiLang;
+    if (isSupportedUiLang(next)) applyLocale(next);
+  });
+}
+
+async function readStoredUiLang() {
+  const syncStorage = getExtensionStorage()?.sync;
+  if (!syncStorage?.get) return normalizeUiLang(navigator.language);
+  try {
+    const result = await storageGet(syncStorage, SETTINGS_STORAGE_KEY);
+    return normalizeUiLang(result?.[SETTINGS_STORAGE_KEY]?.uiLang);
+  } catch (error) {
+    console.warn("[OneLingo] failed to read PDF viewer language:", error);
+    return normalizeUiLang(navigator.language);
+  }
+}
+
+function getExtensionStorage() {
+  return globalThis.browser?.storage ?? globalThis.chrome?.storage ?? null;
+}
+
+function storageGet(area, key) {
+  if (globalThis.browser?.storage) {
+    return area.get(key);
+  }
+  return new Promise((resolve, reject) => {
+    area.get(key, (value) => {
+      const runtimeError = globalThis.chrome?.runtime?.lastError;
+      if (runtimeError) reject(new Error(runtimeError.message));
+      else resolve(value);
+    });
+  });
+}
+
+function normalizeUiLang(value) {
+  if (isSupportedUiLang(value)) return value;
+  if (typeof value !== "string") return DEFAULT_UI_LANG;
+  const normalized = value.toLowerCase();
+  if (normalized.startsWith("zh-tw") || normalized.startsWith("zh-hk")) {
+    return "zh-Hant";
+  }
+  if (normalized.startsWith("zh")) return "zh";
+  if (normalized.startsWith("pt-br")) return "pt-BR";
+  const base = normalized.split("-")[0];
+  return isSupportedUiLang(base) ? base : DEFAULT_UI_LANG;
+}
+
+function isSupportedUiLang(value) {
+  return typeof value === "string" && SUPPORTED_UI_LANGS.has(value);
+}
+
+function applyLocale(lang) {
+  currentUiLang = normalizeUiLang(lang);
+  l10n.setLanguage(currentUiLang);
+  const htmlLang = currentUiLang === "zh" ? "zh-CN" : currentUiLang;
+  document.documentElement.lang = htmlLang;
+  document.documentElement.dir = RTL_LANGS.has(currentUiLang) ? "rtl" : "ltr";
+  for (const element of document.querySelectorAll("[data-l10n-text]")) {
+    element.textContent = t(element.dataset.l10nText);
+  }
+  for (const element of document.querySelectorAll("[data-l10n-title]")) {
+    element.title = t(element.dataset.l10nTitle);
+  }
+  for (const element of document.querySelectorAll("[data-l10n-aria-label]")) {
+    element.setAttribute("aria-label", t(element.dataset.l10nAriaLabel));
+  }
+  for (const element of document.querySelectorAll("[data-l10n-placeholder]")) {
+    element.setAttribute("placeholder", t(element.dataset.l10nPlaceholder));
+  }
+  updateGeneratedLocaleText();
+}
+
+function updateGeneratedLocaleText() {
+  for (const item of elements.thumbnailView.querySelectorAll(".thumbnailItem")) {
+    const pageNumber = Number.parseInt(item.dataset.pageNumber || "0", 10);
+    if (!pageNumber) continue;
+    const label = format(t("pageTitle"), { page: pageNumber });
+    item.title = label;
+    item.querySelector(".thumbnailLabel").textContent = label;
+  }
+  for (const empty of document.querySelectorAll(".sidebarEmpty")) {
+    const key = empty.dataset.l10nKey;
+    if (key) empty.textContent = t(key);
+  }
+}
+
+function t(key) {
+  return UI_LOCALES[currentUiLang]?.[key] ?? UI_LOCALES.en[key] ?? key;
+}
+
+function format(template, values) {
+  return String(template).replace(/\{(\w+)\}/g, (_, key) =>
+    values?.[key] === undefined ? `{${key}}` : String(values[key]),
+  );
 }
 
 function mustGetElement(id) {

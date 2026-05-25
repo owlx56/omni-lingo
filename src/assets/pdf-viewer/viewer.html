@@ -1,12 +1,12 @@
 <!doctype html>
-<html dir="ltr" lang="en">
+<html dir="ltr" lang="zh-CN">
   <head>
     <meta charset="utf-8" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1"
     />
-    <title>OneLingo PDF Reader</title>
+    <title>OneLingo PDF 阅读器</title>
     <link rel="stylesheet" href="pdf_viewer.css" />
     <link rel="stylesheet" href="viewer.css" />
     <link rel="stylesheet" href="onelingo-viewer.css" />
@@ -19,53 +19,55 @@
         <div class="toolbar" id="toolbarViewer">
           <div id="toolbarViewerLeft">
             <button
-              class="toolbarButton iconButton"
+              class="toolbarButton pdfIconButton"
               id="sidebarToggle"
               type="button"
-              title="Toggle sidebar"
-              aria-label="Toggle sidebar"
+              title="管理页面"
+              aria-label="管理页面"
               aria-expanded="false"
               aria-controls="sidebarContainer"
+              data-l10n-title="managePages"
+              data-l10n-aria-label="managePages"
             >
-              <span aria-hidden="true">☰</span>
+              <span class="visuallyHidden" data-l10n-text="managePages">管理页面</span>
             </button>
             <button
-              class="toolbarButton iconButton"
+              class="toolbarButton pdfIconButton"
               id="findToggle"
               type="button"
-              title="Find in document"
-              aria-label="Find in document"
+              title="在文档中查找"
+              aria-label="在文档中查找"
               aria-expanded="false"
               aria-controls="findbar"
+              data-l10n-title="findInDocument"
+              data-l10n-aria-label="findInDocument"
             >
-              <span aria-hidden="true">⌕</span>
+              <span class="visuallyHidden" data-l10n-text="findInDocument">
+                在文档中查找
+              </span>
             </button>
+            <span class="toolbarSeparator" aria-hidden="true"></span>
             <button
-              class="toolbarButton"
-              id="openFile"
-              type="button"
-              title="Open file"
-              aria-label="Open file"
-            >
-              Open
-            </button>
-            <button
-              class="toolbarButton"
+              class="toolbarButton pdfIconButton"
               id="previous"
               type="button"
-              title="Previous page"
-              aria-label="Previous page"
+              title="上一页"
+              aria-label="上一页"
+              data-l10n-title="previousPage"
+              data-l10n-aria-label="previousPage"
             >
-              Previous
+              <span class="visuallyHidden" data-l10n-text="previousPage">上一页</span>
             </button>
             <button
-              class="toolbarButton"
+              class="toolbarButton pdfIconButton"
               id="next"
               type="button"
-              title="Next page"
-              aria-label="Next page"
+              title="下一页"
+              aria-label="下一页"
+              data-l10n-title="nextPage"
+              data-l10n-aria-label="nextPage"
             >
-              Next
+              <span class="visuallyHidden" data-l10n-text="nextPage">下一页</span>
             </button>
             <span class="toolbarPageControls">
               <input
@@ -74,26 +76,37 @@
                 min="1"
                 value="1"
                 autocomplete="off"
-                aria-label="Page"
+                aria-label="页码"
+                title="页码"
+                data-l10n-title="page"
+                data-l10n-aria-label="page"
               />
               <span id="numPages" class="toolbarLabel">/ 0</span>
             </span>
           </div>
           <div id="toolbarViewerMiddle">
             <button
-              class="toolbarButton"
+              class="toolbarButton pdfIconButton"
               id="zoomOut"
               type="button"
-              title="Zoom out"
-              aria-label="Zoom out"
+              title="缩小"
+              aria-label="缩小"
+              data-l10n-title="zoomOut"
+              data-l10n-aria-label="zoomOut"
             >
-              -
+              <span class="visuallyHidden" data-l10n-text="zoomOut">缩小</span>
             </button>
             <div id="scaleSelectContainer" class="dropdownToolbarButton">
-              <select id="scaleSelect" title="Zoom" aria-label="Zoom">
-                <option value="auto" selected>Auto</option>
-                <option value="page-width">Page Width</option>
-                <option value="page-fit">Page Fit</option>
+              <select
+                id="scaleSelect"
+                title="缩放"
+                aria-label="缩放"
+                data-l10n-title="zoom"
+                data-l10n-aria-label="zoom"
+              >
+                <option value="auto" selected data-l10n-text="scaleAuto">自动缩放</option>
+                <option value="page-width" data-l10n-text="scalePageWidth">页宽</option>
+                <option value="page-fit" data-l10n-text="scalePageFit">适合页面</option>
                 <option value="0.75">75%</option>
                 <option value="1">100%</option>
                 <option value="1.25">125%</option>
@@ -102,35 +115,118 @@
               </select>
             </div>
             <button
-              class="toolbarButton"
+              class="toolbarButton pdfIconButton"
               id="zoomIn"
               type="button"
-              title="Zoom in"
-              aria-label="Zoom in"
+              title="放大"
+              aria-label="放大"
+              data-l10n-title="zoomIn"
+              data-l10n-aria-label="zoomIn"
             >
-              +
+              <span class="visuallyHidden" data-l10n-text="zoomIn">放大</span>
             </button>
           </div>
           <div id="toolbarViewerRight">
             <button
-              class="toolbarButton"
-              id="download"
+              class="toolbarButton pdfIconButton editorButton"
+              id="editorHighlight"
               type="button"
-              title="Download"
-              aria-label="Download"
+              title="高亮"
+              aria-label="高亮"
+              aria-pressed="false"
+              data-editor-mode="highlight"
+              data-l10n-title="highlight"
+              data-l10n-aria-label="highlight"
             >
-              Download
+              <span class="visuallyHidden" data-l10n-text="highlight">高亮</span>
             </button>
             <button
-              class="toolbarButton iconButton"
+              class="toolbarButton pdfIconButton editorButton"
+              id="editorFreeText"
+              type="button"
+              title="文本"
+              aria-label="文本"
+              aria-pressed="false"
+              data-editor-mode="freeText"
+              data-l10n-title="text"
+              data-l10n-aria-label="text"
+            >
+              <span class="visuallyHidden" data-l10n-text="text">文本</span>
+            </button>
+            <button
+              class="toolbarButton pdfIconButton editorButton"
+              id="editorInk"
+              type="button"
+              title="绘图"
+              aria-label="绘图"
+              aria-pressed="false"
+              data-editor-mode="ink"
+              data-l10n-title="draw"
+              data-l10n-aria-label="draw"
+            >
+              <span class="visuallyHidden" data-l10n-text="draw">绘图</span>
+            </button>
+            <button
+              class="toolbarButton pdfIconButton editorButton"
+              id="editorStamp"
+              type="button"
+              title="添加或编辑图像"
+              aria-label="添加或编辑图像"
+              aria-pressed="false"
+              data-editor-mode="stamp"
+              data-l10n-title="addImage"
+              data-l10n-aria-label="addImage"
+            >
+              <span class="visuallyHidden" data-l10n-text="addImage">
+                添加或编辑图像
+              </span>
+            </button>
+            <span class="toolbarSeparator" aria-hidden="true"></span>
+            <button
+              class="toolbarButton pdfIconButton"
+              id="openFile"
+              type="button"
+              title="打开文件"
+              aria-label="打开文件"
+              data-l10n-title="openFile"
+              data-l10n-aria-label="openFile"
+            >
+              <span class="visuallyHidden" data-l10n-text="openFile">打开文件</span>
+            </button>
+            <button
+              class="toolbarButton pdfIconButton"
+              id="print"
+              type="button"
+              title="打印"
+              aria-label="打印"
+              data-l10n-title="print"
+              data-l10n-aria-label="print"
+            >
+              <span class="visuallyHidden" data-l10n-text="print">打印</span>
+            </button>
+            <button
+              class="toolbarButton pdfIconButton"
+              id="download"
+              type="button"
+              title="保存"
+              aria-label="保存"
+              data-l10n-title="save"
+              data-l10n-aria-label="save"
+            >
+              <span class="visuallyHidden" data-l10n-text="save">保存</span>
+            </button>
+            <button
+              class="toolbarButton pdfIconButton"
               id="secondaryToolbarToggle"
               type="button"
-              title="Tools"
-              aria-label="Tools"
+              title="工具"
+              aria-label="工具"
               aria-expanded="false"
               aria-controls="secondaryToolbar"
+              data-l10n-title="tools"
+              data-l10n-aria-label="tools"
             >
-              <span aria-hidden="true">⋯</span>
+              <span class="visuallyHidden" data-l10n-text="tools">工具</span>
             </button>
           </div>
         </div>
@@ -141,35 +237,61 @@
           id="findInput"
           type="search"
           autocomplete="off"
-          placeholder="Find in document"
-          aria-label="Find in document"
+          placeholder="在文档中查找"
+          title="查找"
+          aria-label="在文档中查找"
+          data-l10n-title="find"
+          data-l10n-placeholder="findInDocument"
+          data-l10n-aria-label="findInDocument"
         />
-        <button class="toolbarButton" id="findPrevious" type="button">Previous</button>
-        <button class="toolbarButton" id="findNext" type="button">Next</button>
+        <button
+          class="toolbarButton pdfIconButton findbarButton"
+          id="findPrevious"
+          type="button"
+          title="查找上一个"
+          aria-label="查找上一个"
+          data-l10n-title="findPrevious"
+          data-l10n-aria-label="findPrevious"
+        >
+          <span class="visuallyHidden" data-l10n-text="findPrevious">查找上一个</span>
+        </button>
+        <button
+          class="toolbarButton pdfIconButton findbarButton"
+          id="findNext"
+          type="button"
+          title="查找下一个"
+          aria-label="查找下一个"
+          data-l10n-title="findNext"
+          data-l10n-aria-label="findNext"
+        >
+          <span class="visuallyHidden" data-l10n-text="findNext">查找下一个</span>
+        </button>
         <span id="findResultsCount" class="toolbarLabel"></span>
         <span id="findMsg" class="toolbarLabel"></span>
         <label class="findOption">
           <input id="findHighlightAll" type="checkbox" checked />
-          <span>Highlight all</span>
+          <span data-l10n-text="highlightAll">全部高亮</span>
         </label>
         <label class="findOption">
           <input id="findMatchCase" type="checkbox" />
-          <span>Match case</span>
+          <span data-l10n-text="matchCase">区分大小写</span>
         </label>
         <label class="findOption">
           <input id="findEntireWord" type="checkbox" />
-          <span>Whole words</span>
+          <span data-l10n-text="wholeWords">全字匹配</span>
         </label>
         <label class="findOption">
           <input id="findMatchDiacritics" type="checkbox" checked />
-          <span>Diacritics</span>
+          <span data-l10n-text="matchDiacritics">匹配变音符号</span>
         </label>
         <button
-          class="toolbarButton iconButton"
+          class="toolbarButton iconTextButton"
           id="findClose"
           type="button"
-          title="Close"
-          aria-label="Close find bar"
+          title="关闭"
+          aria-label="关闭查找栏"
+          data-l10n-title="close"
+          data-l10n-aria-label="closeFindbar"
         >
           <span aria-hidden="true">×</span>
         </button>
@@ -181,7 +303,7 @@
 
       <div id="sidebarContainer" data-onelingo-reader-ui hidden>
         <div class="sidebarHeader">
-          <div class="sidebarTabs" role="tablist" aria-label="Document views">
+          <div class="sidebarTabs" role="tablist" aria-label="文档视图">
             <button
               class="sidebarTab selected"
               id="viewThumbnail"
@@ -189,8 +311,9 @@
               role="tab"
               aria-selected="true"
               data-sidebar-view="thumbnails"
+              data-l10n-text="pages"
             >
-              Pages
+              页面
             </button>
             <button
               class="sidebarTab"
@@ -199,8 +322,9 @@
               role="tab"
               aria-selected="false"
               data-sidebar-view="outline"
+              data-l10n-text="outline"
             >
-              Outline
+              大纲
             </button>
             <button
               class="sidebarTab"
@@ -209,8 +333,9 @@
               role="tab"
               aria-selected="false"
               data-sidebar-view="attachments"
+              data-l10n-text="attachments"
             >
-              Files
+              附件
             </button>
           </div>
         </div>
@@ -221,92 +346,185 @@
         </div>
       </div>
 
-      <div id="secondaryToolbar" data-onelingo-reader-ui hidden>
+      <div id="secondaryToolbar" data-onelingo-reader-ui role="menu" hidden>
         <div class="secondaryToolbarSection">
-          <button class="secondaryToolbarButton" id="firstPage" type="button">
-            First page
+          <button
+            class="secondaryToolbarButton"
+            id="secondaryOpenFile"
+            type="button"
+            role="menuitem"
+            data-l10n-text="openFile"
+          >
+            打开文件
           </button>
-          <button class="secondaryToolbarButton" id="lastPage" type="button">
-            Last page
+          <button
+            class="secondaryToolbarButton"
+            id="presentationMode"
+            type="button"
+            role="menuitem"
+            data-l10n-text="presentationMode"
+          >
+            演示模式
+          </button>
+          <button
+            class="secondaryToolbarButton"
+            id="currentPage"
+            type="button"
+            role="menuitem"
+            data-l10n-text="currentPage"
+          >
+            当前页面
           </button>
         </div>
         <div class="secondaryToolbarSection">
-          <button class="secondaryToolbarButton" id="rotateCw" type="button">
-            Rotate clockwise
+          <button
+            class="secondaryToolbarButton"
+            id="firstPage"
+            type="button"
+            role="menuitem"
+            data-l10n-text="firstPage"
+          >
+            转到第一页
           </button>
-          <button class="secondaryToolbarButton" id="rotateCcw" type="button">
-            Rotate counterclockwise
+          <button
+            class="secondaryToolbarButton"
+            id="lastPage"
+            type="button"
+            role="menuitem"
+            data-l10n-text="lastPage"
+          >
+            转到最后一页
           </button>
         </div>
-        <div class="secondaryToolbarSection" role="group" aria-label="Scroll mode">
+        <div class="secondaryToolbarSection">
+          <button
+            class="secondaryToolbarButton"
+            id="rotateCw"
+            type="button"
+            role="menuitem"
+            data-l10n-text="rotateCw"
+          >
+            顺时针旋转
+          </button>
+          <button
+            class="secondaryToolbarButton"
+            id="rotateCcw"
+            type="button"
+            role="menuitem"
+            data-l10n-text="rotateCcw"
+          >
+            逆时针旋转
+          </button>
+        </div>
+        <div class="secondaryToolbarSection" role="group" aria-label="光标工具">
+          <button
+            class="secondaryToolbarButton"
+            id="cursorSelectTool"
+            type="button"
+            role="menuitemradio"
+            aria-checked="true"
+            data-cursor-tool="select"
+            data-l10n-text="textSelectTool"
+          >
+            文本选择工具
+          </button>
+          <button
+            class="secondaryToolbarButton"
+            id="cursorHandTool"
+            type="button"
+            role="menuitemradio"
+            aria-checked="false"
+            data-cursor-tool="hand"
+            data-l10n-text="handTool"
+          >
+            手形工具
+          </button>
+        </div>
+        <div class="secondaryToolbarSection" role="group" aria-label="滚动模式">
+          <button
+            class="secondaryToolbarButton"
+            type="button"
+            role="menuitemradio"
+            data-scroll-mode="page"
+            data-l10n-text="pageScrolling"
+          >
+            页面滚动
+          </button>
           <button
             class="secondaryToolbarButton"
             type="button"
             role="menuitemradio"
             data-scroll-mode="vertical"
+            data-l10n-text="verticalScrolling"
           >
-            Vertical scrolling
+            垂直滚动
           </button>
           <button
             class="secondaryToolbarButton"
             type="button"
             role="menuitemradio"
             data-scroll-mode="horizontal"
+            data-l10n-text="horizontalScrolling"
           >
-            Horizontal scrolling
+            水平滚动
           </button>
           <button
             class="secondaryToolbarButton"
             type="button"
             role="menuitemradio"
             data-scroll-mode="wrapped"
+            data-l10n-text="wrappedScrolling"
           >
-            Wrapped scrolling
-          </button>
-          <button
-            class="secondaryToolbarButton"
-            type="button"
-            role="menuitemradio"
-            data-scroll-mode="page"
-          >
-            Page scrolling
+            平铺滚动
           </button>
         </div>
-        <div class="secondaryToolbarSection" role="group" aria-label="Spread mode">
+        <div class="secondaryToolbarSection" role="group" aria-label="页面展开">
           <button
             class="secondaryToolbarButton"
             type="button"
             role="menuitemradio"
             data-spread-mode="none"
+            data-l10n-text="noSpreads"
           >
-            No spreads
+            单页视图
           </button>
           <button
             class="secondaryToolbarButton"
             type="button"
             role="menuitemradio"
             data-spread-mode="odd"
+            data-l10n-text="oddSpreads"
           >
-            Odd spreads
+            双页视图
           </button>
           <button
             class="secondaryToolbarButton"
             type="button"
             role="menuitemradio"
             data-spread-mode="even"
+            data-l10n-text="evenSpreads"
           >
-            Even spreads
+            书籍视图
           </button>
         </div>
         <div class="secondaryToolbarSection">
-          <button class="secondaryToolbarButton" id="documentProperties" type="button">
-            Document properties
+          <button
+            class="secondaryToolbarButton"
+            id="documentProperties"
+            type="button"
+            role="menuitem"
+            data-l10n-text="documentProperties"
+          >
+            文档属性...
           </button>
-          <button class="secondaryToolbarButton" id="secondaryOpenFile" type="button">
-            Open file
-          </button>
-          <button class="secondaryToolbarButton" id="secondaryDownload" type="button">
-            Download
+          <button
+            class="secondaryToolbarButton"
+            id="secondaryDownload"
+            type="button"
+            role="menuitem"
+            data-l10n-text="save"
+          >
+            保存
           </button>
         </div>
       </div>
@@ -322,12 +540,13 @@
       <dialog id="propertiesDialog" data-onelingo-reader-ui>
         <form method="dialog" id="propertiesForm">
           <div class="dialogHeader">
-            <h1>Document properties</h1>
+            <h1 data-l10n-text="documentProperties">文档属性...</h1>
             <button
-              class="toolbarButton iconButton"
+              class="toolbarButton iconTextButton"
               id="propertiesClose"
               type="submit"
-              aria-label="Close"
+              aria-label="关闭"
+              data-l10n-aria-label="close"
             >
               <span aria-hidden="true">×</span>
             </button>
