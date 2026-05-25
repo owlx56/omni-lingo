@@ -1,4 +1,102 @@
 import { defineConfig } from "wxt";
+import { readdir, readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+
+type PublicAssetFile =
+  | {
+      absoluteSrc: string;
+      relativeDest: string;
+    }
+  | {
+      contents: string;
+      relativeDest: string;
+    };
+
+const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
+const PDFJS_DIST_DIR = join(ROOT_DIR, "node_modules", "pdfjs-dist");
+const PDF_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "pdf-viewer");
+
+function toPublicPath(path: string): string {
+  return path.replaceAll("\\", "/");
+}
+
+function addFileAsset(
+  files: PublicAssetFile[],
+  absoluteSrc: string,
+  relativeDest: string,
+): void {
+  files.push({
+    absoluteSrc,
+    relativeDest: toPublicPath(relativeDest),
+  });
+}
+
+async function addDirectoryAssets(
+  files: PublicAssetFile[],
+  absoluteSrcDir: string,
+  relativeDestDir: string,
+): Promise<void> {
+  const entries = await readdir(absoluteSrcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const absoluteSrc = join(absoluteSrcDir, entry.name);
+    const relativeDest = join(relativeDestDir, entry.name);
+    if (entry.isDirectory()) {
+      await addDirectoryAssets(files, absoluteSrc, relativeDest);
+    } else if (entry.isFile()) {
+      addFileAsset(files, absoluteSrc, relativeDest);
+    }
+  }
+}
+
+async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void> {
+  const packageJson = JSON.parse(
+    await readFile(join(PDFJS_DIST_DIR, "package.json"), "utf8"),
+  ) as { version?: string };
+
+  addFileAsset(files, join(PDFJS_DIST_DIR, "LICENSE"), "pdf/LICENSE");
+  files.push({
+    contents: `${packageJson.version ?? "unknown"}\n`,
+    relativeDest: "pdf/PDFJS_VERSION",
+  });
+
+  for (const file of ["pdf.mjs", "pdf.worker.mjs", "pdf.sandbox.mjs"]) {
+    addFileAsset(files, join(PDFJS_DIST_DIR, "build", file), `pdf/build/${file}`);
+  }
+
+  addFileAsset(
+    files,
+    join(PDFJS_DIST_DIR, "web", "pdf_viewer.mjs"),
+    "pdf/web/pdf_viewer.mjs",
+  );
+  addFileAsset(
+    files,
+    join(PDFJS_DIST_DIR, "web", "pdf_viewer.css"),
+    "pdf/web/pdf_viewer.css",
+  );
+
+  for (const dir of ["cmaps", "iccs", "standard_fonts", "wasm"]) {
+    await addDirectoryAssets(
+      files,
+      join(PDFJS_DIST_DIR, dir),
+      `pdf/web/${dir}`,
+    );
+  }
+  await addDirectoryAssets(
+    files,
+    join(PDFJS_DIST_DIR, "web", "images"),
+    "pdf/web/images",
+  );
+
+  for (const file of [
+    "viewer.html",
+    "viewer.mjs",
+    "viewer.css",
+    "onelingo-viewer.css",
+  ]) {
+    addFileAsset(files, join(PDF_VIEWER_ASSET_DIR, file), `pdf/web/${file}`);
+  }
+}
 
 function ensureCspDirectiveSource(
   csp: string | undefined,
@@ -169,6 +267,14 @@ export default defineConfig({
         "http://localhost:3000",
       );
       csp.sandbox = ensureExtensionPageCsp(csp.sandbox, "http://localhost:3000");
+    },
+    "prepare:publicPaths": (_wxt, paths) => {
+      if (!paths.includes("pdf/web/viewer.html")) {
+        paths.push("pdf/web/viewer.html");
+      }
+    },
+    "build:publicAssets": async (_wxt, files) => {
+      await addPdfViewerPublicAssets(files);
     },
   },
   webExt: {

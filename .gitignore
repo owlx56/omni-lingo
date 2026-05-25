@@ -12,6 +12,7 @@ node_modules
 stats.html
 stats-*.json
 .wxt
+public/pdf
 web-ext.config.ts
 dist
 

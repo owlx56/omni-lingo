@@ -52,7 +52,7 @@ function App(): JSX.Element {
   let stopThemeSync: (() => void) | undefined;
 
   const pdfViewerUrl = (fileUrl: string): string =>
-    `${browser.runtime.getURL("/pdf/web/viewer.html")}?file=${encodeURIComponent(fileUrl)}`;
+    `${browser.runtime.getURL("/")}pdf/web/viewer.html?file=${encodeURIComponent(fileUrl)}`;
 
   onMount(() => {
     void init();

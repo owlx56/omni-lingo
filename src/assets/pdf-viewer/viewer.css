@@ -1,0 +1,321 @@
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  font-size: 14px;
+}
+
+#outerContainer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--body-bg-color, #ece9e1);
+  color: var(--main-color, #1f1e1d);
+}
+
+#toolbarContainer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 30;
+}
+
+#toolbarViewer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  box-sizing: border-box;
+}
+
+#toolbarViewerLeft,
+#toolbarViewerMiddle,
+#toolbarViewerRight {
+  display: flex;
+  align-items: center;
+}
+
+#toolbarViewerLeft {
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+#toolbarViewerMiddle {
+  justify-content: center;
+}
+
+#toolbarViewerRight {
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.toolbarPageControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline-start: 6px;
+  white-space: nowrap;
+}
+
+#viewerContainer {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow: auto;
+  outline: none;
+}
+
+#viewer {
+  min-height: 100%;
+}
+
+#loadingBar {
+  position: absolute;
+  right: 0;
+  left: 0;
+  z-index: 29;
+  height: 2px;
+  overflow: hidden;
+}
+
+#loadingBar[hidden] {
+  display: none;
+}
+
+#loadingBarProgress {
+  width: 0;
+  height: 100%;
+  transition: width 120ms ease;
+}
+
+#errorWrapper {
+  position: fixed;
+  inset-block-start: 54px;
+  inset-inline-start: 50%;
+  z-index: 60;
+  max-width: min(520px, calc(100vw - 32px));
+  transform: translateX(-50%);
+}
+
+#errorWrapper[hidden] {
+  display: none;
+}
+
+#sidebarContainer {
+  position: absolute;
+  top: var(--toolbar-height, 42px);
+  bottom: 0;
+  left: 0;
+  z-index: 20;
+  width: 244px;
+  overflow: hidden;
+}
+
+#sidebarContainer[hidden] {
+  display: none;
+}
+
+#sidebarContent {
+  height: calc(100% - 44px);
+  overflow: auto;
+}
+
+.sidebarHeader {
+  box-sizing: border-box;
+  height: 44px;
+}
+
+.sidebarTabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.sidebarView {
+  box-sizing: border-box;
+  min-height: 100%;
+}
+
+.findbar {
+  position: absolute;
+  top: calc(var(--toolbar-height, 42px) + 8px);
+  left: 50%;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  max-width: min(920px, calc(100vw - 24px));
+  transform: translateX(-50%);
+}
+
+.findbar[hidden] {
+  display: none;
+}
+
+.findOption {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+#secondaryToolbar {
+  position: absolute;
+  top: calc(var(--toolbar-height, 42px) + 8px);
+  right: 8px;
+  z-index: 45;
+  box-sizing: border-box;
+}
+
+#secondaryToolbar[hidden] {
+  display: none;
+}
+
+.secondaryToolbarSection {
+  display: grid;
+  gap: 2px;
+}
+
+.thumbnailItem,
+.outlineItem,
+.attachmentItem,
+.secondaryToolbarButton,
+.sidebarTab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+
+.thumbnailItem {
+  display: grid;
+  width: 100%;
+  justify-items: center;
+  cursor: pointer;
+}
+
+.thumbnailCanvasSlot {
+  display: grid;
+  min-height: 124px;
+  place-items: center;
+}
+
+.thumbnailCanvasSlot canvas {
+  display: block;
+}
+
+.thumbnailLabel {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.outlineList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.outlineList .outlineList {
+  padding-inline-start: 12px;
+}
+
+.outlineItem,
+.attachmentItem {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  cursor: pointer;
+}
+
+.sidebarEmpty {
+  margin: 0;
+}
+
+#propertiesDialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(720px, calc(100vh - 48px));
+  padding: 0;
+}
+
+#propertiesDialog::backdrop {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+#propertiesForm {
+  margin: 0;
+}
+
+.dialogHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dialogHeader h1 {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+#propertiesList {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+}
+
+#propertiesList dt,
+#propertiesList dd {
+  min-width: 0;
+  margin: 0;
+}
+
+#propertiesList dd {
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 721px) {
+  html.sidebarOpen #viewerContainer,
+  html.sidebarOpen #loadingBar {
+    left: 244px;
+  }
+}
+
+@media (max-width: 920px) {
+  #toolbarViewer {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  #toolbarViewerMiddle {
+    display: none;
+  }
+
+  .toolbarButton {
+    max-width: 86px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .findbar {
+    left: 8px;
+    right: 8px;
+    max-width: none;
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  #sidebarContainer {
+    width: min(284px, calc(100vw - 44px));
+  }
+
+  .findOption {
+    display: none;
+  }
+}
