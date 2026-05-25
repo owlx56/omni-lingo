@@ -4,11 +4,14 @@ import {
   type ThemePreference,
 } from "@/lib/storage/settings";
 
-type EffectiveTheme = "light" | "dark";
+export type EffectiveTheme = "light" | "dark";
+type ThemeListener = (theme: EffectiveTheme) => void;
 
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 let currentPreference: ThemePreference = "system";
+let currentEffective: EffectiveTheme | null = null;
+const listeners = new Set<ThemeListener>();
 
 export function initTheme(): void {
   applyEffective(resolveEffective(currentPreference));
@@ -45,5 +48,28 @@ function resolveEffective(pref: ThemePreference): EffectiveTheme {
 }
 
 function applyEffective(theme: EffectiveTheme): void {
-  document.documentElement.setAttribute("data-theme", theme);
+  currentEffective = theme;
+  applyThemeToDocument(document, theme);
+  for (const listener of listeners) listener(theme);
+}
+
+export function getEffectiveTheme(): EffectiveTheme {
+  return currentEffective ?? resolveEffective(currentPreference);
+}
+
+export function watchEffectiveTheme(listener: ThemeListener): () => void {
+  listeners.add(listener);
+  listener(getEffectiveTheme());
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function applyThemeToDocument(
+  targetDocument: Document,
+  theme: EffectiveTheme,
+): void {
+  targetDocument.documentElement.setAttribute("data-theme", theme);
+  targetDocument.documentElement.style.colorScheme = theme;
+  if (targetDocument.body) targetDocument.body.style.colorScheme = theme;
 }

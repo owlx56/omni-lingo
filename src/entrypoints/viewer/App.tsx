@@ -11,6 +11,12 @@ import type { Book, Rendition } from "epubjs";
 import { loadDocument, storeDocument } from "@/lib/document-store";
 import { useT } from "@/lib/i18n";
 import { sendMessage } from "@/lib/messaging";
+import {
+  applyThemeToDocument,
+  getEffectiveTheme,
+  watchEffectiveTheme,
+  type EffectiveTheme,
+} from "@/lib/theme";
 import { initEpubBridge } from "./epub-bridge";
 
 type DocFormat = "pdf" | "epub";
@@ -43,6 +49,7 @@ function App(): JSX.Element {
 
   let bookRef: Book | undefined;
   let renditionRef: Rendition | undefined;
+  let stopThemeSync: (() => void) | undefined;
 
   const pdfViewerUrl = (fileUrl: string): string =>
     `${browser.runtime.getURL("/pdf/web/viewer.html")}?file=${encodeURIComponent(fileUrl)}`;
@@ -52,6 +59,7 @@ function App(): JSX.Element {
   });
 
   onCleanup(() => {
+    stopThemeSync?.();
     renditionRef?.destroy();
     bookRef?.destroy();
   });
@@ -134,11 +142,16 @@ function App(): JSX.Element {
     const blob = new Blob([data], { type: "application/pdf" });
     const objectUrl = URL.createObjectURL(blob);
     setState("ready");
+    stopThemeSync?.();
+    stopThemeSync = undefined;
     requestAnimationFrame(() => {
       const iframe = document.getElementById(
         "pdf-frame",
       ) as HTMLIFrameElement | null;
-      if (iframe) iframe.src = pdfViewerUrl(objectUrl);
+      if (iframe) {
+        stopThemeSync = syncPdfFrameTheme(iframe);
+        iframe.src = pdfViewerUrl(objectUrl);
+      }
     });
   };
 
@@ -170,6 +183,8 @@ function App(): JSX.Element {
     renditionRef = rendition;
 
     initEpubBridge(rendition);
+    stopThemeSync?.();
+    stopThemeSync = syncRenditionTheme(rendition);
 
     rendition.on("relocated", (loc: { start: { label: string } }) => {
       setCurrentLocation(loc.start.label);
@@ -220,6 +235,80 @@ function App(): JSX.Element {
         <div class="epub-render-area" id="epub-render" />
       </Show>
     </main>
+  );
+}
+
+function syncPdfFrameTheme(iframe: HTMLIFrameElement): () => void {
+  let currentTheme = getEffectiveTheme();
+  const syncFrame = (): void => {
+    try {
+      const doc = iframe.contentDocument;
+      if (doc) applyThemeToDocument(doc, currentTheme);
+    } catch {
+      // The bundled PDF.js frame is same-origin; keep this defensive for reloads.
+    }
+  };
+  const onLoad = (): void => syncFrame();
+  iframe.addEventListener("load", onLoad);
+  const stopWatch = watchEffectiveTheme((theme) => {
+    currentTheme = theme;
+    syncFrame();
+  });
+  return () => {
+    iframe.removeEventListener("load", onLoad);
+    stopWatch();
+  };
+}
+
+function syncRenditionTheme(rendition: Rendition): () => void {
+  rendition.hooks.content.register((contents: { document: Document }) => {
+    applyEpubDocumentTheme(contents.document, getEffectiveTheme());
+  });
+  return watchEffectiveTheme((theme) => {
+    for (const contents of getRenditionContents(rendition)) {
+      applyEpubDocumentTheme(contents.document, theme);
+    }
+  });
+}
+
+type EpubContentDocument = { document: Document };
+
+function applyEpubDocumentTheme(doc: Document, theme: EffectiveTheme): void {
+  applyThemeToDocument(doc, theme);
+
+  const style = doc.getElementById("onelingo-epub-theme") ?? doc.createElement("style");
+  style.id = "onelingo-epub-theme";
+  style.textContent = epubThemeCss(theme);
+  if (!style.parentNode) (doc.head ?? doc.documentElement).appendChild(style);
+}
+
+function epubThemeCss(theme: EffectiveTheme): string {
+  const isDark = theme === "dark";
+  const bg = isDark ? "#1f1f1e" : "#ffffff";
+  const text = isDark ? "#ebe8df" : "#1f1e1d";
+  const selection = isDark
+    ? "rgba(91, 141, 214, 0.42)"
+    : "rgba(44, 117, 224, 0.28)";
+  const link = isDark ? "#8ab4f8" : "#1f5fbf";
+  return [
+    `html,body{background:${bg}!important;color:${text}!important;color-scheme:${theme}!important;}`,
+    `::selection{background:${selection}!important;}`,
+    `a,a:visited{color:${link}!important;}`,
+  ].join("\n");
+}
+
+function getRenditionContents(rendition: Rendition): EpubContentDocument[] {
+  const contents = (rendition as { getContents: () => unknown }).getContents();
+  const items = Array.isArray(contents) ? contents : contents ? [contents] : [];
+  return items.filter(hasDocument);
+}
+
+function hasDocument(value: unknown): value is EpubContentDocument {
+  const doc = (value as { document?: unknown } | null)?.document;
+  return (
+    typeof doc === "object" &&
+    doc !== null &&
+    (doc as { nodeType?: unknown }).nodeType === Node.DOCUMENT_NODE
   );
 }
 

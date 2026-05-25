@@ -11,7 +11,12 @@ import {
   initSelection,
   updateSelectionEnabledPref,
 } from "@/features/selection";
-import { initTheme } from "@/lib/theme";
+import {
+  applyThemeToDocument,
+  initTheme,
+  watchEffectiveTheme,
+  type EffectiveTheme,
+} from "@/lib/theme";
 
 const READER_UI_ATTR = "data-onelingo-reader-ui";
 const HIGHLIGHT_NAME = "onelingo-pdf-hover";
@@ -47,12 +52,19 @@ interface PdfBridgeState {
 export default defineUnlistedScript(() => {
   document.documentElement.setAttribute("data-onelingo-pdf-viewer", "");
   initTheme();
+  watchEffectiveTheme(syncPdfViewerTheme);
   markPdfChrome();
   initPdfTranslation();
 
   const observer = new MutationObserver(markPdfChrome);
   observer.observe(document.documentElement, { childList: true, subtree: true });
 });
+
+function syncPdfViewerTheme(theme: EffectiveTheme): void {
+  applyThemeToDocument(document, theme);
+  document.documentElement.classList.toggle("onelingo-theme-dark", theme === "dark");
+  document.documentElement.classList.toggle("onelingo-theme-light", theme === "light");
+}
 
 function markPdfChrome(): void {
   for (const selector of [
