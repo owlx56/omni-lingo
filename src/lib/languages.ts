@@ -1,6 +1,6 @@
 export const UI_LANGS = [
   "en",
-  "zh",
+  "zh-Hans",
   "zh-Hant",
   "ja",
   "ko",
@@ -27,8 +27,8 @@ export type TargetLang = (typeof TARGET_LANGS)[number];
 
 export const UI_LANG_LABELS: Record<UiLang, string> = {
   en: "English",
-  zh: "中文",
-  "zh-Hant": "中文-繁体",
+  "zh-Hans": "简体中文",
+  "zh-Hant": "繁體中文",
   ja: "日本語",
   ko: "한국어",
   ar: "العربية",

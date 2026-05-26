@@ -6,6 +6,6 @@ import { createSignal } from "solid-js";
 // 当前划词文本
 export const [selText, setSelText] = createSignal("");
 // 翻译目标语言
-export const [selTarget, setSelTarget] = createSignal("zh");
+export const [selTarget, setSelTarget] = createSignal("zh-Hans");
 // null = 还在路上；string = 已到
 export const [selResult, setSelResult] = createSignal<string | null>(null);

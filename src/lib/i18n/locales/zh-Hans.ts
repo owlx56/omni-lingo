@@ -2,6 +2,6 @@
 import { I18N_CATALOG } from "../catalog";
 import type { PartialDict } from "../messages";
 
-const ZH: PartialDict = I18N_CATALOG["zh"];
+const ZH_HANS: PartialDict = I18N_CATALOG["zh-Hans"];
 
-export default ZH;
+export default ZH_HANS;

@@ -1,4 +1,5 @@
 import type { Engine, TranslateRequest, TranslateResponse } from "./types";
+import { microsoftLanguageTag } from "./language-tags";
 
 const AUTH_URL = "https://edge.microsoft.com/translate/auth";
 const ENDPOINT = "https://api-edge.cognitive.microsofttranslator.com/translate";
@@ -82,11 +83,13 @@ async function callTranslateBatch(
 ): Promise<unknown | null> {
   const first = reqs[0];
   if (!first) return [];
-  const from = first.source ? `from=${encodeURIComponent(first.source)}&` : "";
+  const from = first.source
+    ? `from=${encodeURIComponent(microsoftLanguageTag(first.source))}&`
+    : "";
   const textType = first.format === "html" ? "&textType=html" : "";
   const url =
     `${ENDPOINT}?${from}` +
-    `to=${encodeURIComponent(first.target)}` +
+    `to=${encodeURIComponent(microsoftLanguageTag(first.target))}` +
     `&api-version=3.0&includeSentenceLength=true${textType}`;
 
   const resp = await fetch(url, {

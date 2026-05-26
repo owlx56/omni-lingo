@@ -111,7 +111,7 @@ docs/
 语言列表集中在 `src/lib/languages.ts`，当前支持：
 
 ```text
-English, 中文, 中文-繁体, 日本語, 한국어, العربية, Türk, русский, Việt, ไทย,
+English, 简体中文, 繁體中文, 日本語, 한국어, العربية, Türk, русский, Việt, ไทย,
 Deutsch, Español, Français, Português(BR), हिन्दी, Italiano, Bahasa Indonesia, فارسی
 ```
 

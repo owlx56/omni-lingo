@@ -85,7 +85,7 @@ reader 也遵守同一条消息边界。PDF reader 和 EPUB bridge 需要读写�
 
 - `UI_LANGS` 是 options / popup 支持的 18 种界面语言；
 - `TARGET_LANGS` 在 `UI_LANGS` 前追加 `inherit`，用于功能目标语言；
-- `UI_LANG_LABELS` 必须使用每种语言自己的字符展示，例如 `English`、`中文`、`日本語`、`العربية`。
+- `UI_LANG_LABELS` 必须使用每种语言自己的字符展示，例如 `English`、`简体中文`、`日本語`、`العربية`。
 
 UI 文案在 `src/lib/i18n/`：
 

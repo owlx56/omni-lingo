@@ -75,12 +75,9 @@ export interface Settings {
   translationStyle: TranslationStyle;
 }
 
-// 老版本存储可能带的老字段：
-//  - hoverLargeText：boolean -> hoverFontSize 13/17 迁移
-//  - targetLang：老的全局语言 -> uiLang 迁移
+// 老版本存储可能带 hoverLargeText：boolean -> hoverFontSize 13/17 迁移。
 type LegacySettings = Partial<Settings> & {
   hoverLargeText?: unknown;
-  targetLang?: unknown;
 };
 
 export type SettingsPatch = Omit<
@@ -92,7 +89,7 @@ export type SettingsPatch = Omit<
 };
 
 const DEFAULTS: Settings = {
-  uiLang: "zh",
+  uiLang: "zh-Hans",
   hoverEnabled: true,
   selectionEnabled: true,
   hoverTargetLang: "inherit",
@@ -140,8 +137,7 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     legacy?.hoverFontSize ??
       (legacy?.hoverLargeText === true ? HOVER_FONT_SIZE_MAX : undefined),
   );
-  // uiLang 优先读新字段；否则回退到 legacy targetLang。
-  const uiLang = normalizeUiLang(legacy?.uiLang ?? legacy?.targetLang);
+  const uiLang = normalizeUiLang(legacy?.uiLang);
   const hoverEnabled = normalizeBoolean(
     legacy?.hoverEnabled,
     DEFAULTS.hoverEnabled,

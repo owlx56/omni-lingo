@@ -87,7 +87,7 @@ function initPdfTranslation(): void {
   const state: PdfBridgeState = {
     hoverEnabled: true,
     hoverPreferredEnabled: null,
-    hoverTarget: "zh",
+    hoverTarget: "zh-Hans",
     hoverEngine: "google",
     hoverGranularity: "word",
     hoverFontSize: 14,

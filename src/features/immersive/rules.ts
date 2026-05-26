@@ -542,7 +542,7 @@ export function resolveFullPageRule(
   rule: FullPageRule,
   input: PageTranslateCommand,
 ): ResolvedFullPageRule {
-  const target = input.target || normalizeLangValue(rule.toLang) || "zh";
+  const target = input.target || normalizeLangValue(rule.toLang) || "zh-Hans";
   const engine = input.engine;
   const mode = input.mode ?? "replace";
   const transOnly =

@@ -33,7 +33,9 @@ const SCALE_STEP = 1.1;
 const MIN_SCALE = 0.25;
 const MAX_SCALE = 5;
 const THUMBNAIL_WIDTH = 96;
-const DEFAULT_UI_LANG = "zh";
+const DEFAULT_UI_LANG = "zh-Hans";
+const ZH_HANS_LOWER = "zh-Hans".toLowerCase();
+const ZH_HANT_LOWER = "zh-Hant".toLowerCase();
 const SETTINGS_STORAGE_KEYS = ["settings", "sync:settings"];
 const SIDEBAR_WIDTH_STORAGE_KEY = "onelingo:pdf-sidebar-width";
 const SIDEBAR_DEFAULT_WIDTH = 244;
@@ -73,7 +75,7 @@ class OneLingoPdfL10n {
   }
 
   getLanguage() {
-    return this.lang === "zh" ? "zh-cn" : this.lang.toLowerCase();
+    return this.lang.toLowerCase();
   }
 
   getDirection() {
@@ -1374,10 +1376,17 @@ function normalizeUiLang(value) {
   if (isSupportedUiLang(value)) return value;
   if (typeof value !== "string") return DEFAULT_UI_LANG;
   const normalized = value.toLowerCase();
-  if (normalized.startsWith("zh-tw") || normalized.startsWith("zh-hk")) {
+  if (
+    normalized.startsWith(ZH_HANT_LOWER) ||
+    normalized.startsWith("zh-tw") ||
+    normalized.startsWith("zh-hk")
+  ) {
     return "zh-Hant";
   }
-  if (normalized.startsWith("zh")) return "zh";
+  if (normalized.startsWith(ZH_HANS_LOWER) || normalized.startsWith("zh-cn")) {
+    return "zh-Hans";
+  }
+  if (normalized === "zh" || normalized.startsWith("zh-")) return "zh-Hans";
   if (normalized.startsWith("pt-br")) return "pt-BR";
   const base = normalized.split("-")[0];
   return isSupportedUiLang(base) ? base : DEFAULT_UI_LANG;
@@ -1390,7 +1399,12 @@ function isSupportedUiLang(value) {
 function applyLocale(lang) {
   currentUiLang = normalizeUiLang(lang);
   l10n.setLanguage(currentUiLang);
-  const htmlLang = currentUiLang === "zh" ? "zh-CN" : currentUiLang;
+  const htmlLang =
+    currentUiLang === "zh-Hans"
+      ? "zh-Hans"
+      : currentUiLang === "zh-Hant"
+        ? "zh-Hant"
+        : currentUiLang;
   document.documentElement.lang = htmlLang;
   document.documentElement.dir = RTL_LANGS.has(currentUiLang) ? "rtl" : "ltr";
   for (const element of document.querySelectorAll("[data-l10n-text]")) {

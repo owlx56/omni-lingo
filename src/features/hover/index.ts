@@ -78,7 +78,7 @@ export function initHover(): void {
     enabled: true,
     settingsEnabled: true,
     preferredEnabled: null,
-    target: "zh",
+    target: "zh-Hans",
     engine: "google",
     granularity: "word",
     fontSize: 13,

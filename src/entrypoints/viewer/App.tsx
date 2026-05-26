@@ -355,7 +355,7 @@ function applyLanguageToDocument(targetDocument: Document, uiLang: UiLang): void
 }
 
 function htmlLang(uiLang: UiLang): string {
-  if (uiLang === "zh") return "zh-CN";
+  if (uiLang === "zh-Hans") return "zh-Hans";
   if (uiLang === "zh-Hant") return "zh-Hant";
   return uiLang;
 }

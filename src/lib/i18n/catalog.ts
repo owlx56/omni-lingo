@@ -285,7 +285,7 @@ export type PartialDict = Partial<Dict>;
 
 const I18N_TRANSLATIONS = {
   en: EN_MESSAGES,
-  "zh": {
+  "zh-Hans": {
   "settings.title": "OneLingo",
   "settings.scope": "本地扩展页面",
   "sidebar.account": "通用设置",
@@ -319,7 +319,7 @@ const I18N_TRANSLATIONS = {
   "section.clickToShowOriginal": "点击译文显示原文",
   "section.translationStyle": "译文样式",
   "common.followUiLang": "跟随主语言",
-  "common.chinese": "中文",
+  "common.chinese": "简体中文",
   "common.english": "English",
   "common.on": "开启",
   "common.off": "关闭",
@@ -591,7 +591,7 @@ const I18N_TRANSLATIONS = {
   "section.clickToShowOriginal": "點擊譯文顯示原文",
   "section.translationStyle": "譯文樣式",
   "common.followUiLang": "跟隨主語言",
-  "common.chinese": "中文",
+  "common.chinese": "繁體中文",
   "common.english": "English",
   "common.on": "開啟",
   "common.off": "關閉",

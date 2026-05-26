@@ -74,7 +74,7 @@ export function initEpubBridge(rendition: Rendition): void {
   const state: EpubBridgeState = {
     hoverEnabled: true,
     hoverPreferredEnabled: null,
-    hoverTarget: "zh",
+    hoverTarget: "zh-Hans",
     hoverEngine: "google",
     hoverGranularity: "word",
     hoverFontSize: 14,

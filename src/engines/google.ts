@@ -1,4 +1,5 @@
 import type { Engine, TranslateRequest, TranslateResponse } from "./types";
+import { googleLanguageTag } from "./language-tags";
 
 // 免费未公开接口。返回形如：
 // [[["你好","hello",null,null,10]], null, "en", ...]
@@ -11,8 +12,8 @@ export const google: Engine = {
   async translate(req: TranslateRequest): Promise<TranslateResponse> {
     const url =
       `${ENDPOINT}?client=gtx&dt=t` +
-      `&sl=${encodeURIComponent(req.source ?? "auto")}` +
-      `&tl=${encodeURIComponent(req.target)}` +
+      `&sl=${encodeURIComponent(req.source ? googleLanguageTag(req.source) : "auto")}` +
+      `&tl=${encodeURIComponent(googleLanguageTag(req.target))}` +
       `&q=${encodeURIComponent(req.text)}`;
 
     const resp = await fetch(url);

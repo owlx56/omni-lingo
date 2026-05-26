@@ -120,7 +120,7 @@ function ensureSelectionState(): State {
     enabled: true,
     settingsEnabled: true,
     preferredEnabled: null,
-    target: "zh",
+    target: "zh-Hans",
     engine: "google",
     logo: null,
     card: null,

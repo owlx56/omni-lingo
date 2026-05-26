@@ -1,4 +1,5 @@
 import type { Engine, TranslateRequest, TranslateResponse } from "./types";
+import { googleLanguageTag } from "./language-tags";
 
 const ENDPOINT = "https://translate.googleapis.com/translate_a/t";
 
@@ -24,8 +25,8 @@ async function translateGoogle2Batch(
   const params = new URLSearchParams({
     client: "gtx",
     dt: "t",
-    sl: first.source ?? "auto",
-    tl: first.target,
+    sl: first.source ? googleLanguageTag(first.source) : "auto",
+    tl: googleLanguageTag(first.target),
     format: first.format ?? "text",
   });
   const body = new URLSearchParams();
