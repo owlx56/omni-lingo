@@ -43,10 +43,25 @@ interface PdfBridgeState {
   hoverEngine: string;
   hoverGranularity: HoverGranularity;
   hoverFontSize: number;
+  wordSegmenter: Intl.Segmenter;
+  sentenceSegmenter: Intl.Segmenter;
   hoverSeq: number;
   hoverTimer: number | null;
   lastHoverText: string;
   tooltip: HTMLDivElement | null;
+}
+
+type CaretDoc = Document & {
+  caretPositionFromPoint?(
+    x: number,
+    y: number,
+  ): { offsetNode: Node; offset: number } | null;
+  caretRangeFromPoint?(x: number, y: number): Range | null;
+};
+
+interface CaretHit {
+  node: Text;
+  offset: number | null;
 }
 
 export default defineUnlistedScript(() => {
@@ -91,6 +106,10 @@ function initPdfTranslation(): void {
     hoverEngine: "google",
     hoverGranularity: "word",
     hoverFontSize: 14,
+    wordSegmenter: new Intl.Segmenter(undefined, { granularity: "word" }),
+    sentenceSegmenter: new Intl.Segmenter(undefined, {
+      granularity: "sentence",
+    }),
     hoverSeq: 0,
     hoverTimer: null,
     lastHoverText: "",
@@ -173,7 +192,13 @@ function onPdfMouseMove(event: MouseEvent, state: PdfBridgeState): void {
     dismissHover(state);
     return;
   }
-  const hit = pdfTextHitAt(event.clientX, event.clientY, state.hoverGranularity);
+  const hit = pdfTextHitAt(
+    event.clientX,
+    event.clientY,
+    state.hoverGranularity,
+    state.wordSegmenter,
+    state.sentenceSegmenter,
+  );
   if (!hit || shouldSkipSameLanguageText(hit.text, state.hoverTarget)) {
     dismissHover(state);
     return;
@@ -206,100 +231,112 @@ function pdfTextHitAt(
   x: number,
   y: number,
   granularity: HoverGranularity,
+  wordSegmenter: Intl.Segmenter,
+  sentenceSegmenter: Intl.Segmenter,
 ): PdfTextHit | null {
-  const span = pdfTextSpanFromPoint(x, y);
-  if (!span) return null;
-  const textNode = firstTextNode(span);
-  const fullText = textNode?.nodeValue ?? "";
-  if (!textNode || !fullText.trim()) return null;
+  const caret = caretHitAt(x, y) ?? textLayerHitAt(x, y);
+  if (!caret) return null;
+  const textNode = caret.node;
+  const text = textNode.nodeValue ?? "";
+  if (!text.trim()) return null;
 
-  const spanRect = span.getBoundingClientRect();
-  const unit = textUnitAtPoint(fullText, spanRect, x, granularity);
-  if (!unit) return null;
+  let wordStart = -1;
+  let hitRect: DOMRect | null = null;
+  let hitWordText = "";
+  let hitWordRange: Range | null = null;
 
-  const range = document.createRange();
-  range.setStart(textNode, unit.start);
-  range.setEnd(textNode, unit.end);
+  for (const word of wordSegmenter.segment(text)) {
+    if (!word.isWordLike) continue;
+    const start = word.index;
+    const end = start + word.segment.length;
+
+    const range = document.createRange();
+    range.setStart(textNode, start);
+    range.setEnd(textNode, end);
+    for (const rect of range.getClientRects()) {
+      if (!pointInRect(x, y, rect)) continue;
+      wordStart = start;
+      hitRect = rect;
+      hitWordText = word.segment;
+      hitWordRange = range;
+      break;
+    }
+    if (wordStart !== -1) break;
+  }
+  if (wordStart === -1 || !hitRect || !hitWordRange) return null;
+
+  if (granularity === "word") {
+    return {
+      anchor: hitRect,
+      range: hitWordRange,
+      text: hitWordText,
+    };
+  }
+
+  if (granularity === "sentence") {
+    for (const sentence of sentenceSegmenter.segment(text)) {
+      const start = sentence.index;
+      const end = start + sentence.segment.length;
+      if (wordStart < start || wordStart >= end) continue;
+      const sentenceText = sentence.segment.trim();
+      if (!sentenceText) return null;
+      const sentenceRange = document.createRange();
+      sentenceRange.setStart(textNode, start);
+      sentenceRange.setEnd(textNode, end);
+      return {
+        anchor: hitRect,
+        range: sentenceRange,
+        text: sentenceText,
+      };
+    }
+    return null;
+  }
+
+  const paragraph = paragraphHit(textNode, hitRect);
+  if (paragraph) return paragraph;
   return {
-    anchor: firstUsefulRect(range) ?? spanRect,
-    range,
-    text: unit.text,
+    anchor: hitRect,
+    range: hitWordRange,
+    text: hitWordText,
   };
 }
 
-function pdfTextSpanFromPoint(x: number, y: number): HTMLElement | null {
-  for (const element of document.elementsFromPoint(x, y)) {
-    const span = element.closest?.(".textLayer span");
-    if (span instanceof HTMLElement && (span.textContent ?? "").trim()) {
-      return span;
-    }
-    if (element instanceof HTMLElement && element.classList.contains("textLayer")) {
-      const nested = textLayerSpanAt(element, x, y);
-      if (nested) return nested;
+function caretHitAt(x: number, y: number): CaretHit | null {
+  const doc = document as CaretDoc;
+  if (doc.caretPositionFromPoint) {
+    const p = doc.caretPositionFromPoint(x, y);
+    if (p?.offsetNode.nodeType === Node.TEXT_NODE) {
+      return { node: p.offsetNode as Text, offset: p.offset };
     }
   }
-  const layers = document.querySelectorAll<HTMLElement>(".textLayer");
-  for (const layer of layers) {
-    const nested = textLayerSpanAt(layer, x, y);
-    if (nested) return nested;
+  if (doc.caretRangeFromPoint) {
+    const r = doc.caretRangeFromPoint(x, y);
+    if (r?.startContainer.nodeType === Node.TEXT_NODE) {
+      return { node: r.startContainer as Text, offset: r.startOffset };
+    }
   }
   return null;
 }
 
-function textLayerSpanAt(
-  layer: HTMLElement,
-  x: number,
-  y: number,
-): HTMLElement | null {
-  const layerRect = layer.getBoundingClientRect();
-  if (!pointInRect(x, y, layerRect)) return null;
-  for (const span of layer.querySelectorAll<HTMLElement>("span")) {
-    if (!(span.textContent ?? "").trim()) continue;
-    if (pointInRect(x, y, span.getBoundingClientRect())) return span;
+function textLayerHitAt(x: number, y: number): CaretHit | null {
+  const el = document.elementFromPoint(x, y);
+  const textLayerNode = el?.closest?.(".textLayer span, .textLayer");
+  if (!textLayerNode) return null;
+  const walker = document.createTreeWalker(textLayerNode, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    if ((node.nodeValue ?? "").trim()) {
+      return { node: node as Text, offset: null };
+    }
+    node = walker.nextNode();
   }
   return null;
-}
-
-function textUnitAtPoint(
-  text: string,
-  rect: DOMRect,
-  x: number,
-  granularity: HoverGranularity,
-): { end: number; start: number; text: string } | null {
-  if (granularity !== "word") {
-    const trimmed = text.trim();
-    const start = text.indexOf(trimmed);
-    return trimmed ? { end: start + trimmed.length, start, text: trimmed } : null;
-  }
-
-  const words = [...new Intl.Segmenter(undefined, { granularity: "word" }).segment(text)]
-    .filter((part) => part.isWordLike)
-    .map((part) => ({
-      end: part.index + part.segment.length,
-      start: part.index,
-      text: part.segment.trim(),
-    }))
-    .filter((part) => part.text);
-  if (words.length === 0) return null;
-  if (words.length === 1 || rect.width <= 0) return words[0] ?? null;
-
-  const ratio = Math.min(0.999, Math.max(0, (x - rect.left) / rect.width));
-  const index = Math.min(words.length - 1, Math.floor(ratio * words.length));
-  return words[index] ?? null;
 }
 
 function firstTextNode(root: Node): Text | null {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const node = walker.nextNode();
   return node instanceof Text ? node : null;
-}
-
-function firstUsefulRect(range: Range): DOMRect | null {
-  for (const rect of range.getClientRects()) {
-    if (rect.width > 0 && rect.height > 0) return rect;
-  }
-  const rect = range.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0 ? rect : null;
 }
 
 function pointInRect(x: number, y: number, rect: DOMRect): boolean {
