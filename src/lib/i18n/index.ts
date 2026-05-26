@@ -11,7 +11,7 @@
 import { useSettings } from "@/lib/storage/settings";
 import type { UiLang } from "@/lib/languages";
 import { format, type MessageKey } from "./messages";
-import { MESSAGES } from "./locales";
+import { I18N_CATALOG } from "./catalog";
 
 export type { MessageKey } from "./messages";
 
@@ -34,7 +34,7 @@ export function translate(
   key: MessageKey,
   params?: Record<string, string | number>,
 ): string {
-  const uiDict = MESSAGES[lang];
-  const tpl = uiDict[key] ?? MESSAGES.en[key] ?? key;
+  const uiDict = I18N_CATALOG[lang];
+  const tpl = uiDict[key] ?? I18N_CATALOG.en[key] ?? key;
   return format(tpl, params);
 }

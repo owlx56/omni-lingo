@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 import { translate } from "./index.ts";
 import { UI_LANGS } from "../languages.ts";
+import { I18N_CATALOG } from "./catalog.ts";
 
 describe("translate", () => {
   test("stores each UI language in its own locale file", () => {
@@ -19,7 +20,16 @@ describe("translate", () => {
     expect(translate("de", "preferences.uiLang")).toBe("Primäre Sprache");
   });
 
-  test("falls back to English when a language does not override a key", () => {
+  test("fills missing language overrides from English", () => {
     expect(translate("ja", "settings.title")).toBe("OneLingo");
+  });
+
+  test("keeps reader copy in the shared catalog", () => {
+    for (const lang of UI_LANGS) {
+      expect(I18N_CATALOG[lang]["viewer.title"]).toBeTruthy();
+      expect(I18N_CATALOG[lang]["pdfViewer.readerTitle"]).toBeTruthy();
+      expect(I18N_CATALOG[lang]["pdfViewer.scaleAuto"]).toBeTruthy();
+      expect(I18N_CATALOG[lang]["pdfViewer.pdfjs.pageLandmark"]).toBeTruthy();
+    }
   });
 });

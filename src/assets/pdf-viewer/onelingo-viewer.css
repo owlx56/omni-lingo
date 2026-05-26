@@ -298,7 +298,7 @@ body {
 
 #pageNumber:focus-visible,
 #findInput:focus-visible,
-#scaleSelect:focus-visible {
+.scaleSelectButton:focus-visible {
   border-color: color-mix(in srgb, var(--onelingo-accent) 55%, var(--onelingo-border));
   outline: 2px solid color-mix(in srgb, var(--onelingo-accent) 26%, transparent);
   outline-offset: 1px;
@@ -311,21 +311,176 @@ body {
 }
 
 #scaleSelectContainer {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   height: 34px;
   min-width: 128px;
-  background: var(--onelingo-surface-alt);
+  background: transparent;
 }
 
-#scaleSelect {
+.scaleNativeSelect {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scaleSelectButton {
+  display: inline-flex;
+  align-items: center;
   width: 100%;
+  min-width: 128px;
+  max-width: 170px;
   height: 34px;
-  padding: 0 24px 0 10px;
-  border: 1px solid transparent;
+  gap: 8px;
+  padding: 0 8px 0 10px;
+  border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--onelingo-text);
+  cursor: pointer;
+  font: inherit;
   font-size: 14px;
-  font-weight: 400;
+  line-height: 1.35;
+  text-align: start;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.scaleSelectButton:is(:hover, :focus-visible),
+#scaleSelectContainer.open .scaleSelectButton {
+  background: var(--onelingo-surface-alt);
+}
+
+.scaleSelectValue {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  padding-bottom: 1px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scaleSelectChevron {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--onelingo-text-muted);
+  transition: transform 0.14s ease;
+}
+
+.scaleSelectChevron::before {
+  width: 16px;
+  height: 16px;
+  background: currentColor;
+  content: "";
+  -webkit-mask-image: url("images/toolbarButton-menuArrow.svg");
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: 16px 16px;
+  mask-image: url("images/toolbarButton-menuArrow.svg");
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: 16px 16px;
+}
+
+#scaleSelectContainer.open .scaleSelectChevron {
+  transform: rotate(180deg);
+}
+
+.scaleSelectMenu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 4px);
+  right: 0;
+  width: max(100%, 176px);
+  max-width: calc(100vw - 28px);
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid rgba(31, 30, 29, 0.18);
+  border-radius: 8px;
+  background: var(--onelingo-surface);
+  box-shadow:
+    0 0 0 1px rgba(31, 30, 29, 0.04),
+    0 16px 36px rgba(31, 30, 29, 0.12),
+    0 3px 10px rgba(31, 30, 29, 0.08);
+}
+
+.scaleSelectMenu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.scaleSelectMenu::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scaleSelectMenu::-webkit-scrollbar-thumb {
+  min-height: 36px;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(31, 30, 29, 0.28);
+  background-clip: content-box;
+}
+
+.scaleSelectMenu::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(31, 30, 29, 0.46);
+}
+
+.scaleSelectMenu {
+  scrollbar-color: rgba(31, 30, 29, 0.28) transparent;
+  scrollbar-width: thin;
+}
+
+.scaleSelectOption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  width: 100%;
+  min-height: 34px;
+  gap: 14px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--onelingo-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.35;
+  text-align: start;
+}
+
+.scaleSelectOption.active,
+.scaleSelectOption:hover,
+.scaleSelectOption:focus-visible {
+  background: rgba(31, 30, 29, 0.06);
+  outline: none;
+}
+
+.scaleSelectOptionLabel {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  padding-bottom: 1px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scaleSelectOptionCheck {
+  display: inline-flex;
+  justify-content: flex-end;
+  color: var(--onelingo-accent);
 }
 
 #viewerContainer,
@@ -672,6 +827,29 @@ html[data-theme="dark"] .pdfViewer .page {
 
 html[data-theme="dark"] #sidebarContainer {
   box-shadow: 2px 0 18px rgba(0, 0, 0, 0.28);
+}
+
+html[data-theme="dark"] .scaleSelectMenu {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 20px 44px rgba(0, 0, 0, 0.42),
+    0 4px 14px rgba(0, 0, 0, 0.28);
+  scrollbar-color: rgba(255, 255, 255, 0.36) transparent;
+}
+
+html[data-theme="dark"] .scaleSelectMenu::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.36);
+}
+
+html[data-theme="dark"] .scaleSelectMenu::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.48);
+}
+
+html[data-theme="dark"] .scaleSelectOption.active,
+html[data-theme="dark"] .scaleSelectOption:hover,
+html[data-theme="dark"] .scaleSelectOption:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 @media (max-width: 1080px) {

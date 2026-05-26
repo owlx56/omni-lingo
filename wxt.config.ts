@@ -2,6 +2,7 @@ import { defineConfig } from "wxt";
 import { readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import "./scripts/generate-i18n";
 
 type PublicAssetFile =
   | {
@@ -91,6 +92,7 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
   await addDirectoryAssets(files, INTER_FONT_DIR, "pdf/web/fonts/inter");
 
   for (const file of [
+    "locales.generated.mjs",
     "viewer.html",
     "viewer.mjs",
     "viewer.css",

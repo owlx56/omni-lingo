@@ -1,4 +1,5 @@
 import {
+  createEffect,
   createSignal,
   onCleanup,
   onMount,
@@ -10,7 +11,12 @@ import ePub from "epubjs";
 import type { Book, Rendition } from "epubjs";
 import { loadDocument, storeDocument } from "@/lib/document-store";
 import { useT } from "@/lib/i18n";
+import type { UiLang } from "@/lib/languages";
 import { sendMessage } from "@/lib/messaging";
+import {
+  useSettings,
+  watchSettings,
+} from "@/lib/storage/settings";
 import {
   applyThemeToDocument,
   getEffectiveTheme,
@@ -41,6 +47,7 @@ const MAX_URL_RESOLVE_DEPTH = 4;
 
 function App(): JSX.Element {
   const t = useT();
+  const settings = useSettings();
   const [state, setState] = createSignal<ViewState>("loading");
   const [error, setError] = createSignal("");
   const [docTitle, setDocTitle] = createSignal("");
@@ -53,6 +60,12 @@ function App(): JSX.Element {
 
   const pdfViewerUrl = (fileUrl: string): string =>
     `${browser.runtime.getURL("/")}pdf/web/viewer.html?file=${encodeURIComponent(fileUrl)}`;
+
+  createEffect(() => {
+    const lang = settings().uiLang;
+    applyLanguageToDocument(document, lang);
+    document.title = docTitle() || t("viewer.title");
+  });
 
   onMount(() => {
     void init();
@@ -81,14 +94,14 @@ function App(): JSX.Element {
       } else if (pending?.action === "bypass" && pending.url) {
         location.replace(pending.url);
       } else if (pending?.action === "handled") {
-        setError("Document opened in OneLingo Reader.");
+        setError(t("viewer.error.openedInReader"));
         setState("error");
       } else {
-        setError("No sniffed document URL was found.");
+        setError(t("viewer.error.noSniffedDocument"));
         setState("error");
       }
     } else {
-      setError("No document specified.");
+      setError(t("viewer.error.noDocument"));
       setState("error");
     }
   };
@@ -97,7 +110,7 @@ function App(): JSX.Element {
     try {
       const doc = await loadDocument(key);
       if (!doc) {
-        setError("Document not found in storage. It may have been cleared.");
+        setError(t("viewer.error.notFound"));
         setState("error");
         return;
       }
@@ -149,7 +162,7 @@ function App(): JSX.Element {
         "pdf-frame",
       ) as HTMLIFrameElement | null;
       if (iframe) {
-        stopThemeSync = syncPdfFrameTheme(iframe);
+        stopThemeSync = syncPdfFrameTheme(iframe, settings().uiLang);
         iframe.src = pdfViewerUrl(objectUrl);
       }
     });
@@ -169,7 +182,7 @@ function App(): JSX.Element {
 
     const el = document.getElementById("epub-render");
     if (!el) {
-      setError("Viewer element not found.");
+      setError(t("viewer.error.missingElement"));
       setState("error");
       return;
     }
@@ -184,7 +197,7 @@ function App(): JSX.Element {
 
     initEpubBridge(rendition);
     stopThemeSync?.();
-    stopThemeSync = syncRenditionTheme(rendition);
+    stopThemeSync = syncRenditionDocumentPrefs(rendition, settings().uiLang);
 
     rendition.on("relocated", (loc: { start: { label: string } }) => {
       setCurrentLocation(loc.start.label);
@@ -238,43 +251,82 @@ function App(): JSX.Element {
   );
 }
 
-function syncPdfFrameTheme(iframe: HTMLIFrameElement): () => void {
+function syncPdfFrameTheme(
+  iframe: HTMLIFrameElement,
+  initialUiLang: UiLang,
+): () => void {
   let currentTheme = getEffectiveTheme();
+  let currentUiLang: UiLang = initialUiLang;
   const syncFrame = (): void => {
     try {
       const doc = iframe.contentDocument;
-      if (doc) applyThemeToDocument(doc, currentTheme);
+      if (doc) {
+        applyThemeToDocument(doc, currentTheme);
+        applyLanguageToDocument(doc, currentUiLang);
+      }
     } catch {
       // The bundled PDF.js frame is same-origin; keep this defensive for reloads.
     }
   };
   const onLoad = (): void => syncFrame();
   iframe.addEventListener("load", onLoad);
-  const stopWatch = watchEffectiveTheme((theme) => {
+  const stopThemeWatch = watchEffectiveTheme((theme) => {
     currentTheme = theme;
     syncFrame();
   });
+  const stopSettingsWatch = watchSettings((settings) => {
+    currentUiLang = settings.uiLang;
+    syncFrame();
+  });
+  syncFrame();
   return () => {
     iframe.removeEventListener("load", onLoad);
-    stopWatch();
+    stopThemeWatch();
+    stopSettingsWatch();
   };
 }
 
-function syncRenditionTheme(rendition: Rendition): () => void {
+function syncRenditionDocumentPrefs(
+  rendition: Rendition,
+  initialUiLang: UiLang,
+): () => void {
+  let currentTheme = getEffectiveTheme();
+  let currentUiLang: UiLang = initialUiLang;
+
   rendition.hooks.content.register((contents: { document: Document }) => {
-    applyEpubDocumentTheme(contents.document, getEffectiveTheme());
+    applyEpubDocumentPrefs(contents.document, currentTheme, currentUiLang);
   });
-  return watchEffectiveTheme((theme) => {
+
+  const syncContents = (): void => {
     for (const contents of getRenditionContents(rendition)) {
-      applyEpubDocumentTheme(contents.document, theme);
+      applyEpubDocumentPrefs(contents.document, currentTheme, currentUiLang);
     }
+  };
+  const stopThemeWatch = watchEffectiveTheme((theme) => {
+    currentTheme = theme;
+    syncContents();
   });
+  const stopSettingsWatch = watchSettings((settings) => {
+    currentUiLang = settings.uiLang;
+    syncContents();
+  });
+  syncContents();
+
+  return () => {
+    stopThemeWatch();
+    stopSettingsWatch();
+  };
 }
 
 type EpubContentDocument = { document: Document };
 
-function applyEpubDocumentTheme(doc: Document, theme: EffectiveTheme): void {
+function applyEpubDocumentPrefs(
+  doc: Document,
+  theme: EffectiveTheme,
+  uiLang: UiLang,
+): void {
   applyThemeToDocument(doc, theme);
+  applyLanguageToDocument(doc, uiLang);
 
   const style = doc.getElementById("onelingo-epub-theme") ?? doc.createElement("style");
   style.id = "onelingo-epub-theme";
@@ -295,6 +347,17 @@ function epubThemeCss(theme: EffectiveTheme): string {
     `::selection{background:${selection}!important;}`,
     `a,a:visited{color:${link}!important;}`,
   ].join("\n");
+}
+
+function applyLanguageToDocument(targetDocument: Document, uiLang: UiLang): void {
+  targetDocument.documentElement.lang = htmlLang(uiLang);
+  targetDocument.documentElement.dir = uiLang === "ar" || uiLang === "fa" ? "rtl" : "ltr";
+}
+
+function htmlLang(uiLang: UiLang): string {
+  if (uiLang === "zh") return "zh-CN";
+  if (uiLang === "zh-Hant") return "zh-Hant";
+  return uiLang;
 }
 
 function getRenditionContents(rendition: Rendition): EpubContentDocument[] {

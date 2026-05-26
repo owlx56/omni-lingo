@@ -14,6 +14,11 @@ import {
   ScrollMode,
   SpreadMode,
 } from "./pdf_viewer.mjs";
+import {
+  PDF_VIEWER_LOCALES,
+  PDF_VIEWER_PDFJS_L10N,
+  PDF_VIEWER_SUPPORTED_UI_LANGS,
+} from "./locales.generated.mjs";
 
 const ASSET_PATHS = {
   cMapUrl: "../web/cmaps/",
@@ -29,7 +34,7 @@ const MIN_SCALE = 0.25;
 const MAX_SCALE = 5;
 const THUMBNAIL_WIDTH = 96;
 const DEFAULT_UI_LANG = "zh";
-const SETTINGS_STORAGE_KEY = "sync:settings";
+const SETTINGS_STORAGE_KEYS = ["settings", "sync:settings"];
 
 const SCROLL_MODES = {
   horizontal: ScrollMode.HORIZONTAL,
@@ -49,244 +54,9 @@ const EDITOR_MODES = {
   stamp: AnnotationEditorType.STAMP,
 };
 const RTL_LANGS = new Set(["ar", "fa"]);
-const SUPPORTED_UI_LANGS = new Set([
-  "en",
-  "zh",
-  "zh-Hant",
-  "ja",
-  "ko",
-  "ar",
-  "tr",
-  "ru",
-  "vi",
-  "th",
-  "de",
-  "es",
-  "fr",
-  "pt-BR",
-  "hi",
-  "it",
-  "id",
-  "fa",
-]);
-const UI_LOCALES = {
-  en: {
-    addImage: "Add or edit images",
-    annotationUnavailable: "Annotation editing is not available for this document.",
-    attachment: "Attachment",
-    attachments: "Attachments",
-    close: "Close",
-    closeFindbar: "Close find bar",
-    currentPage: "Current page",
-    documentProperties: "Document properties...",
-    draw: "Draw",
-    evenSpreads: "Book view",
-    fileName: "File name",
-    find: "Find",
-    findInDocument: "Find in document",
-    findNext: "Find next",
-    findPrevious: "Find previous",
-    firstPage: "Go to first page",
-    handTool: "Hand tool",
-    highlight: "Highlight",
-    highlightAll: "Highlight all",
-    horizontalScrolling: "Horizontal scrolling",
-    keywords: "Keywords",
-    lastPage: "Go to last page",
-    loadingError: "An error occurred while loading the PDF.",
-    managePages: "Manage pages",
-    matchCase: "Match case",
-    matchDiacritics: "Match diacritics",
-    missingFile: "No PDF file was specified.",
-    modificationDate: "Modification date",
-    nextPage: "Next page",
-    noAttachments: "No attachments available.",
-    noOutline: "No outline available.",
-    noPreview: "Preview unavailable",
-    noSpreads: "Single page view",
-    oddSpreads: "Two page view",
-    openFile: "Open file",
-    outline: "Outline",
-    page: "Page",
-    pageCount: "Page count",
-    pageScrolling: "Page scrolling",
-    pageTitle: "Page {page}",
-    pages: "Pages",
-    pdfProducer: "PDF producer",
-    pdfVersion: "PDF version",
-    presentationMode: "Presentation mode",
-    previousPage: "Previous page",
-    print: "Print",
-    rotateCcw: "Rotate counterclockwise",
-    rotateCw: "Rotate clockwise",
-    save: "Save",
-    scaleAuto: "Automatic zoom",
-    scalePageFit: "Page fit",
-    scalePageWidth: "Page width",
-    searching: "Searching...",
-    searchNotFound: "Phrase not found",
-    subject: "Subject",
-    text: "Text",
-    textSelectTool: "Text selection tool",
-    title: "Title",
-    tools: "Tools",
-    unableAttachments: "Unable to load attachments.",
-    unableOutline: "Unable to load outline.",
-    untitled: "Untitled",
-    verticalScrolling: "Vertical scrolling",
-    wholeWords: "Whole words",
-    wrappedBottom: "Reached end, continued from top",
-    wrappedScrolling: "Wrapped scrolling",
-    wrappedTop: "Reached top, continued from bottom",
-    zoom: "Zoom",
-    zoomIn: "Zoom in",
-    zoomOut: "Zoom out",
-    author: "Author",
-    creationDate: "Creation date",
-    creator: "Creator",
-  },
-  zh: {
-    addImage: "添加或编辑图像",
-    annotationUnavailable: "此文档无法使用批注编辑。",
-    attachment: "附件",
-    attachments: "附件",
-    author: "作者",
-    close: "关闭",
-    closeFindbar: "关闭查找栏",
-    creationDate: "创建日期",
-    creator: "创建工具",
-    currentPage: "当前页面",
-    documentProperties: "文档属性...",
-    draw: "绘图",
-    evenSpreads: "书籍视图",
-    fileName: "文件名",
-    find: "查找",
-    findInDocument: "在文档中查找",
-    findNext: "查找下一个",
-    findPrevious: "查找上一个",
-    firstPage: "转到第一页",
-    handTool: "手形工具",
-    highlight: "高亮",
-    highlightAll: "全部高亮",
-    horizontalScrolling: "水平滚动",
-    keywords: "关键词",
-    lastPage: "转到最后一页",
-    loadingError: "加载 PDF 时出错。",
-    managePages: "管理页面",
-    matchCase: "区分大小写",
-    matchDiacritics: "匹配变音符号",
-    missingFile: "没有指定 PDF 文件。",
-    modificationDate: "修改日期",
-    nextPage: "下一页",
-    noAttachments: "没有可用附件。",
-    noOutline: "没有可用大纲。",
-    noPreview: "预览不可用",
-    noSpreads: "单页视图",
-    oddSpreads: "双页视图",
-    openFile: "打开文件",
-    outline: "大纲",
-    page: "页码",
-    pageCount: "页数",
-    pageScrolling: "页面滚动",
-    pageTitle: "第 {page} 页",
-    pages: "页面",
-    pdfProducer: "PDF 生成器",
-    pdfVersion: "PDF 版本",
-    presentationMode: "演示模式",
-    previousPage: "上一页",
-    print: "打印",
-    rotateCcw: "逆时针旋转",
-    rotateCw: "顺时针旋转",
-    save: "保存",
-    scaleAuto: "自动缩放",
-    scalePageFit: "适合页面",
-    scalePageWidth: "页宽",
-    searching: "正在搜索...",
-    searchNotFound: "找不到短语",
-    subject: "主题",
-    text: "文本",
-    textSelectTool: "文本选择工具",
-    title: "标题",
-    tools: "工具",
-    unableAttachments: "无法加载附件。",
-    unableOutline: "无法加载大纲。",
-    untitled: "无标题",
-    verticalScrolling: "垂直滚动",
-    wholeWords: "全字匹配",
-    wrappedBottom: "已到达文档末尾，从开头继续",
-    wrappedScrolling: "平铺滚动",
-    wrappedTop: "已到达文档开头，从末尾继续",
-    zoom: "缩放",
-    zoomIn: "放大",
-    zoomOut: "缩小",
-  },
-};
-UI_LOCALES["zh-Hant"] = {
-  ...UI_LOCALES.zh,
-  addImage: "新增或編輯影像",
-  attachment: "附件",
-  attachments: "附件",
-  close: "關閉",
-  closeFindbar: "關閉搜尋列",
-  currentPage: "目前頁面",
-  documentProperties: "文件內容...",
-  draw: "繪圖",
-  fileName: "檔案名稱",
-  find: "搜尋",
-  findInDocument: "在文件中搜尋",
-  findNext: "搜尋下一個",
-  findPrevious: "搜尋上一個",
-  firstPage: "前往第一頁",
-  handTool: "手形工具",
-  lastPage: "前往最後一頁",
-  managePages: "管理頁面",
-  nextPage: "下一頁",
-  noSpreads: "單頁檢視",
-  openFile: "開啟檔案",
-  page: "頁碼",
-  pageTitle: "第 {page} 頁",
-  previousPage: "上一頁",
-  save: "儲存",
-  scaleAuto: "自動縮放",
-  scalePageFit: "符合頁面",
-  scalePageWidth: "頁寬",
-  textSelectTool: "文字選取工具",
-  tools: "工具",
-  zoomIn: "放大",
-  zoomOut: "縮小",
-};
-const PDFJS_L10N = {
-  en: {
-    "pdfjs-editor-highlight-editor": { "aria-label": "Highlight editor" },
-    "pdfjs-editor-ink-editor": { "aria-label": "Drawing editor" },
-    "pdfjs-editor-stamp-editor": { "aria-label": "Image editor" },
-    "pdfjs-free-text2": {
-      "aria-label": "Text editor",
-      "default-content": "Start typing...",
-    },
-    "pdfjs-page-landmark": { "aria-label": "Page {page}" },
-  },
-  zh: {
-    "pdfjs-editor-highlight-editor": { "aria-label": "高亮编辑器" },
-    "pdfjs-editor-ink-editor": { "aria-label": "绘图编辑器" },
-    "pdfjs-editor-stamp-editor": { "aria-label": "图像编辑器" },
-    "pdfjs-free-text2": {
-      "aria-label": "文本编辑器",
-      "default-content": "开始输入...",
-    },
-    "pdfjs-page-landmark": { "aria-label": "第 {page} 页" },
-  },
-};
-PDFJS_L10N["zh-Hant"] = {
-  "pdfjs-editor-highlight-editor": { "aria-label": "高亮編輯器" },
-  "pdfjs-editor-ink-editor": { "aria-label": "繪圖編輯器" },
-  "pdfjs-editor-stamp-editor": { "aria-label": "影像編輯器" },
-  "pdfjs-free-text2": {
-    "aria-label": "文字編輯器",
-    "default-content": "開始輸入...",
-  },
-  "pdfjs-page-landmark": { "aria-label": "第 {page} 頁" },
-};
+const SUPPORTED_UI_LANGS = new Set(PDF_VIEWER_SUPPORTED_UI_LANGS);
+const UI_LOCALES = PDF_VIEWER_LOCALES;
+const PDFJS_L10N = PDF_VIEWER_PDFJS_L10N;
 
 class OneLingoPdfL10n {
   constructor(lang) {
@@ -405,6 +175,9 @@ const elements = {
   rotateCcw: mustGetElement("rotateCcw"),
   rotateCw: mustGetElement("rotateCw"),
   scaleSelect: mustGetElement("scaleSelect"),
+  scaleSelectButton: mustGetElement("scaleSelectButton"),
+  scaleSelectMenu: mustGetElement("scaleSelectMenu"),
+  scaleSelectValue: mustGetElement("scaleSelectValue"),
   secondaryDownload: mustGetElement("secondaryDownload"),
   secondaryOpenFile: mustGetElement("secondaryOpenFile"),
   secondaryToolbar: mustGetElement("secondaryToolbar"),
@@ -450,6 +223,8 @@ let thumbnailObserver = null;
 let activeSidebarView = "thumbnails";
 let cursorTool = "select";
 let handToolState = null;
+let findStatusState = null;
+let findStatusPrevious = false;
 
 linkService.setViewer(pdfViewer);
 linkService.setHistory(pdfHistory);
@@ -504,6 +279,21 @@ function wireToolbar() {
   elements.scaleSelect.addEventListener("change", () => {
     pdfViewer.currentScaleValue = elements.scaleSelect.value;
   });
+  elements.scaleSelectButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (elements.scaleSelectMenu.hidden) {
+      openScaleSelect();
+    } else {
+      closeScaleSelect();
+    }
+  });
+  elements.scaleSelectButton.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openScaleSelect();
+      focusScaleSelectOption(pdfViewer.currentScaleValue);
+    }
+  });
   elements.zoomOutButton.addEventListener("click", () => {
     pdfViewer.currentScale = clamp(pdfViewer.currentScale / SCALE_STEP);
   });
@@ -544,6 +334,7 @@ function wireToolbar() {
       return;
     }
     if (event.key === "Escape") {
+      closeScaleSelect();
       closeSecondaryToolbar();
       if (pdfViewer.annotationEditorMode !== AnnotationEditorType.DISABLE) {
         setAnnotationEditorMode("none");
@@ -558,6 +349,13 @@ function wireToolbar() {
     }
   });
   document.addEventListener("click", (event) => {
+    if (
+      !elements.scaleSelectMenu.hidden &&
+      event.target instanceof Element &&
+      !event.target.closest("#scaleSelectContainer")
+    ) {
+      closeScaleSelect();
+    }
     if (
       !elements.secondaryToolbar.hidden &&
       event.target instanceof Element &&
@@ -725,9 +523,10 @@ async function loadPdf(fileUrl) {
   hideError();
   showLoading(0);
   closeSecondaryToolbar();
+  closeScaleSelect();
   setAnnotationEditorMode("none");
   currentFileUrl = fileUrl;
-  document.title = `${nameFromUrl(fileUrl)} - OneLingo`;
+  updateDocumentTitle();
 
   if (loadingTask) {
     await loadingTask.destroy().catch(() => {});
@@ -780,6 +579,82 @@ function updatePageControls() {
   elements.nextButton.disabled = total === 0 || page >= total;
 }
 
+function openScaleSelect() {
+  renderScaleSelectMenu();
+  elements.scaleSelectMenu.hidden = false;
+  elements.scaleSelectButton.setAttribute("aria-expanded", "true");
+  elements.scaleSelect.parentElement?.classList.add("open");
+}
+
+function closeScaleSelect() {
+  elements.scaleSelectMenu.hidden = true;
+  elements.scaleSelectButton.setAttribute("aria-expanded", "false");
+  elements.scaleSelect.parentElement?.classList.remove("open");
+}
+
+function focusScaleSelectOption(value) {
+  const option = elements.scaleSelectMenu.querySelector(
+    `[data-scale-value="${cssEscape(value)}"]`,
+  );
+  if (option instanceof HTMLElement) option.focus();
+}
+
+function renderScaleSelectMenu() {
+  const fragment = document.createDocumentFragment();
+  for (const option of elements.scaleSelect.options) {
+    const item = document.createElement("button");
+    const selected = option.value === elements.scaleSelect.value;
+    item.className = "scaleSelectOption";
+    item.type = "button";
+    item.role = "option";
+    item.dataset.scaleValue = option.value;
+    item.setAttribute("aria-selected", String(selected));
+    item.classList.toggle("active", selected);
+    const label = document.createElement("span");
+    label.className = "scaleSelectOptionLabel";
+    label.textContent = scaleOptionLabel(option);
+    const check = document.createElement("span");
+    check.className = "scaleSelectOptionCheck";
+    check.textContent = selected ? "✓" : "";
+    item.append(label, check);
+    item.addEventListener("click", () => setScaleValue(option.value));
+    item.addEventListener("keydown", onScaleSelectOptionKeydown);
+    fragment.append(item);
+  }
+  elements.scaleSelectMenu.replaceChildren(fragment);
+}
+
+function onScaleSelectOptionKeydown(event) {
+  if (!(event.currentTarget instanceof HTMLElement)) return;
+  const options = [...elements.scaleSelectMenu.querySelectorAll(".scaleSelectOption")];
+  const index = options.indexOf(event.currentTarget);
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    const delta = event.key === "ArrowDown" ? 1 : -1;
+    const next = options[(index + delta + options.length) % options.length];
+    if (next instanceof HTMLElement) next.focus();
+    return;
+  }
+  if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    const next = event.key === "Home" ? options[0] : options.at(-1);
+    if (next instanceof HTMLElement) next.focus();
+    return;
+  }
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    event.currentTarget.click();
+  }
+}
+
+function setScaleValue(value) {
+  elements.scaleSelect.value = value;
+  pdfViewer.currentScaleValue = value;
+  closeScaleSelect();
+  updateScaleSelectUi();
+  elements.scaleSelectButton.focus();
+}
+
 function syncScaleSelect() {
   const normalized = pdfViewer.currentScaleValue;
   const existing = [...elements.scaleSelect.options].some(
@@ -787,6 +662,7 @@ function syncScaleSelect() {
   );
   if (existing) {
     elements.scaleSelect.value = normalized;
+    updateScaleSelectUi();
     return;
   }
   const percent = `${Math.round(pdfViewer.currentScale * 100)}%`;
@@ -799,6 +675,27 @@ function syncScaleSelect() {
   custom.value = normalized;
   custom.textContent = percent;
   elements.scaleSelect.value = normalized;
+  updateScaleSelectUi();
+}
+
+function updateScaleSelectUi() {
+  const selected =
+    [...elements.scaleSelect.options].find(
+      (option) => option.value === elements.scaleSelect.value,
+    ) ?? elements.scaleSelect.selectedOptions?.[0];
+  elements.scaleSelectValue.textContent = selected
+    ? scaleOptionLabel(selected)
+    : elements.scaleSelect.value;
+  if (!elements.scaleSelectMenu.hidden) renderScaleSelectMenu();
+}
+
+function scaleOptionLabel(option) {
+  const l10nKey = option.dataset.l10nText;
+  return l10nKey ? t(l10nKey) : option.textContent ?? option.value;
+}
+
+function cssEscape(value) {
+  return globalThis.CSS?.escape ? CSS.escape(value) : String(value).replaceAll('"', '\\"');
 }
 
 function openFindbar() {
@@ -831,11 +728,15 @@ function dispatchFind(type, findPrevious = false) {
 
 function resetFindbar() {
   elements.findInput.value = "";
+  findStatusState = null;
+  findStatusPrevious = false;
   elements.findMsg.textContent = "";
   elements.findResultsCount.textContent = "";
 }
 
 function updateFindStatus(state, previous) {
+  findStatusState = state;
+  findStatusPrevious = previous;
   switch (state) {
     case FindState.PENDING:
       elements.findMsg.textContent = t("searching");
@@ -1354,7 +1255,10 @@ async function loadUiLanguage() {
 function watchUiLanguage() {
   getExtensionStorage()?.onChanged?.addListener?.((changes, areaName) => {
     if (areaName && areaName !== "sync") return;
-    const next = changes[SETTINGS_STORAGE_KEY]?.newValue?.uiLang;
+    const settingsChange = SETTINGS_STORAGE_KEYS
+      .map((key) => changes[key])
+      .find(Boolean);
+    const next = settingsChange?.newValue?.uiLang;
     if (isSupportedUiLang(next)) applyLocale(next);
   });
 }
@@ -1363,8 +1267,12 @@ async function readStoredUiLang() {
   const syncStorage = getExtensionStorage()?.sync;
   if (!syncStorage?.get) return normalizeUiLang(navigator.language);
   try {
-    const result = await storageGet(syncStorage, SETTINGS_STORAGE_KEY);
-    return normalizeUiLang(result?.[SETTINGS_STORAGE_KEY]?.uiLang);
+    const result = await storageGet(syncStorage, SETTINGS_STORAGE_KEYS);
+    for (const key of SETTINGS_STORAGE_KEYS) {
+      const value = result?.[key]?.uiLang;
+      if (isSupportedUiLang(value)) return value;
+    }
+    return normalizeUiLang(navigator.language);
   } catch (error) {
     console.warn("[OneLingo] failed to read PDF viewer language:", error);
     return normalizeUiLang(navigator.language);
@@ -1423,7 +1331,10 @@ function applyLocale(lang) {
   for (const element of document.querySelectorAll("[data-l10n-placeholder]")) {
     element.setAttribute("placeholder", t(element.dataset.l10nPlaceholder));
   }
+  updateScaleSelectUi();
+  updateDocumentTitle();
   updateGeneratedLocaleText();
+  void l10n.translateOnce(elements.viewer);
 }
 
 function updateGeneratedLocaleText() {
@@ -1438,6 +1349,13 @@ function updateGeneratedLocaleText() {
     const key = empty.dataset.l10nKey;
     if (key) empty.textContent = t(key);
   }
+  if (findStatusState !== null) updateFindStatus(findStatusState, findStatusPrevious);
+}
+
+function updateDocumentTitle() {
+  document.title = currentFileUrl
+    ? `${nameFromUrl(currentFileUrl)} - ${t("readerTitle")}`
+    : t("readerTitle");
 }
 
 function t(key) {
