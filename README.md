@@ -106,7 +106,7 @@ docs/
 
 ## 设置和多语言
 
-设置统一走 `src/lib/storage/settings.ts`。`uiLang` 是 options / popup 的界面语言，也是 hover / selection / immersive 的目标语言设为 `inherit` 时的回退语言。
+设置统一走 `src/lib/storage/settings.ts`。`uiLang` 是 options / popup 的界面语言；hover / selection / immersive 的目标语言默认与它一致，用户修改某个功能目标语言后该功能独立保存。
 
 语言列表集中在 `src/lib/languages.ts`，当前支持：
 
@@ -115,7 +115,7 @@ English, 简体中文, 繁體中文, 日本語, 한국어, العربية, Türk
 Deutsch, Español, Français, Português(BR), हिन्दी, Italiano, Bahasa Indonesia, فارسی
 ```
 
-i18n key 和模板格式化 helper 在 `src/lib/i18n/messages.ts`；实际文案按语言放在 `src/lib/i18n/locales/*.ts`，由 `src/lib/i18n/locales/index.ts` 汇总。新增 options / popup 文案时，先在 `messages.ts` 增加 key，再补对应语言文件。
+i18n 文案源集中在 `src/lib/i18n/catalog.ts`；`src/lib/i18n/locales/*.ts`、`src/lib/i18n/locales/index.ts` 和 `src/assets/pdf-viewer/locales.generated.mjs` 都由脚本生成。新增 options / popup / viewer 文案时，只改 `catalog.ts`，再运行 `bun run i18n:generate`。
 
 共享 UI 控件在 `src/lib/ui/controls.tsx` 和 `src/lib/ui/controls.css`。options / popup 的 Select、Segment、Switch、Row、色板等优先从这里改，避免两个入口样式漂移。
 

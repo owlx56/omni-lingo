@@ -11,7 +11,7 @@
 //   - About 页是只读 row，不做控件。
 
 import { For, Show, createEffect, createSignal, type JSX } from "solid-js";
-import { TARGET_LANGS, UI_LANG_LABELS, UI_LANGS } from "@/lib/languages";
+import { UI_LANG_LABELS, UI_LANGS } from "@/lib/languages";
 import {
   resolveTranslationStyleColor,
   resolveTranslationStyleFontFamily,
@@ -162,10 +162,10 @@ function uiLangSelectOptions(): SelectOption<UiLang>[] {
   }));
 }
 
-function targetLangSelectOptions(t: TFn): SelectOption<TargetLang>[] {
-  return TARGET_LANGS.map((value) => ({
+function targetLangSelectOptions(): SelectOption<TargetLang>[] {
+  return UI_LANGS.map((value) => ({
     value,
-    label: value === "inherit" ? t("common.followUiLang") : UI_LANG_LABELS[value],
+    label: UI_LANG_LABELS[value],
   }));
 }
 
@@ -378,7 +378,7 @@ function App() {
             onChange={(hoverTargetLang) =>
               void setSettings({ hoverTargetLang })
             }
-            options={targetLangSelectOptions(t)}
+            options={targetLangSelectOptions()}
             value={settings().hoverTargetLang}
           />
         </Row>
@@ -486,7 +486,7 @@ function App() {
           onChange={(selectionTargetLang) =>
             void setSettings({ selectionTargetLang })
           }
-          options={targetLangSelectOptions(t)}
+          options={targetLangSelectOptions()}
           value={settings().selectionTargetLang}
         />
       </Row>
@@ -516,7 +516,7 @@ function App() {
             onChange={(immersiveTargetLang) =>
               void setSettings({ immersiveTargetLang })
             }
-            options={targetLangSelectOptions(t)}
+            options={targetLangSelectOptions()}
             value={settings().immersiveTargetLang}
           />
         </Row>

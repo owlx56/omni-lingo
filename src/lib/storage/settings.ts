@@ -57,12 +57,15 @@ export const HOVER_FONT_SIZE_MIN = 13;
 export const HOVER_FONT_SIZE_MAX = 17;
 
 export interface Settings {
-  uiLang: UiLang; // 主语言：options/popup/未来悬浮球的 UI 语言，同时是三个功能 target 的 inherit 回退值
+  uiLang: UiLang; // 主语言：options/popup/未来悬浮球的 UI 语言
   hoverEnabled: boolean;
   selectionEnabled: boolean;
   hoverTargetLang: TargetLang;
   selectionTargetLang: TargetLang;
   immersiveTargetLang: TargetLang;
+  hoverTargetLangCustomized: boolean;
+  selectionTargetLangCustomized: boolean;
+  immersiveTargetLangCustomized: boolean;
   theme: ThemePreference;
   engines: EngineMap;
   hoverGranularity: HoverGranularity;
@@ -92,9 +95,12 @@ const DEFAULTS: Settings = {
   uiLang: "zh-Hans",
   hoverEnabled: true,
   selectionEnabled: true,
-  hoverTargetLang: "inherit",
-  selectionTargetLang: "inherit",
-  immersiveTargetLang: "inherit",
+  hoverTargetLang: "zh-Hans",
+  selectionTargetLang: "zh-Hans",
+  immersiveTargetLang: "zh-Hans",
+  hoverTargetLangCustomized: false,
+  selectionTargetLangCustomized: false,
+  immersiveTargetLangCustomized: false,
   theme: "system",
   engines: { hover: "google", selection: "google", fullPage: "google2" },
   hoverGranularity: "word",
@@ -146,9 +152,27 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     legacy?.selectionEnabled,
     DEFAULTS.selectionEnabled,
   );
-  const hoverTargetLang = normalizeTargetLang(legacy?.hoverTargetLang);
-  const selectionTargetLang = normalizeTargetLang(legacy?.selectionTargetLang);
-  const immersiveTargetLang = normalizeTargetLang(legacy?.immersiveTargetLang);
+  const hoverTargetLang = normalizeTargetLang(legacy?.hoverTargetLang, uiLang);
+  const selectionTargetLang = normalizeTargetLang(
+    legacy?.selectionTargetLang,
+    uiLang,
+  );
+  const immersiveTargetLang = normalizeTargetLang(
+    legacy?.immersiveTargetLang,
+    uiLang,
+  );
+  const hoverTargetLangCustomized = normalizeBoolean(
+    legacy?.hoverTargetLangCustomized,
+    false,
+  );
+  const selectionTargetLangCustomized = normalizeBoolean(
+    legacy?.selectionTargetLangCustomized,
+    false,
+  );
+  const immersiveTargetLangCustomized = normalizeBoolean(
+    legacy?.immersiveTargetLangCustomized,
+    false,
+  );
   const theme = normalizeTheme(legacy?.theme);
   const documentLinkSniffEnabled = normalizeBoolean(
     legacy?.documentLinkSniffEnabled,
@@ -175,6 +199,9 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     hoverTargetLang,
     selectionTargetLang,
     immersiveTargetLang,
+    hoverTargetLangCustomized,
+    selectionTargetLangCustomized,
+    immersiveTargetLangCustomized,
     theme,
     documentLinkSniffEnabled,
     documentLinkSniffKeepOriginal,
@@ -186,8 +213,8 @@ function normalizeUiLang(value: unknown): UiLang {
   return isUiLang(value) ? value : DEFAULTS.uiLang;
 }
 
-function normalizeTargetLang(value: unknown): TargetLang {
-  return isTargetLang(value) ? value : "inherit";
+function normalizeTargetLang(value: unknown, fallback: UiLang): TargetLang {
+  return isTargetLang(value) ? value : fallback;
 }
 
 function normalizeTheme(value: unknown): ThemePreference {
@@ -225,15 +252,11 @@ function normalizeTranslationColor(value: unknown): TranslationColor {
   return DEFAULTS.translationStyle.color;
 }
 
-/**
- * 将功能 target 语言 resolve 为实际语言码。
- * "inherit" 表示跟随主语言 uiLang。
- */
 export function resolveTargetLang(
   target: TargetLang,
-  uiLang: UiLang,
+  _uiLang: UiLang,
 ): UiLang {
-  return target === "inherit" ? uiLang : target;
+  return target;
 }
 
 function clampFontSize(value: unknown): number {
@@ -272,9 +295,40 @@ export async function getSettings(): Promise<Settings> {
 
 export async function setSettings(patch: SettingsPatch): Promise<void> {
   const cur = await getSettings();
+  const uiLang = patch.uiLang ?? cur.uiLang;
   const next: Settings = {
     ...cur,
     ...patch,
+    uiLang,
+    hoverTargetLang:
+      patch.hoverTargetLang ??
+      (patch.uiLang !== undefined && !cur.hoverTargetLangCustomized
+        ? uiLang
+        : cur.hoverTargetLang),
+    selectionTargetLang:
+      patch.selectionTargetLang ??
+      (patch.uiLang !== undefined && !cur.selectionTargetLangCustomized
+        ? uiLang
+        : cur.selectionTargetLang),
+    immersiveTargetLang:
+      patch.immersiveTargetLang ??
+      (patch.uiLang !== undefined && !cur.immersiveTargetLangCustomized
+        ? uiLang
+        : cur.immersiveTargetLang),
+    hoverTargetLangCustomized:
+      patch.hoverTargetLang !== undefined
+        ? true
+        : (patch.hoverTargetLangCustomized ?? cur.hoverTargetLangCustomized),
+    selectionTargetLangCustomized:
+      patch.selectionTargetLang !== undefined
+        ? true
+        : (patch.selectionTargetLangCustomized ??
+          cur.selectionTargetLangCustomized),
+    immersiveTargetLangCustomized:
+      patch.immersiveTargetLang !== undefined
+        ? true
+        : (patch.immersiveTargetLangCustomized ??
+          cur.immersiveTargetLangCustomized),
     engines: { ...cur.engines, ...(patch.engines ?? {}) },
     translationStyle: {
       ...cur.translationStyle,

@@ -21,9 +21,9 @@ export const UI_LANGS = [
 
 export type UiLang = (typeof UI_LANGS)[number];
 
-export const TARGET_LANGS = ["inherit", ...UI_LANGS] as const;
+export const TARGET_LANGS = UI_LANGS;
 
-export type TargetLang = (typeof TARGET_LANGS)[number];
+export type TargetLang = UiLang;
 
 export const UI_LANG_LABELS: Record<UiLang, string> = {
   en: "English",
@@ -51,5 +51,5 @@ export function isUiLang(value: unknown): value is UiLang {
 }
 
 export function isTargetLang(value: unknown): value is TargetLang {
-  return value === "inherit" || isUiLang(value);
+  return isUiLang(value);
 }

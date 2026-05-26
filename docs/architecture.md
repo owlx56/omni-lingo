@@ -79,12 +79,12 @@ reader 也遵守同一条消息边界。PDF reader 和 EPUB bridge 需要读写�
 
 ## 设置、语言和 UI 文案
 
-设置统一从 `src/lib/storage/settings.ts` 读写。`uiLang` 是 options / popup 的界面语言，也是 hover、selection、immersive 的目标语言设为 `inherit` 时的回退语言。
+设置统一从 `src/lib/storage/settings.ts` 读写。`uiLang` 是 options / popup 的界面语言；hover、selection、immersive 的目标语言默认与它一致，用户修改某个功能目标语言后该功能独立保存。
 
 语言列表集中在 `src/lib/languages.ts`：
 
 - `UI_LANGS` 是 options / popup 支持的 18 种界面语言；
-- `TARGET_LANGS` 在 `UI_LANGS` 前追加 `inherit`，用于功能目标语言；
+- `TARGET_LANGS` 与 `UI_LANGS` 相同，用于功能目标语言；
 - `UI_LANG_LABELS` 必须使用每种语言自己的字符展示，例如 `English`、`简体中文`、`日本語`、`العربية`。
 
 UI 文案在 `src/lib/i18n/`：
