@@ -15,7 +15,7 @@
 
 这些路径必须使用 vanilla TypeScript 和直接 DOM API。不要引入 Solid signals、store 或 `createEffect`。
 
-交互路径不同：Rich 卡片、悬浮球、设置面板、options 页、PDF / 文件翻译 UI 可以使用 Solid，并挂在 closed Shadow DOM 下。
+交互路径不同：Rich 卡片、悬浮球、设置面板、options 页、viewer 页和 PDF / 文件翻译 UI 可以使用 Solid，并挂在 closed Shadow DOM 下；扩展页面自身如 options / popup / viewer 不需要 Shadow DOM。
 
 ### Minimal 和 Rich 是两种交互模型
 
@@ -63,14 +63,28 @@ options 和 popup 使用 Solid，但通用控件必须优先复用 `src/lib/ui/c
 
 ### UI i18n
 
-options / popup 的界面文案都走 `src/lib/i18n/`，不要在组件里硬编码可见字符串。新增文案时：
+options / popup / EPUB viewer / PDF viewer 的界面文案都走 `src/lib/i18n/catalog.ts`，不要在组件或静态 viewer 里硬编码可见字符串。新增文案时：
 
-1. 在 `src/lib/i18n/messages.ts` 增加 key；
-2. 在 `src/lib/i18n/locales/` 下补语言文件；
-3. 在组件里通过 `t("namespace.key")` 读取；
-4. 跑 `bun test src/lib/i18n/index.test.js` 检查语言文件结构。
+1. 在 `src/lib/i18n/catalog.ts` 增加英文 key 和需要的语言覆盖；
+2. 在组件里通过 `t("namespace.key")` 读取；
+3. 如果是 PDF 静态 viewer 文案，使用 `pdfViewer.*` key；
+4. 跑 `bun run i18n:generate` 生成 `locales/*.ts` 和 `src/assets/pdf-viewer/locales.generated.mjs`；
+5. 跑 `bun test src/lib/i18n/index.test.js` 检查语言结构和 viewer 文案覆盖。
+
+`src/lib/i18n/messages.ts`、`src/lib/i18n/locales/*.ts`、`src/lib/i18n/locales/index.ts` 和 `src/assets/pdf-viewer/locales.generated.mjs` 都是从 catalog 派生的类型 / 兼容 / 静态资源产物，不要手改。
 
 语言列表只在 `src/lib/languages.ts` 维护。语言下拉选项显示 `UI_LANG_LABELS`，必须用每种语言自己的文字，不要翻译成当前 UI 语言。
+
+### PDF / EPUB Reader
+
+文档阅读器边界见 `docs/document-viewer.md`。简要规则：
+
+- PDF reader 使用 `pdfjs-dist` 依赖，构建时由 `wxt.config.ts` 复制 PDF.js runtime、worker、cmaps、wasm、字体和 OneLingo viewer 静态文件；不要重新 vendor 整个 PDF.js 目录。
+- OneLingo 自定义 PDF UI 只放在 `src/assets/pdf-viewer/viewer.html`、`viewer.mjs`、`viewer.css`、`onelingo-viewer.css`。
+- EPUB 主路径使用 `epubjs`，reader shell 在 `src/entrypoints/viewer/App.tsx`，iframe 内容桥接在 `src/entrypoints/viewer/epub-bridge.ts`。
+- reader 内 selection 行为必须复用 `src/features/selection/`。未来改 selection 功能时，普通网页、PDF reader、EPUB reader 应尽量同时生效。
+- reader UI 控件必须标记或继承 `data-onelingo-reader-ui` 边界，hover / selection 不应命中工具栏、侧栏、菜单、对话框。
+- 打开文件链接嗅探同时涉及 content script 点击拦截和 background DNR / webRequest 主框架嗅探。修其中一个前先确认另一个是否也需要同步。
 
 ### 存储
 
@@ -81,7 +95,8 @@ options / popup 的界面文案都走 `src/lib/i18n/`，不要在组件里硬编
 | 跨设备配置                   | `storage.sync`                 |
 | 本机配置                     | `storage.local`                |
 | 翻译缓存                     | 内存 LRU + IndexedDB           |
-| 生词本、术语、PDF / 文件结果 | 通过 background 访问 IndexedDB |
+| reader 临时文档              | viewer 页面 IndexedDB `onelingo-docs` |
+| 生词本、术语、长期文件结果   | 通过 background 访问 IndexedDB |
 
 background 是 MV3 service worker，随时可能被杀。持久状态必须可恢复。
 
