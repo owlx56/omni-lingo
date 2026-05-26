@@ -292,8 +292,11 @@
               role="tab"
               aria-selected="true"
               data-sidebar-view="thumbnails"
-              data-l10n-text="pages"
+              data-l10n-title="pages"
+              data-l10n-aria-label="pages"
             >
+              <span class="sidebarTabIcon sidebarTabIconPages" aria-hidden="true"></span>
+              <span class="sidebarTabLabel" data-l10n-text="pages"></span>
             </button>
             <button
               class="sidebarTab"
@@ -302,8 +305,11 @@
               role="tab"
               aria-selected="false"
               data-sidebar-view="outline"
-              data-l10n-text="outline"
+              data-l10n-title="outline"
+              data-l10n-aria-label="outline"
             >
+              <span class="sidebarTabIcon sidebarTabIconOutline" aria-hidden="true"></span>
+              <span class="sidebarTabLabel" data-l10n-text="outline"></span>
             </button>
             <button
               class="sidebarTab"
@@ -312,8 +318,11 @@
               role="tab"
               aria-selected="false"
               data-sidebar-view="attachments"
-              data-l10n-text="attachments"
+              data-l10n-title="attachments"
+              data-l10n-aria-label="attachments"
             >
+              <span class="sidebarTabIcon sidebarTabIconAttachments" aria-hidden="true"></span>
+              <span class="sidebarTabLabel" data-l10n-text="attachments"></span>
             </button>
           </div>
         </div>
@@ -322,6 +331,11 @@
           <div id="outlineView" class="sidebarView" hidden></div>
           <div id="attachmentsView" class="sidebarView" hidden></div>
         </div>
+        <div
+          id="sidebarResizer"
+          aria-hidden="true"
+          data-onelingo-reader-ui
+        ></div>
       </div>
 
       <div id="secondaryToolbar" data-onelingo-reader-ui role="menu" hidden>

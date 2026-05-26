@@ -29,6 +29,7 @@
   --onelingo-border-strong: rgba(31, 30, 29, 0.16);
   --onelingo-accent: #2c75e0;
   --onelingo-shadow: 0 10px 30px rgba(31, 30, 29, 0.13);
+  --sidebar-tab-label-display: none;
   --main-color: var(--onelingo-text);
   --body-bg-color: var(--onelingo-surface-alt);
   --toolbar-bg-color: var(--onelingo-bg);
@@ -529,6 +530,10 @@ html.handTool #viewerContainer.handToolActive {
   box-shadow: 2px 0 14px rgba(31, 30, 29, 0.08);
 }
 
+#sidebarContainer[data-tab-labels="visible"] {
+  --sidebar-tab-label-display: inline;
+}
+
 .sidebarHeader {
   padding: 6px 8px;
   border-bottom: 1px solid var(--onelingo-border);
@@ -539,12 +544,18 @@ html.handTool #viewerContainer.handToolActive {
 }
 
 .sidebarTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   min-width: 0;
   height: 30px;
+  padding: 0 8px;
   border-radius: 8px;
   color: var(--onelingo-text-muted);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 400;
   line-height: 30px;
   text-align: center;
   transition:
@@ -553,9 +564,79 @@ html.handTool #viewerContainer.handToolActive {
     transform 0.15s ease;
 }
 
+.sidebarTabIcon {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: 18px 18px;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: 18px 18px;
+}
+
+.sidebarTabIconPages {
+  -webkit-mask-image: url("images/toolbarButton-viewThumbnail.svg");
+  mask-image: url("images/toolbarButton-viewThumbnail.svg");
+}
+
+.sidebarTabIconOutline {
+  -webkit-mask-image: url("images/toolbarButton-viewOutline.svg");
+  mask-image: url("images/toolbarButton-viewOutline.svg");
+}
+
+.sidebarTabIconAttachments {
+  -webkit-mask-image: url("images/toolbarButton-viewAttachments.svg");
+  mask-image: url("images/toolbarButton-viewAttachments.svg");
+}
+
+.sidebarTabLabel {
+  display: var(--sidebar-tab-label-display);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sidebarTab.selected {
   background: var(--onelingo-surface-alt);
   color: var(--onelingo-text);
+}
+
+#sidebarResizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 2;
+  width: 8px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+#sidebarResizer::after {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  bottom: 0;
+  width: 1px;
+  background: transparent;
+  content: "";
+  transition: background-color 0.15s ease;
+}
+
+#sidebarResizer:is(:hover, :focus-visible)::after,
+html.sidebarResizing #sidebarResizer::after {
+  background: var(--onelingo-border-strong);
+}
+
+html.sidebarResizing,
+html.sidebarResizing * {
+  cursor: ew-resize !important;
+  user-select: none !important;
 }
 
 .sidebarView {
@@ -827,6 +908,12 @@ html[data-theme="dark"] .pdfViewer .page {
 
 html[data-theme="dark"] #sidebarContainer {
   box-shadow: 2px 0 18px rgba(0, 0, 0, 0.28);
+}
+
+@media (max-width: 720px) {
+  #sidebarResizer {
+    display: none;
+  }
 }
 
 html[data-theme="dark"] .scaleSelectMenu {

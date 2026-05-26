@@ -35,6 +35,11 @@ const MAX_SCALE = 5;
 const THUMBNAIL_WIDTH = 96;
 const DEFAULT_UI_LANG = "zh";
 const SETTINGS_STORAGE_KEYS = ["settings", "sync:settings"];
+const SIDEBAR_WIDTH_STORAGE_KEY = "onelingo:pdf-sidebar-width";
+const SIDEBAR_DEFAULT_WIDTH = 244;
+const SIDEBAR_MIN_WIDTH = 176;
+const SIDEBAR_MAX_WIDTH = 520;
+const SIDEBAR_LABEL_WIDTH = 400;
 
 const SCROLL_MODES = {
   horizontal: ScrollMode.HORIZONTAL,
@@ -183,6 +188,7 @@ const elements = {
   secondaryToolbar: mustGetElement("secondaryToolbar"),
   secondaryToolbarToggle: mustGetElement("secondaryToolbarToggle"),
   sidebarContainer: mustGetElement("sidebarContainer"),
+  sidebarResizer: mustGetElement("sidebarResizer"),
   sidebarToggle: mustGetElement("sidebarToggle"),
   thumbnailView: mustGetElement("thumbnailView"),
   viewer: mustGetElement("viewer"),
@@ -221,6 +227,7 @@ let currentFileUrl = null;
 let currentObjectUrl = null;
 let thumbnailObserver = null;
 let activeSidebarView = "thumbnails";
+let sidebarWidth = readStoredSidebarWidth();
 let cursorTool = "select";
 let handToolState = null;
 let findStatusState = null;
@@ -230,6 +237,7 @@ linkService.setViewer(pdfViewer);
 linkService.setHistory(pdfHistory);
 
 applyLocale(DEFAULT_UI_LANG);
+applySidebarWidth(sidebarWidth);
 void loadUiLanguage();
 watchUiLanguage();
 wireToolbar();
@@ -405,6 +413,10 @@ function wireSidebar() {
       openSidebar();
     });
   }
+  elements.sidebarResizer.addEventListener("pointerdown", onSidebarResizeStart);
+  window.addEventListener("resize", () => {
+    applySidebarWidth(sidebarWidth);
+  });
 }
 
 function wireSecondaryToolbar() {
@@ -765,6 +777,7 @@ function openSidebar() {
   elements.sidebarContainer.hidden = false;
   elements.sidebarToggle.setAttribute("aria-expanded", "true");
   document.documentElement.classList.add("sidebarOpen");
+  applySidebarWidth(sidebarWidth);
   renderVisibleThumbnails();
   pdfViewer.update();
 }
@@ -774,6 +787,67 @@ function closeSidebar() {
   elements.sidebarToggle.setAttribute("aria-expanded", "false");
   document.documentElement.classList.remove("sidebarOpen");
   pdfViewer.update();
+}
+
+function onSidebarResizeStart(event) {
+  if (window.matchMedia("(max-width: 720px)").matches) return;
+  event.preventDefault();
+  elements.sidebarResizer.setPointerCapture?.(event.pointerId);
+  const startX = event.clientX;
+  const startWidth = sidebarWidth;
+  document.documentElement.classList.add("sidebarResizing");
+
+  const onMove = (moveEvent) => {
+    const nextWidth = startWidth + moveEvent.clientX - startX;
+    applySidebarWidth(nextWidth);
+    renderVisibleThumbnails();
+    pdfViewer.update();
+  };
+  const onEnd = () => {
+    document.documentElement.classList.remove("sidebarResizing");
+    writeStoredSidebarWidth(sidebarWidth);
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onEnd);
+    window.removeEventListener("pointercancel", onEnd);
+  };
+
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onEnd);
+  window.addEventListener("pointercancel", onEnd);
+}
+
+function applySidebarWidth(width) {
+  sidebarWidth = clampSidebarWidth(width);
+  document.documentElement.style.setProperty("--sidebar-width", `${sidebarWidth}px`);
+  elements.sidebarContainer.dataset.tabLabels =
+    sidebarWidth >= SIDEBAR_LABEL_WIDTH ? "visible" : "hidden";
+}
+
+function clampSidebarWidth(width) {
+  const mobile = window.matchMedia("(max-width: 720px)").matches;
+  const mobileMax = Math.min(284, window.innerWidth - 44);
+  const desktopMax = Math.min(SIDEBAR_MAX_WIDTH, window.innerWidth - 96);
+  const max = Math.max(SIDEBAR_MIN_WIDTH, mobile ? mobileMax : desktopMax);
+  if (!Number.isFinite(width)) return SIDEBAR_DEFAULT_WIDTH;
+  return Math.min(max, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
+}
+
+function readStoredSidebarWidth() {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_STORAGE_KEY);
+    const parsed = raw ? Number.parseInt(raw, 10) : SIDEBAR_DEFAULT_WIDTH;
+    return clampSidebarWidth(parsed);
+  } catch {
+    return SIDEBAR_DEFAULT_WIDTH;
+  }
+}
+
+function writeStoredSidebarWidth(width) {
+  try {
+    localStorage.setItem(SIDEBAR_WIDTH_STORAGE_KEY, String(clampSidebarWidth(width)));
+  } catch {
+    // Storage can be unavailable in constrained extension contexts.
+  }
 }
 
 function setSidebarView(view) {
