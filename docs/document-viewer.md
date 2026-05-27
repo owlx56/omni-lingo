@@ -61,7 +61,7 @@ PDF reader 使用 `pdfjs-dist` npm 依赖，不再把完整 `public/pdf` vendor 
 
 - selection UI 走 `src/features/selection/`，不要在 reader 里复制一套“译”按钮逻辑。
 - PDF reader 通过 `src/entrypoints/pdf-bridge.ts` 调用 `initSelection()`，并实现 `readPageFeatureStatus` / `updatePageFeaturePrefs`。
-- PDF hover 只在 PDF.js `textLayer` 内按 Less Translate 的方式拆 token：原始 text span 内包一层 `all: unset` wrapper，再把 `text.split(/(\s|\.|\,|\:|\!|\?|\"|\||\'|。|，|？|》|《)/g).filter(Boolean)` 的片段放进 `all: unset` token span；可翻译 token 直接绑定 `mouseenter` / `mousemove` / `mouseout` / `mouseleave` / `mouseover`，并用全局 `mousemove` + `elementFromPoint()` 复核当前鼠标点下的 token。命中使用当前 token 的 `getBoundingClientRect()`，下划线优先使用和普通网页 hover 相同的 CSS Custom Highlight `text-decoration`；只有不支持 Custom Highlight 时才用 fixed overlay 兜底。空白 delimiter token 不绑定事件，鼠标落在空格上应自然清除 hover。不要回到 caret / 坐标比例估算。
+- PDF hover 只在 PDF.js `textLayer` 内按 Less Translate 的方式懒拆 token：全局 `mousemove` 只用 `elementFromPoint()` 找当前鼠标命中的元素并处理它的直接文本节点，不直接翻译、不做坐标二次命中；文本节点内包一层 `all: unset` wrapper，再把 `text.split(/(\s|\.|\,|\:|\!|\?|\"|\||\'|。|，|？|》|《)/g).filter(Boolean)` 的片段放进 `all: unset` token span。可翻译 token 只绑定 Less 同款 `mouseenter` / `mouseout` / `mouseleave` / `mouseover`，真正命中、翻译和下划线都由 token 自己的 `getBoundingClientRect()` 决定；PDF 内部 hover 固定使用 Less 的 token 粒度，不套普通网页的 sentence / paragraph hoverGranularity。下划线用 Less Translate 同款 fixed 1px overlay line，而不是 Range / caret / 坐标比例估算。空白 delimiter token 不绑定事件，鼠标落在空格上应自然清除 hover。
 - EPUB reader 因内容在 epubjs iframe 中，需要 `src/entrypoints/viewer/epub-bridge.ts` 在 iframe 文档里转接 hover / selection 命中、坐标和高亮。
 - reader UI 元素要标记 `data-onelingo-reader-ui`，hover / selection 命中测试必须避开工具栏、侧栏、弹层和菜单。
 

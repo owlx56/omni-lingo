@@ -78,6 +78,16 @@ body {
   background: var(--body-bg-color);
 }
 
+.textLayer {
+  font-family: sans-serif;
+  letter-spacing: normal;
+}
+
+.textLayer span,
+.textLayer br {
+  letter-spacing: normal;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;
