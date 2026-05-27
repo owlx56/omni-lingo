@@ -1,5 +1,5 @@
 import { defineConfig } from "wxt";
-import { readdir, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import "./scripts/generate-i18n";
@@ -51,6 +51,19 @@ async function addDirectoryAssets(
   }
 }
 
+async function addOptionalDirectoryAssets(
+  files: PublicAssetFile[],
+  absoluteSrcDir: string,
+  relativeDestDir: string,
+): Promise<void> {
+  try {
+    await access(absoluteSrcDir);
+  } catch {
+    return;
+  }
+  await addDirectoryAssets(files, absoluteSrcDir, relativeDestDir);
+}
+
 async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void> {
   const packageJson = JSON.parse(
     await readFile(join(PDFJS_DIST_DIR, "package.json"), "utf8"),
@@ -62,14 +75,14 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
     relativeDest: "pdf/PDFJS_VERSION",
   });
 
-  for (const file of ["pdf.mjs", "pdf.worker.mjs", "pdf.sandbox.mjs"]) {
+  for (const file of ["pdf.js", "pdf.worker.js", "pdf.sandbox.js"]) {
     addFileAsset(files, join(PDFJS_DIST_DIR, "build", file), `pdf/build/${file}`);
   }
 
   addFileAsset(
     files,
-    join(PDFJS_DIST_DIR, "web", "pdf_viewer.mjs"),
-    "pdf/web/pdf_viewer.mjs",
+    join(PDFJS_DIST_DIR, "web", "pdf_viewer.js"),
+    "pdf/web/pdf_viewer.js",
   );
   addFileAsset(
     files,
@@ -77,8 +90,8 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
     "pdf/web/pdf_viewer.css",
   );
 
-  for (const dir of ["cmaps", "iccs", "standard_fonts", "wasm"]) {
-    await addDirectoryAssets(
+  for (const dir of ["cmaps", "image_decoders", "standard_fonts"]) {
+    await addOptionalDirectoryAssets(
       files,
       join(PDFJS_DIST_DIR, dir),
       `pdf/web/${dir}`,

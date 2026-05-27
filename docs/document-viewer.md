@@ -39,20 +39,20 @@ options / context menu / sniffer
 
 ## PDF.js 资产
 
-PDF reader 使用 `pdfjs-dist` npm 依赖，不再把完整 `public/pdf` vendor 进仓库。
+PDF reader 使用 `pdfjs-dist` npm 依赖，不再把完整 `public/pdf` vendor 进仓库。当前固定在 `3.3.122`，和 Less Translate 的 PDF viewer 版本一致；这个版本的 textLayer 几何更接近 Less 的 hover 命中行为。
 
 `wxt.config.ts` 的 `build:publicAssets` 会复制：
 
-- `node_modules/pdfjs-dist/build/pdf.mjs`
-- `pdf.worker.mjs`
-- `pdf.sandbox.mjs`
-- `web/pdf_viewer.mjs`
+- `node_modules/pdfjs-dist/build/pdf.js`
+- `pdf.worker.js`
+- `pdf.sandbox.js`
+- `web/pdf_viewer.js`
 - `web/pdf_viewer.css`
-- `cmaps/`、`iccs/`、`standard_fonts/`、`wasm/`、`web/images/`
+- `cmaps/`、`image_decoders/`、`standard_fonts/`、`web/images/`
 - `src/assets/fonts/inter/`
 - `src/assets/pdf-viewer/` 下的 OneLingo viewer 文件
 
-`prepare:publicPaths` 会把 `pdf/web/viewer.html` 加入 public path。改 PDF.js 版本时更新 `package.json` 的 `pdfjs-dist`，然后跑 build；不要手改 `.output/` 或复制 node_modules 产物进源码目录。
+`prepare:publicPaths` 会把 `pdf/web/viewer.html` 加入 public path。改 PDF.js 版本时更新 `package.json` 的 `pdfjs-dist`，然后跑 build；不要手改 `.output/` 或复制 node_modules 产物进源码目录。PDF.js `3.3.122` 的 viewer 是 UMD 脚本，所以 `viewer.html` 先加载 `../build/pdf.js` 和 `pdf_viewer.js`，`viewer.mjs` 再从 `globalThis.pdfjsLib` / `globalThis.pdfjsViewer` 读取 API。
 
 ## Reader 翻译
 
@@ -60,6 +60,7 @@ PDF reader 使用 `pdfjs-dist` npm 依赖，不再把完整 `public/pdf` vendor 
 
 - selection UI 走 `src/features/selection/`，不要在 reader 里复制一套“译”按钮逻辑。
 - PDF reader 通过 `src/entrypoints/pdf-bridge.ts` 调用 `initSelection()`，并实现 `readPageFeatureStatus` / `updatePageFeaturePrefs`。
+- PDF hover 只在 PDF.js `textLayer` 内按 Less Translate 的方式拆 token：原始 text span 内包一层 `all: unset` wrapper，再把 `text.split(/(\s|\.|\,|\:|\!|\?|\"|\||\'|。|，|？|》|《)/g).filter(Boolean)` 的片段放进 `all: unset` token span；可翻译 token 直接绑定 `mouseenter` / `mousemove` / `mouseout` / `mouseleave` / `mouseover`，并用全局 `mousemove` + `elementFromPoint()` 复核当前鼠标点下的 token。命中与下划线都使用当前 token 的 `getBoundingClientRect()`；空白 delimiter token 不绑定事件，鼠标落在空格上应自然清除 hover。不要回到 caret / 坐标比例估算，也不要混用 Range rect 和 token rect。
 - EPUB reader 因内容在 epubjs iframe 中，需要 `src/entrypoints/viewer/epub-bridge.ts` 在 iframe 文档里转接 hover / selection 命中、坐标和高亮。
 - reader UI 元素要标记 `data-onelingo-reader-ui`，hover / selection 命中测试必须避开工具栏、侧栏、弹层和菜单。
 

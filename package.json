@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "epubjs": "^0.3.93",
-    "pdfjs-dist": "5.7.284",
+    "pdfjs-dist": "3.3.122",
     "solid-js": "^1.9.11"
   },
   "devDependencies": {

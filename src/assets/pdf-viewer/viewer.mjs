@@ -1,9 +1,19 @@
 import {
-  AnnotationEditorType,
-  getDocument,
-  GlobalWorkerOptions,
-} from "../build/pdf.mjs";
-import {
+  PDF_VIEWER_LOCALES,
+  PDF_VIEWER_PDFJS_L10N,
+  PDF_VIEWER_SUPPORTED_UI_LANGS,
+} from "./locales.generated.mjs";
+
+const pdfjsLib = globalThis.pdfjsLib ?? globalThis["pdfjs-dist/build/pdf"];
+const pdfjsViewer =
+  globalThis.pdfjsViewer ?? globalThis["pdfjs-dist/web/pdf_viewer"];
+
+if (!pdfjsLib || !pdfjsViewer) {
+  throw new Error("PDF.js assets failed to load.");
+}
+
+const { AnnotationEditorType, getDocument, GlobalWorkerOptions } = pdfjsLib;
+const {
   EventBus,
   FindState,
   LinkTarget,
@@ -13,20 +23,13 @@ import {
   PDFViewer,
   ScrollMode,
   SpreadMode,
-} from "./pdf_viewer.mjs";
-import {
-  PDF_VIEWER_LOCALES,
-  PDF_VIEWER_PDFJS_L10N,
-  PDF_VIEWER_SUPPORTED_UI_LANGS,
-} from "./locales.generated.mjs";
+} = pdfjsViewer;
 
 const ASSET_PATHS = {
   cMapUrl: "../web/cmaps/",
-  iccUrl: "../web/iccs/",
   imageResourcesPath: "./images/",
   standardFontDataUrl: "../web/standard_fonts/",
-  wasmUrl: "../web/wasm/",
-  workerSrc: "../build/pdf.worker.mjs",
+  workerSrc: "../build/pdf.worker.js",
 };
 
 const SCALE_STEP = 1.1;
@@ -211,8 +214,6 @@ const findController = new PDFFindController({ eventBus, linkService });
 const pdfViewer = new PDFViewer({
   annotationEditorMode: AnnotationEditorType.NONE,
   container: elements.viewerContainer,
-  enableHighlightFloatingButton: true,
-  enableUpdatedAddImage: true,
   eventBus,
   findController,
   imageResourcesPath: ASSET_PATHS.imageResourcesPath,
@@ -559,10 +560,8 @@ async function loadPdf(fileUrl) {
     cMapPacked: true,
     cMapUrl: ASSET_PATHS.cMapUrl,
     enableXfa: true,
-    iccUrl: ASSET_PATHS.iccUrl,
     standardFontDataUrl: ASSET_PATHS.standardFontDataUrl,
     url: fileUrl,
-    wasmUrl: ASSET_PATHS.wasmUrl,
   });
   loadingTask.onProgress = ({ loaded, total }) => {
     if (total > 0) showLoading((loaded / total) * 100);
@@ -1065,7 +1064,11 @@ function closeSecondaryToolbar() {
 
 function setAnnotationEditorMode(kind) {
   const mode = kind === "none" ? AnnotationEditorType.NONE : EDITOR_MODES[kind];
-  if (mode === undefined) return;
+  if (mode === undefined) {
+    showError(t("annotationUnavailable"));
+    updateAnnotationEditorState();
+    return;
+  }
   if (pdfViewer.annotationEditorMode === AnnotationEditorType.DISABLE) {
     if (mode !== AnnotationEditorType.NONE) showError(t("annotationUnavailable"));
     updateAnnotationEditorState(AnnotationEditorType.DISABLE);
@@ -1073,7 +1076,7 @@ function setAnnotationEditorMode(kind) {
   }
   const nextMode = pdfViewer.annotationEditorMode === mode ? AnnotationEditorType.NONE : mode;
   try {
-    pdfViewer.annotationEditorMode = { mode: nextMode };
+    pdfViewer.annotationEditorMode = nextMode;
     updateAnnotationEditorState(nextMode);
   } catch (error) {
     console.warn("[OneLingo] failed to switch PDF annotation mode:", error);
@@ -1090,8 +1093,10 @@ function updateAnnotationEditorState(mode = pdfViewer.annotationEditorMode) {
     elements.editorStamp,
   ]) {
     const activeMode = EDITOR_MODES[button.dataset.editorMode];
+    const unavailable = activeMode === undefined;
     const pressed = !disabled && activeMode === mode;
-    button.disabled = disabled;
+    button.disabled = disabled || unavailable;
+    button.hidden = unavailable;
     button.classList.toggle("toggled", pressed);
     button.setAttribute("aria-pressed", String(pressed));
   }
