@@ -50,6 +50,7 @@ PDF reader 使用 `pdfjs-dist` npm 依赖，不再把完整 `public/pdf` vendor 
 - `web/pdf_viewer.css`
 - `cmaps/`、`image_decoders/`、`standard_fonts/`、`web/images/`
 - `src/assets/fonts/inter/`
+- `src/assets/pdf-viewer/images/` 下的 OneLingo toolbar 图标
 - `src/assets/pdf-viewer/` 下的 OneLingo viewer 文件
 
 `prepare:publicPaths` 会把 `pdf/web/viewer.html` 加入 public path。改 PDF.js 版本时更新 `package.json` 的 `pdfjs-dist`，然后跑 build；不要手改 `.output/` 或复制 node_modules 产物进源码目录。PDF.js `3.3.122` 的 viewer 是 UMD 脚本，所以 `viewer.html` 先加载 `../build/pdf.js` 和 `pdf_viewer.js`，`viewer.mjs` 再从 `globalThis.pdfjsLib` / `globalThis.pdfjsViewer` 读取 API。
