@@ -22,6 +22,7 @@ const READER_UI_ATTR = "data-onelingo-reader-ui";
 const HOVER_DELAY_MS = 10;
 const TOOLTIP_ATTR = "data-onelingo-pdf-tooltip";
 const HOVER_HIGHLIGHT_ATTR = "data-onelingo-pdf-hover-highlight";
+const HIGHLIGHT_NAME = "onelingo-pdf-hover";
 const PDF_TEXT_SPAN_ATTR = "data-onelingo-pdf-text-span";
 const PDF_TOKEN_WRAP_ATTR = "data-onelingo-pdf-token-wrap";
 const PDF_TOKEN_ATTR = "data-onelingo-pdf-token";
@@ -33,10 +34,12 @@ let tokenizeTextLayersFrame: number | null = null;
 let pdfHoverPointFrame: number | null = null;
 let pendingPdfHoverPoint: PdfHoverPoint | null = null;
 let pdfBridgeState: PdfBridgeState | null = null;
+let pdfHighlightStyleInjected = false;
 
 interface PdfTextHit {
   anchor: DOMRect;
   highlightRects: DOMRect[];
+  highlightRanges: Range[];
   text: string;
 }
 
@@ -44,12 +47,20 @@ interface PdfTokenHit {
   end: number;
   fullText: string;
   highlightRects: DOMRect[];
+  highlightRanges: Range[];
   parent: HTMLElement;
   rect: DOMRect;
   start: number;
   text: string;
   token: HTMLElement;
 }
+
+type HighlightCtor = new (...ranges: Range[]) => unknown;
+type HighlightRegistry = {
+  set(name: string, h: unknown): void;
+  delete(name: string): void;
+};
+type CSSWithHighlights = typeof CSS & { highlights?: HighlightRegistry };
 
 interface PdfHoverPoint {
   x: number;
@@ -278,7 +289,7 @@ function startPdfHover(hit: PdfTextHit | null, state: PdfBridgeState): void {
   state.hoverSeq++;
   const seq = state.hoverSeq;
   clearHoverTimer(state);
-  setHighlight(state, hit.highlightRects);
+  setHighlight(state, hit);
 
   state.hoverTimer = window.setTimeout(() => {
     state.hoverTimer = null;
@@ -422,10 +433,12 @@ function pdfTextHitFromToken(
     text: string,
   ): PdfTextHit | null => {
     const highlightRects = tokenRectsInRange(word.parent, start, end);
-    if (!highlightRects.length) return null;
+    const highlightRanges = tokenRangesInRange(word.parent, start, end);
+    if (!highlightRects.length || !highlightRanges.length) return null;
     return {
       anchor: word.rect,
       highlightRects,
+      highlightRanges,
       text,
     };
   };
@@ -434,6 +447,7 @@ function pdfTextHitFromToken(
     return {
       anchor: word.rect,
       highlightRects: word.highlightRects,
+      highlightRanges: word.highlightRanges,
       text: word.text,
     };
   }
@@ -455,6 +469,7 @@ function pdfTextHitFromToken(
   return {
     anchor: word.rect,
     highlightRects: word.highlightRects,
+    highlightRanges: word.highlightRanges,
     text: word.text,
   };
 }
@@ -486,10 +501,12 @@ function paragraphHit(word: PdfTokenHit): PdfTextHit | null {
   const trimmed = trimTextRange(fullText, 0, fullText.length);
   if (!trimmed) return null;
   const highlightRects = tokenRectsInRange(word.parent, trimmed.start, trimmed.end);
-  if (!highlightRects.length) return null;
+  const highlightRanges = tokenRangesInRange(word.parent, trimmed.start, trimmed.end);
+  if (!highlightRects.length || !highlightRanges.length) return null;
   return {
     anchor: word.rect,
     highlightRects,
+    highlightRanges,
     text: fullText.slice(trimmed.start, trimmed.end),
   };
 }
@@ -508,11 +525,14 @@ function pdfTokenHit(token: HTMLElement): PdfTokenHit | null {
 
   const text = (token.textContent ?? "").trim();
   if (!text) return null;
+  const highlightRange = tokenRange(token);
+  if (!highlightRange) return null;
 
   return {
     end,
     fullText: getPdfSpanOriginalText(parent),
     highlightRects: [rect],
+    highlightRanges: [highlightRange],
     parent,
     rect,
     start,
@@ -548,6 +568,32 @@ function tokenRectsInRange(parent: HTMLElement, start: number, end: number): DOM
     if (rect.width > 0 && rect.height > 0) rects.push(rect);
   }
   return rects;
+}
+
+function tokenRangesInRange(parent: HTMLElement, start: number, end: number): Range[] {
+  const root =
+    parent.querySelector<HTMLElement>(`[${PDF_TOKEN_WRAP_ATTR}]`) ?? parent;
+  const ranges: Range[] = [];
+  for (const token of root.querySelectorAll<HTMLElement>(`[${PDF_TOKEN_ATTR}]`)) {
+    const tokenStart = readTokenOffset(token, "onelingoStart");
+    const tokenEnd = readTokenOffset(token, "onelingoEnd");
+    if (tokenStart === null || tokenEnd === null) continue;
+    if (tokenEnd <= start || tokenStart >= end) continue;
+    const range = tokenRange(token);
+    if (range) ranges.push(range);
+  }
+  return ranges;
+}
+
+function tokenRange(token: HTMLElement): Range | null {
+  const textNode = token.firstChild;
+  if (textNode?.nodeType !== Node.TEXT_NODE) return null;
+  const text = textNode.textContent ?? "";
+  if (!text.trim()) return null;
+  const range = document.createRange();
+  range.setStart(textNode, 0);
+  range.setEnd(textNode, text.length);
+  return range;
 }
 
 function lessTranslateSplitSegments(
@@ -667,19 +713,57 @@ function isReaderUi(target: EventTarget | null): boolean {
   return target instanceof Element && !!target.closest(`[${READER_UI_ATTR}]`);
 }
 
-function setHighlight(state: PdfBridgeState, rects: DOMRect[]): void {
+function setHighlight(state: PdfBridgeState, hit: PdfTextHit): void {
+  if (setNativeHighlight(hit.highlightRanges)) {
+    clearOverlayHighlight(state);
+    return;
+  }
+  setOverlayHighlight(state, hit.highlightRects);
+}
+
+function setNativeHighlight(ranges: Range[]): boolean {
+  const registry = getHighlightRegistry();
+  const Ctor = getHighlightCtor();
+  if (!registry || !Ctor || !ranges.length) return false;
+  injectHighlightStyle();
+  registry.set(HIGHLIGHT_NAME, new Ctor(...ranges));
+  return true;
+}
+
+function getHighlightRegistry(): HighlightRegistry | null {
+  return (CSS as CSSWithHighlights).highlights ?? null;
+}
+
+function getHighlightCtor(): HighlightCtor | null {
+  return (globalThis as { Highlight?: HighlightCtor }).Highlight ?? null;
+}
+
+function injectHighlightStyle(): void {
+  if (pdfHighlightStyleInjected) return;
+  const style = document.createElement("style");
+  style.setAttribute("data-onelingo-pdf-highlight", "");
+  style.textContent =
+    `::highlight(${HIGHLIGHT_NAME}){` +
+    "text-decoration:underline solid #aaa;" +
+    "text-decoration-thickness:1px;" +
+    "text-underline-offset:2px}";
+  (document.head ?? document.documentElement).appendChild(style);
+  pdfHighlightStyleInjected = true;
+}
+
+function setOverlayHighlight(state: PdfBridgeState, rects: DOMRect[]): void {
   const layer = ensureHighlightLayer(state);
   layer.replaceChildren(
     ...rects.map((rect) => {
+      const top = snapCssPixel(rect.bottom + 2);
       const line = document.createElement("span");
       line.style.cssText = [
         "position:fixed",
         "pointer-events:none",
         "z-index:2147483646",
-        "height:1px",
-        "background:rgba(128,128,128,0.4)",
+        "border-top:1px solid #aaa",
         `left:${rect.left}px`,
-        `top:${rect.bottom + 2}px`,
+        `top:${top}px`,
         `width:${rect.width}px`,
       ].join(";");
       return line;
@@ -688,7 +772,17 @@ function setHighlight(state: PdfBridgeState, rects: DOMRect[]): void {
 }
 
 function clearHighlight(state: PdfBridgeState): void {
+  getHighlightRegistry()?.delete(HIGHLIGHT_NAME);
+  clearOverlayHighlight(state);
+}
+
+function clearOverlayHighlight(state: PdfBridgeState): void {
   state.highlightLayer?.replaceChildren();
+}
+
+function snapCssPixel(value: number): number {
+  const ratio = window.devicePixelRatio || 1;
+  return Math.round(value * ratio) / ratio;
 }
 
 function ensureHighlightLayer(state: PdfBridgeState): HTMLDivElement {
