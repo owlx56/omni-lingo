@@ -21,6 +21,7 @@ const TRANSLATE_DELAY_MS = 10;
 const TOOLTIP_ATTR = "data-onelingo-tooltip";
 const READER_UI_ATTR = "data-onelingo-reader-ui";
 const HIGHLIGHT_NAME = "onelingo-hover";
+const HIGHLIGHT_STYLE_ATTR = "data-onelingo-hl";
 
 type CaretDoc = Document & {
   caretPositionFromPoint?(
@@ -54,6 +55,40 @@ export interface HoverTextHit {
   range: Range;
 }
 
+export interface HoverControllerOptions {
+  highlightName?: string;
+  mapAnchorRect?: (sourceDocument: Document, rect: DOMRect) => DOMRect;
+  tooltipAttr?: string;
+  tooltipDocument?: Document;
+}
+
+export interface HoverPointerInput {
+  clientX: number;
+  clientY: number;
+  sourceDocument?: Document;
+  target: EventTarget | null;
+}
+
+export interface HoverController {
+  dismiss(): void;
+  getEnabledStatus(): {
+    hoverEnabled: boolean;
+    hasHoverEnabledPref: boolean;
+  };
+  handleMove(input: HoverPointerInput): void;
+  updateEnabledPref(hoverEnabled: boolean): {
+    hoverEnabled: boolean;
+    hasHoverEnabledPref: boolean;
+  };
+}
+
+interface ResolvedHoverControllerOptions {
+  highlightName: string;
+  mapAnchorRect: (sourceDocument: Document, rect: DOMRect) => DOMRect;
+  tooltipAttr: string;
+  tooltipDocument: Document;
+}
+
 interface State {
   enabled: boolean;
   settingsEnabled: boolean;
@@ -69,6 +104,8 @@ interface State {
   seq: number;
   wordSegmenter: Intl.Segmenter;
   sentenceSegmenter: Intl.Segmenter;
+  highlightDoc: Document | null;
+  options: ResolvedHoverControllerOptions;
 }
 
 interface HoverTranslateRequest {
@@ -77,10 +114,62 @@ interface HoverTranslateRequest {
   engine: string;
 }
 
-let hoverState: State | null = null;
+type ElementLike = Pick<Element, "closest" | "tagName"> & {
+  isContentEditable?: boolean;
+  nodeType: number;
+};
 
-export function initHover(): void {
-  const state: State = {
+let defaultHoverController: HoverController | null = null;
+
+export function initHover(
+  options: HoverControllerOptions = {},
+): HoverController {
+  const controller = createHoverController(options);
+  defaultHoverController = controller;
+  bindHoverDocument(controller, document);
+  return controller;
+}
+
+export function createHoverController(
+  options: HoverControllerOptions = {},
+): HoverController {
+  const state = createState(resolveHoverControllerOptions(options));
+  initHoverSettings(state);
+
+  return {
+    dismiss: () => dismiss(state),
+    getEnabledStatus: () => readEnabledStatus(state),
+    handleMove: (input) => handleMove(state, input),
+    updateEnabledPref: (hoverEnabled) => {
+      state.preferredEnabled = hoverEnabled;
+      applyEnabled(state);
+      return readEnabledStatus(state);
+    },
+  };
+}
+
+export function bindHoverDocument(
+  controller: HoverController,
+  doc: Document,
+): void {
+  doc.addEventListener(
+    "mousemove",
+    (event) => {
+      controller.handleMove({
+        clientX: event.clientX,
+        clientY: event.clientY,
+        sourceDocument: doc,
+        target: event.target,
+      });
+    },
+    { passive: true },
+  );
+  doc.addEventListener("mouseleave", () => controller.dismiss());
+  doc.addEventListener("scroll", () => controller.dismiss(), { passive: true });
+}
+
+function createState(options: ResolvedHoverControllerOptions): State {
+  return {
     enabled: true,
     settingsEnabled: true,
     preferredEnabled: null,
@@ -97,9 +186,23 @@ export function initHover(): void {
     sentenceSegmenter: new Intl.Segmenter(undefined, {
       granularity: "sentence",
     }),
+    highlightDoc: null,
+    options,
   };
-  hoverState = state;
+}
 
+function resolveHoverControllerOptions(
+  options: HoverControllerOptions,
+): ResolvedHoverControllerOptions {
+  return {
+    highlightName: options.highlightName ?? HIGHLIGHT_NAME,
+    mapAnchorRect: options.mapAnchorRect ?? ((_sourceDocument, rect) => rect),
+    tooltipAttr: options.tooltipAttr ?? TOOLTIP_ATTR,
+    tooltipDocument: options.tooltipDocument ?? document,
+  };
+}
+
+function initHoverSettings(state: State): void {
   void getSettings()
     .then((s) => {
       applyHoverSettings(state, s);
@@ -115,12 +218,6 @@ export function initHover(): void {
   } catch (err) {
     console.warn("[OneLingo] failed to watch hover settings:", err);
   }
-
-  document.addEventListener("mousemove", (e) => onMove(e, state), {
-    passive: true,
-  });
-  document.addEventListener("mouseleave", () => dismiss(state));
-  document.addEventListener("scroll", () => dismiss(state), { passive: true });
 }
 
 function applyHoverSettings(
@@ -140,23 +237,34 @@ export function getHoverEnabledStatus(): {
   hoverEnabled: boolean;
   hasHoverEnabledPref: boolean;
 } {
-  return {
-    hoverEnabled: hoverState?.enabled ?? true,
-    hasHoverEnabledPref:
-      hoverState !== null && hoverState.preferredEnabled !== null,
-  };
+  return (
+    defaultHoverController?.getEnabledStatus() ?? {
+      hoverEnabled: true,
+      hasHoverEnabledPref: false,
+    }
+  );
 }
 
 export function updateHoverEnabledPref(hoverEnabled: boolean): {
   hoverEnabled: boolean;
   hasHoverEnabledPref: boolean;
 } {
-  if (!hoverState) {
-    return { hoverEnabled, hasHoverEnabledPref: true };
-  }
-  hoverState.preferredEnabled = hoverEnabled;
-  applyEnabled(hoverState);
-  return getHoverEnabledStatus();
+  return (
+    defaultHoverController?.updateEnabledPref(hoverEnabled) ?? {
+      hoverEnabled,
+      hasHoverEnabledPref: true,
+    }
+  );
+}
+
+function readEnabledStatus(state: State): {
+  hoverEnabled: boolean;
+  hasHoverEnabledPref: boolean;
+} {
+  return {
+    hoverEnabled: state.enabled,
+    hasHoverEnabledPref: state.preferredEnabled !== null,
+  };
 }
 
 function applyEnabled(s: State): void {
@@ -164,15 +272,18 @@ function applyEnabled(s: State): void {
   if (!s.enabled) dismiss(s);
 }
 
-function onMove(e: MouseEvent, s: State): void {
+function handleMove(s: State, input: HoverPointerInput): void {
   if (!s.enabled) return;
-  if (isEditable(e.target) || isOurUi(e.target)) {
+  if (isEditable(input.target) || isOurUi(input.target, s.options.tooltipAttr)) {
     dismiss(s);
     return;
   }
-  const hit = hitAt(
-    e.clientX,
-    e.clientY,
+
+  const sourceDocument = input.sourceDocument ?? document;
+  const hit = hitAtInDocument(
+    sourceDocument,
+    input.clientX,
+    input.clientY,
     s.wordSegmenter,
     s.sentenceSegmenter,
     s.granularity,
@@ -181,17 +292,17 @@ function onMove(e: MouseEvent, s: State): void {
     dismiss(s);
     return;
   }
-  // 高置信同语种文本不高亮不翻译；不确定时交给引擎。
   if (shouldSkipSameLanguageText(hit.text, s.target)) {
     dismiss(s);
     return;
   }
-  if (hit.text === s.lastText) return; // 同一翻译单元内移动不重发
+  if (hit.text === s.lastText) return;
+
   clearTimer(s);
   s.lastText = hit.text;
   const mySeq = ++s.seq;
-
-  setHighlight(hit.range);
+  setHighlight(s, sourceDocument, hit.range);
+  const anchor = s.options.mapAnchorRect(sourceDocument, hit.rect);
   const req = {
     text: hit.text,
     target: s.target,
@@ -200,7 +311,7 @@ function onMove(e: MouseEvent, s: State): void {
   const cached = sendMessage("peekTranslateMemoryCache", req).catch(() => null);
   s.translateTimer = window.setTimeout(() => {
     s.translateTimer = null;
-    void finishTranslate(s, mySeq, req, hit.rect, cached);
+    void finishTranslate(s, mySeq, req, anchor, cached);
   }, TRANSLATE_DELAY_MS);
 }
 
@@ -230,16 +341,6 @@ async function finishTranslate(
 }
 
 // ─── 取词 / 句 / 段 ──────────────────────────────────
-
-function hitAt(
-  x: number,
-  y: number,
-  wordSeg: Intl.Segmenter,
-  sentSeg: Intl.Segmenter,
-  granularity: HoverGranularity,
-): TextHit | null {
-  return hitAtInDocument(document, x, y, wordSeg, sentSeg, granularity);
-}
 
 export function hitAtInDocument(
   doc: Document,
@@ -285,12 +386,10 @@ export function hitAtInDocument(
   }
   if (wordStart === -1 || !hitRect) return null;
 
-  // 3a. 词模式：几何校验已完成，直接返回命中词
   if (granularity === "word") {
     return { text: hitWordText, rect: hitRect, range: hitWordRange! };
   }
 
-  // 3b. 句子模式：sentence segmenter 在同一文本节点内取句
   if (granularity === "sentence") {
     for (const sent of sentSeg.segment(text)) {
       const ss = sent.index;
@@ -306,7 +405,6 @@ export function hitAtInDocument(
     return null;
   }
 
-  // 3c. 段落模式：找最近 block 祖先，取 innerText
   return paragraphHit(doc, textNode, hitRect);
 }
 
@@ -358,8 +456,7 @@ function paragraphHit(
     if (BLOCK_RE.test(display)) break;
     el = el.parentElement;
   }
-  if (!el || el === doc.documentElement || el === doc.body)
-    return null;
+  if (!el || el === doc.documentElement || el === doc.body) return null;
 
   const paraText = (el as HTMLElement).innerText?.trim();
   if (!paraText) return null;
@@ -373,11 +470,11 @@ function paragraphHit(
 // ─── 显示 / 收起 ─────────────────────────────────────
 
 function show(s: State, translation: string, anchor: DOMRect): void {
+  const tooltipDocument = s.options.tooltipDocument;
   let el = s.tooltip;
   if (!el) {
-    el = document.createElement("div");
-    el.setAttribute(TOOLTIP_ATTR, "");
-    // 字号由 applyTooltipFontSize 单一来源控制，此处只设字体和行高。
+    el = tooltipDocument.createElement("div");
+    el.setAttribute(s.options.tooltipAttr, "");
     el.style.cssText = [
       "position:fixed",
       "z-index:2147483647",
@@ -393,7 +490,7 @@ function show(s: State, translation: string, anchor: DOMRect): void {
       "pointer-events:none",
       "box-shadow:0 2px 8px rgba(0,0,0,.3)",
     ].join(";");
-    document.body.appendChild(el);
+    (tooltipDocument.body ?? tooltipDocument.documentElement).appendChild(el);
     s.tooltip = el;
   }
   applyTooltipFontSize(s);
@@ -407,10 +504,11 @@ function show(s: State, translation: string, anchor: DOMRect): void {
 }
 
 function positionTooltip(el: HTMLElement, anchor: DOMRect): void {
+  const hostWindow = el.ownerDocument.defaultView ?? window;
   const tw = el.offsetWidth;
   const th = el.offsetHeight;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const vw = hostWindow.innerWidth;
+  const vh = hostWindow.innerHeight;
   const margin = 14;
 
   let left = anchor.left;
@@ -418,15 +516,14 @@ function positionTooltip(el: HTMLElement, anchor: DOMRect): void {
   if (top < 4) top = Math.min(anchor.bottom + margin, vh - th - 4);
   if (left + tw > vw - 4) left = Math.max(4, vw - tw - 4);
 
-  el.style.left = left + "px";
-  el.style.top = top + "px";
+  el.style.left = `${left}px`;
+  el.style.top = `${top}px`;
 }
 
 function applyTooltipFontSize(s: State): void {
   const el = s.tooltip;
   if (!el) return;
   el.style.fontSize = `${s.fontSize}px`;
-  // 设置实时生效：若 tooltip 当前可见，按新尺寸重新定位
   if (
     s.lastAnchor &&
     el.style.display === "block" &&
@@ -441,7 +538,7 @@ function dismiss(s: State): void {
   s.lastText = null;
   s.lastAnchor = null;
   s.seq++;
-  clearHighlight();
+  clearHighlight(s);
   if (s.tooltip) s.tooltip.style.display = "none";
 }
 
@@ -453,51 +550,70 @@ function clearTimer(s: State): void {
 }
 
 function isEditable(t: EventTarget | null): boolean {
-  if (!(t instanceof Element)) return false;
-  const tag = t.tagName;
+  const element = asElement(t);
+  if (!element) return false;
+  const tag = element.tagName?.toUpperCase?.() ?? "";
   if (tag === "INPUT" || tag === "TEXTAREA") return true;
-  return (t as HTMLElement).isContentEditable;
+  return element.isContentEditable === true;
 }
 
-function isOurUi(t: EventTarget | null): boolean {
-  if (!(t instanceof Element)) return false;
-  return !!t.closest(
-    `[data-onelingo-tooltip],[data-onelingo-host],[${READER_UI_ATTR}]`,
+function isOurUi(t: EventTarget | null, tooltipAttr: string): boolean {
+  const element = asElement(t);
+  if (!element) return false;
+  return !!element.closest?.(
+    `[${tooltipAttr}],[data-onelingo-host],[${READER_UI_ATTR}]`,
   );
+}
+
+function asElement(target: EventTarget | null): ElementLike | null {
+  if (!target || typeof target !== "object") return null;
+  const value = target as Partial<ElementLike>;
+  return value.nodeType === Node.ELEMENT_NODE ? (value as ElementLike) : null;
 }
 
 // ─── CSS Custom Highlight ─────────────────────────────
 
-let highlightStyleInjected = false;
-
-function getRegistry(): HighlightRegistry | null {
-  return (CSS as CSSWithHighlights).highlights ?? null;
+function getHighlightRegistry(doc: Document): HighlightRegistry | null {
+  const css = doc.defaultView?.CSS as CSSWithHighlights | undefined;
+  return css?.highlights ?? null;
 }
 
-function setHighlight(range: Range): void {
-  const reg = getRegistry();
+function getHighlightCtor(doc: Document): HighlightCtor | null {
+  const win = doc.defaultView as
+    | (Window & typeof globalThis & { Highlight?: HighlightCtor })
+    | null;
+  return win?.Highlight ?? null;
+}
+
+function setHighlight(s: State, doc: Document, range: Range): void {
+  const reg = getHighlightRegistry(doc);
   if (!reg) return;
-  injectHighlightStyle();
-  const Ctor = (globalThis as { Highlight?: HighlightCtor }).Highlight;
+  injectHighlightStyle(doc, s.options.highlightName);
+  const Ctor = getHighlightCtor(doc);
   if (!Ctor) return;
-  reg.set(HIGHLIGHT_NAME, new Ctor(range));
+  if (s.highlightDoc && s.highlightDoc !== doc) {
+    getHighlightRegistry(s.highlightDoc)?.delete(s.options.highlightName);
+  }
+  s.highlightDoc = doc;
+  reg.set(s.options.highlightName, new Ctor(range));
 }
 
-function clearHighlight(): void {
-  const reg = getRegistry();
-  if (!reg) return;
-  reg.delete(HIGHLIGHT_NAME);
+function clearHighlight(s: State): void {
+  if (!s.highlightDoc) return;
+  getHighlightRegistry(s.highlightDoc)?.delete(s.options.highlightName);
+  s.highlightDoc = null;
 }
 
-function injectHighlightStyle(): void {
-  if (highlightStyleInjected) return;
-  const style = document.createElement("style");
-  style.setAttribute("data-onelingo-hl", "");
+function injectHighlightStyle(doc: Document, highlightName: string): void {
+  if (doc.querySelector(`style[${HIGHLIGHT_STYLE_ATTR}="${highlightName}"]`)) {
+    return;
+  }
+  const style = doc.createElement("style");
+  style.setAttribute(HIGHLIGHT_STYLE_ATTR, highlightName);
   style.textContent =
-    `::highlight(${HIGHLIGHT_NAME}){` +
-    `text-decoration:underline solid #aaa;` +
-    `text-decoration-thickness:1px;` +
-    `text-underline-offset:2px}`;
-  (document.head ?? document.documentElement).appendChild(style);
-  highlightStyleInjected = true;
+    `::highlight(${highlightName}){` +
+    "text-decoration:underline solid #aaa;" +
+    "text-decoration-thickness:1px;" +
+    "text-underline-offset:2px}";
+  (doc.head ?? doc.documentElement).appendChild(style);
 }
