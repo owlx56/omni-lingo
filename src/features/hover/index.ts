@@ -99,6 +99,7 @@ interface State {
   fontSize: number; // px
   translateTimer: number | null;
   lastText: string | null; // 上次翻译的文本（去重）
+  lastRange: Range | null; // 上次命中的翻译单元范围（避免同文不同位时被误去重）
   lastAnchor: DOMRect | null; // 设置变更时重新定位用
   tooltip: HTMLDivElement | null;
   seq: number;
@@ -179,6 +180,7 @@ function createState(options: ResolvedHoverControllerOptions): State {
     fontSize: 13,
     translateTimer: null,
     lastText: null,
+    lastRange: null,
     lastAnchor: null,
     tooltip: null,
     seq: 0,
@@ -296,10 +298,11 @@ function handleMove(s: State, input: HoverPointerInput): void {
     dismiss(s);
     return;
   }
-  if (hit.text === s.lastText) return;
+  if (hit.text === s.lastText && sameRange(s.lastRange, hit.range)) return;
 
   clearTimer(s);
   s.lastText = hit.text;
+  s.lastRange = hit.range.cloneRange();
   const mySeq = ++s.seq;
   setHighlight(s, sourceDocument, hit.range);
   const anchor = s.options.mapAnchorRect(sourceDocument, hit.rect);
@@ -351,7 +354,7 @@ export function hitAtInDocument(
   granularity: HoverGranularity,
 ): HoverTextHit | null {
   // 1. caret API 找文本节点 + offset
-  const caret = caretHitAt(doc, x, y) ?? textLayerHitAt(doc, x, y);
+  const caret = caretHitAt(doc, x, y);
   if (!caret) return null;
   const textNode = caret.node;
   const text = textNode.nodeValue ?? "";
@@ -421,21 +424,6 @@ function caretHitAt(doc: Document, x: number, y: number): CaretHit | null {
     if (r?.startContainer.nodeType === Node.TEXT_NODE) {
       return { node: r.startContainer as Text, offset: r.startOffset };
     }
-  }
-  return null;
-}
-
-function textLayerHitAt(doc: Document, x: number, y: number): CaretHit | null {
-  const el = doc.elementFromPoint(x, y);
-  const textLayerNode = el?.closest?.(".textLayer span, .textLayer");
-  if (!textLayerNode) return null;
-  const walker = doc.createTreeWalker(textLayerNode, NodeFilter.SHOW_TEXT);
-  let node = walker.nextNode();
-  while (node) {
-    if ((node.nodeValue ?? "").trim()) {
-      return { node: node as Text, offset: null };
-    }
-    node = walker.nextNode();
   }
   return null;
 }
@@ -536,6 +524,7 @@ function applyTooltipFontSize(s: State): void {
 function dismiss(s: State): void {
   clearTimer(s);
   s.lastText = null;
+  s.lastRange = null;
   s.lastAnchor = null;
   s.seq++;
   clearHighlight(s);
@@ -569,6 +558,16 @@ function asElement(target: EventTarget | null): ElementLike | null {
   if (!target || typeof target !== "object") return null;
   const value = target as Partial<ElementLike>;
   return value.nodeType === Node.ELEMENT_NODE ? (value as ElementLike) : null;
+}
+
+function sameRange(a: Range | null, b: Range): boolean {
+  if (!a) return false;
+  return (
+    a.startContainer === b.startContainer &&
+    a.startOffset === b.startOffset &&
+    a.endContainer === b.endContainer &&
+    a.endOffset === b.endOffset
+  );
 }
 
 // ─── CSS Custom Highlight ─────────────────────────────
