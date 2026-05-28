@@ -80,7 +80,8 @@ options / popup / EPUB viewer / PDF viewer 的界面文案都走 `src/lib/i18n/c
 文档阅读器边界见 `docs/document-viewer.md`。简要规则：
 
 - PDF reader 使用 `pdfjs-dist` 依赖，构建时由 `wxt.config.ts` 复制 PDF.js runtime、worker、cmaps、wasm、字体、官方 viewer shell 和 OneLingo bridge 静态文件；不要重新 vendor 整个 PDF.js 目录。
-- PDF 内置 viewer 必须保持官方 PDF.js `viewer.html` / `viewer.js` / `viewer.css` 的布局和 textLayer 环境，避免自定义 `PDFViewer` 外壳导致双击选词和 hover 几何偏移。
+- PDF 内置 viewer 必须保持官方 PDF.js `viewer.html` / `viewer.js` / `viewer.css` 的布局和 textLayer 环境，避免自定义 `PDFViewer` 外壳导致双击选词边界和 hover 精度偏移。
+- PDF hover 默认直接复用 `src/features/hover/` 的通用逻辑。遇到 PDF hover 精度问题，先检查是否仍在顶层官方 viewer 里运行，再检查 reader UI 边界和 textLayer 命中；不要先验地恢复 PDF-specific hover 分支。
 - EPUB 主路径使用 `epubjs`，reader shell 在 `src/entrypoints/viewer/App.tsx`，iframe 内容桥接在 `src/entrypoints/viewer/epub-bridge.ts`。
 - reader 内 selection 行为必须复用 `src/features/selection/`。未来改 selection 功能时，普通网页、PDF reader、EPUB reader 应尽量同时生效。
 - reader UI 控件必须标记或继承 `data-onelingo-reader-ui` 边界，hover / selection 不应命中工具栏、侧栏、菜单、对话框。

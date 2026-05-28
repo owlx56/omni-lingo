@@ -34,20 +34,16 @@ type PdfViewerWindow = Window & typeof globalThis & {
 
 export default defineUnlistedScript(() => {
   document.documentElement.setAttribute("data-onelingo-pdf-viewer", "");
-  initTheme();
-  watchEffectiveTheme(syncPdfViewerTheme);
-  markPdfChrome();
-  initPdfTranslation();
+  initPdfViewerTheme();
+  initPdfReaderUiBoundary();
+  initPdfReaderFeatures();
   void bootstrapPdfDocumentOpen().catch((err: unknown) => {
     console.warn("[OneLingo] failed to bootstrap PDF document:", err);
   });
-
-  const observer = new MutationObserver(() => {
-    markPdfChrome();
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
 });
 
+// PDF document bootstrap: resolve stored/sniffed inputs and hand them to the
+// top-level official PDF.js viewer application.
 async function bootstrapPdfDocumentOpen(): Promise<void> {
   const params = new URLSearchParams(location.search);
   const key = params.get(STORED_PDF_KEY_PARAM);
@@ -65,6 +61,21 @@ async function bootstrapPdfDocumentOpen(): Promise<void> {
   if (shouldConsumeSniffed) {
     await openSniffedPdf(app);
   }
+}
+
+// Theme + reader chrome marking keep the official viewer selectable while
+// shielding OneLingo's own reader UI from hover/selection handlers.
+function initPdfViewerTheme(): void {
+  initTheme();
+  watchEffectiveTheme(syncPdfViewerTheme);
+}
+
+function initPdfReaderUiBoundary(): void {
+  markPdfChrome();
+  const observer = new MutationObserver(() => {
+    markPdfChrome();
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
 }
 
 async function openStoredPdf(
@@ -157,7 +168,8 @@ function markPdfChrome(): void {
   }
 }
 
-function initPdfTranslation(): void {
+// Reader features intentionally reuse the shared webpage implementations.
+function initPdfReaderFeatures(): void {
   initHover();
   initSelection();
   registerViewerMessageHandlers();

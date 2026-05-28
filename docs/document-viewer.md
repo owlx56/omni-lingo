@@ -60,8 +60,8 @@ PDF reader 使用 `pdfjs-dist` npm 依赖，并加载官方 PDF.js `viewer.html`
 普通网页、PDF reader、EPUB reader 要尽量共享行为：
 
 - selection UI 走 `src/features/selection/`，不要在 reader 里复制一套“译”按钮逻辑。
-- PDF reader 通过 `src/entrypoints/pdf-bridge.ts` 调用 `initSelection()`，并实现 `readPageFeatureStatus` / `updatePageFeaturePrefs`。
-- PDF hover 只在 PDF.js `textLayer` 内生效，但不能改写 textLayer DOM。取词粒度沿用 Less Translate 的 split 规则：`text.split(/(\s|\.|\,|\:|\!|\?|\"|\||\'|。|，|？|》|《)/g).filter(Boolean)`；命中测试用原始文本节点的 `Range.getClientRects()`，下划线用 fixed 1px overlay line。不要包 `all: unset` wrapper / token span，因为 PDF.js 的双击选词和浏览器原生选区依赖原始 textLayer 结构，改写 DOM 会让 hover 和双击选词同时偏移。PDF 内部 hover 固定使用这个 token 粒度，不套普通网页的 sentence / paragraph hoverGranularity。空白 delimiter 命中应自然清除 hover。
+- PDF reader 通过 `src/entrypoints/pdf-bridge.ts` 调用 `initHover()` 和 `initSelection()`，并实现 `readPageFeatureStatus` / `updatePageFeaturePrefs`。
+- PDF hover 与普通网页共用 `src/features/hover/`。在顶层官方 PDF.js viewer 下，这套通用 hover 已验证可与 Less Translate 保持同等精度；不要为了 PDF 单独恢复 token split、overlay underline 或改写 textLayer DOM。PDF.js 的双击选词和浏览器原生选区依赖原始 textLayer 结构，所以仍然不要包 `all: unset` wrapper / token span。
 - EPUB reader 因内容在 epubjs iframe 中，需要 `src/entrypoints/viewer/epub-bridge.ts` 在 iframe 文档里转接 hover / selection 命中、坐标和高亮。
 - reader UI 元素要标记 `data-onelingo-reader-ui`，hover / selection 命中测试必须避开工具栏、侧栏、弹层和菜单。
 

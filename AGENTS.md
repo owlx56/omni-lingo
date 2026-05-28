@@ -30,6 +30,7 @@ OneLingo（一译）是跨 Chrome / Firefox / Safari 的浏览器翻译拓展。
 - UI 文案源在 `src/lib/i18n/catalog.ts`，options / popup / EPUB / PDF reader 都从这里派生；`messages.ts`、`locales/*.ts` 和 `src/assets/pdf-viewer/locales.generated.mjs` 是类型/兼容/静态 viewer 产物。
 - 通用控件放在 `src/lib/ui/controls.tsx` 和 `src/lib/ui/controls.css`；改 options / popup 下拉菜单、开关、色板时优先复用这里。
 - PDF reader 使用 `pdfjs-dist` 依赖，`wxt.config.ts` 在构建时复制 `pdf.mjs`、worker、字体、cmaps、wasm 和 `src/assets/pdf-viewer/` 下的 OneLingo viewer 文件；不要手动 vendor 整个 PDF.js。
+- PDF hover 直接复用 `src/features/hover/` 的通用逻辑；不要再维护一套 PDF-specific hover hit test / token split / overlay underline。
 - EPUB reader 在 `src/entrypoints/viewer/` 使用 `epubjs` 渲染，`epub-bridge.ts` 负责把 hover / selection 行为接进 EPUB iframe。
 - 文件链接嗅探分两层：`src/features/document-sniffer.ts` 处理页面内普通链接点击；`src/entrypoints/background.ts` 用 DNR / webRequest 处理地址栏和主框架 PDF / EPUB 导航。
 - 全文翻译在 `src/features/immersive/`。
