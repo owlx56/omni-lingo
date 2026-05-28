@@ -48,6 +48,12 @@ interface TextHit {
   range: Range; // 高亮范围
 }
 
+export interface HoverTextHit {
+  text: string;
+  rect: DOMRect;
+  range: Range;
+}
+
 interface State {
   enabled: boolean;
   settingsEnabled: boolean;
@@ -232,8 +238,19 @@ function hitAt(
   sentSeg: Intl.Segmenter,
   granularity: HoverGranularity,
 ): TextHit | null {
+  return hitAtInDocument(document, x, y, wordSeg, sentSeg, granularity);
+}
+
+export function hitAtInDocument(
+  doc: Document,
+  x: number,
+  y: number,
+  wordSeg: Intl.Segmenter,
+  sentSeg: Intl.Segmenter,
+  granularity: HoverGranularity,
+): HoverTextHit | null {
   // 1. caret API 找文本节点 + offset
-  const caret = caretHitAt(x, y) ?? textLayerHitAt(x, y);
+  const caret = caretHitAt(doc, x, y) ?? textLayerHitAt(doc, x, y);
   if (!caret) return null;
   const textNode = caret.node;
   const text = textNode.nodeValue ?? "";
@@ -250,7 +267,7 @@ function hitAt(
     const ws = w.index;
     const we = ws + w.segment.length;
 
-    const wr = document.createRange();
+    const wr = doc.createRange();
     wr.setStart(textNode, ws);
     wr.setEnd(textNode, we);
     const rects = wr.getClientRects();
@@ -281,7 +298,7 @@ function hitAt(
       if (wordStart < ss || wordStart >= se) continue;
       const sentText = sent.segment.trim();
       if (!sentText) return null;
-      const sentRange = document.createRange();
+      const sentRange = doc.createRange();
       sentRange.setStart(textNode, ss);
       sentRange.setEnd(textNode, se);
       return { text: sentText, rect: hitRect, range: sentRange };
@@ -290,19 +307,19 @@ function hitAt(
   }
 
   // 3c. 段落模式：找最近 block 祖先，取 innerText
-  return paragraphHit(textNode, hitRect);
+  return paragraphHit(doc, textNode, hitRect);
 }
 
-function caretHitAt(x: number, y: number): CaretHit | null {
-  const doc = document as CaretDoc;
-  if (doc.caretPositionFromPoint) {
-    const p = doc.caretPositionFromPoint(x, y);
+function caretHitAt(doc: Document, x: number, y: number): CaretHit | null {
+  const caretDoc = doc as CaretDoc;
+  if (caretDoc.caretPositionFromPoint) {
+    const p = caretDoc.caretPositionFromPoint(x, y);
     if (p?.offsetNode.nodeType === Node.TEXT_NODE) {
       return { node: p.offsetNode as Text, offset: p.offset };
     }
   }
-  if (doc.caretRangeFromPoint) {
-    const r = doc.caretRangeFromPoint(x, y);
+  if (caretDoc.caretRangeFromPoint) {
+    const r = caretDoc.caretRangeFromPoint(x, y);
     if (r?.startContainer.nodeType === Node.TEXT_NODE) {
       return { node: r.startContainer as Text, offset: r.startOffset };
     }
@@ -310,11 +327,11 @@ function caretHitAt(x: number, y: number): CaretHit | null {
   return null;
 }
 
-function textLayerHitAt(x: number, y: number): CaretHit | null {
-  const el = document.elementFromPoint(x, y);
+function textLayerHitAt(doc: Document, x: number, y: number): CaretHit | null {
+  const el = doc.elementFromPoint(x, y);
   const textLayerNode = el?.closest?.(".textLayer span, .textLayer");
   if (!textLayerNode) return null;
-  const walker = document.createTreeWalker(textLayerNode, NodeFilter.SHOW_TEXT);
+  const walker = doc.createTreeWalker(textLayerNode, NodeFilter.SHOW_TEXT);
   let node = walker.nextNode();
   while (node) {
     if ((node.nodeValue ?? "").trim()) {
@@ -329,20 +346,25 @@ function textLayerHitAt(x: number, y: number): CaretHit | null {
 const BLOCK_RE =
   /^(block|flex|grid|list-item|table(?!-cell\b|-row\b)|table-cell|table-row)$/;
 
-function paragraphHit(textNode: Text, hitRect: DOMRect): TextHit | null {
+function paragraphHit(
+  doc: Document,
+  textNode: Text,
+  hitRect: DOMRect,
+): TextHit | null {
   let el: Element | null = textNode.parentElement;
-  while (el && el !== document.documentElement) {
-    const display = window.getComputedStyle(el).display;
+  const win = doc.defaultView ?? window;
+  while (el && el !== doc.documentElement) {
+    const display = win.getComputedStyle(el).display;
     if (BLOCK_RE.test(display)) break;
     el = el.parentElement;
   }
-  if (!el || el === document.documentElement || el === document.body)
+  if (!el || el === doc.documentElement || el === doc.body)
     return null;
 
   const paraText = (el as HTMLElement).innerText?.trim();
   if (!paraText) return null;
 
-  const paraRange = document.createRange();
+  const paraRange = doc.createRange();
   paraRange.selectNodeContents(el);
 
   return { text: paraText, rect: hitRect, range: paraRange };

@@ -62,7 +62,7 @@ PDF reader 使用 `pdfjs-dist` npm 依赖，并加载官方 PDF.js `viewer.html`
 - selection UI 走 `src/features/selection/`，不要在 reader 里复制一套“译”按钮逻辑。
 - PDF reader 通过 `src/entrypoints/pdf-bridge.ts` 调用 `initHover()` 和 `initSelection()`，并实现 `readPageFeatureStatus` / `updatePageFeaturePrefs`。
 - PDF hover 与普通网页共用 `src/features/hover/`。在顶层官方 PDF.js viewer 下，这套通用 hover 已验证可与 Less Translate 保持同等精度；不要为了 PDF 单独恢复 token split、overlay underline 或改写 textLayer DOM。PDF.js 的双击选词和浏览器原生选区依赖原始 textLayer 结构，所以仍然不要包 `all: unset` wrapper / token span。
-- EPUB reader 因内容在 epubjs iframe 中，需要 `src/entrypoints/viewer/epub-bridge.ts` 在 iframe 文档里转接 hover / selection 命中、坐标和高亮。
+- EPUB reader 因内容在 epubjs iframe 中，需要 `src/entrypoints/viewer/epub-bridge.ts` 在 iframe 文档里转接 hover / selection。当前 EPUB hover 复用 `src/features/hover/` 的核心命中逻辑，`epub-bridge.ts` 只保留 iframe document 绑定、坐标换算和高亮宿主适配。
 - reader UI 元素要标记 `data-onelingo-reader-ui`，hover / selection 命中测试必须避开工具栏、侧栏、弹层和菜单。
 
 修改 selection 行为时，先改 `src/features/selection/` 的共享路径，再检查普通网页、PDF reader、EPUB reader 三处是否同样生效。

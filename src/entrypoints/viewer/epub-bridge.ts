@@ -1,6 +1,10 @@
 import { onMessage, sendMessage, type PageFeatureStatus } from "@/lib/messaging";
 import { shouldSkipSameLanguageText } from "@/lib/lang-detect";
 import {
+  hitAtInDocument,
+  type HoverTextHit,
+} from "@/features/hover";
+import {
   getSettings,
   resolveTargetLang,
   watchSettings,
@@ -25,6 +29,8 @@ interface EpubBridgeState {
   hoverSeq: number;
   hoverTimer: number | null;
   lastHoverText: string;
+  wordSegmenter: Intl.Segmenter;
+  sentenceSegmenter: Intl.Segmenter;
   hoverHighlightDoc: Document | null;
   tooltip: HTMLDivElement | null;
 }
@@ -32,14 +38,6 @@ interface EpubBridgeState {
 const HOVER_DELAY_MS = 10;
 const TOOLTIP_ATTR = "data-onelingo-epub-tooltip";
 const HIGHLIGHT_NAME = "onelingo-epub-hover";
-
-type CaretDoc = Document & {
-  caretPositionFromPoint?(
-    x: number,
-    y: number,
-  ): { offsetNode: Node; offset: number } | null;
-  caretRangeFromPoint?(x: number, y: number): Range | null;
-};
 
 type HighlightCtor = new (range: Range) => unknown;
 type HighlightRegistry = {
@@ -50,17 +48,6 @@ type CSSWithHighlights = typeof CSS & { highlights?: HighlightRegistry };
 
 interface EpubContents {
   document: Document;
-}
-
-interface EpubTextHit {
-  anchor: DOMRect;
-  range: Range;
-  text: string;
-}
-
-interface EpubCaretHit {
-  offset: number;
-  textNode: Text;
 }
 
 type EpubEventSource = {
@@ -81,6 +68,10 @@ export function initEpubBridge(rendition: Rendition): void {
     hoverSeq: 0,
     hoverTimer: null,
     lastHoverText: "",
+    wordSegmenter: new Intl.Segmenter(undefined, { granularity: "word" }),
+    sentenceSegmenter: new Intl.Segmenter(undefined, {
+      granularity: "sentence",
+    }),
     hoverHighlightDoc: null,
     tooltip: null,
   };
@@ -346,10 +337,10 @@ function onEpubMouseMove(
 ): void {
   if (!state.hoverEnabled) return;
   const hit = epubTextHitAt(
+    state,
     doc,
     event.clientX,
     event.clientY,
-    state.hoverGranularity,
   );
   if (!hit || shouldSkipSameLanguageText(hit.text, state.hoverTarget)) {
     dismissEpubHover(state);
@@ -371,7 +362,7 @@ function onEpubMouseMove(
     })
       .then((res) => {
         if (seq === state.hoverSeq)
-          showEpubHoverTooltip(state, res.text, toParentRect(doc, hit.anchor));
+          showEpubHoverTooltip(state, res.text, toParentRect(doc, hit.rect));
       })
       .catch((err: unknown) => {
         console.warn("[OneLingo] EPUB hover translate failed:", err);
@@ -416,216 +407,19 @@ function onEpubSelectedRange(
 }
 
 function epubTextHitAt(
+  state: EpubBridgeState,
   doc: Document,
   x: number,
   y: number,
-  granularity: HoverGranularity,
-): EpubTextHit | null {
-  const caret = caretHitAt(doc, x, y);
-  const textNode = caret?.textNode ?? textNodeAtPoint(doc, x, y);
-  const text = textNode?.nodeValue ?? "";
-  if (!textNode || !text.trim()) return fallbackElementHitAt(doc, x, y, granularity);
-
-  const word = wordAtPoint(doc, textNode, text, x, y, caret?.offset);
-  if (!word) return null;
-  if (granularity === "word") return word;
-
-  if (granularity === "sentence") {
-    for (const sent of new Intl.Segmenter(undefined, {
-      granularity: "sentence",
-    }).segment(text)) {
-      const start = sent.index;
-      const end = start + sent.segment.length;
-      if (word.start < start || word.start >= end) continue;
-      const sentText = sent.segment.trim();
-      if (!sentText) return null;
-      const range = doc.createRange();
-      range.setStart(textNode, start);
-      range.setEnd(textNode, end);
-      return {
-        anchor: word.anchor,
-        range,
-        text: sentText,
-      };
-    }
-    return null;
-  }
-
-  return paragraphHit(doc, textNode, word.anchor);
-}
-
-function textNodeAtPoint(doc: Document, x: number, y: number): Text | null {
-  const element = doc.elementFromPoint(x, y);
-  const root =
-    element?.closest?.("p,li,blockquote,section,article,div,body") ?? element;
-  if (!root) return null;
-
-  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let node = walker.nextNode();
-  while (node) {
-    if (
-      node.nodeType === Node.TEXT_NODE &&
-      textNodeContainsPoint(doc, node as Text, x, y)
-    ) {
-      return node as Text;
-    }
-    node = walker.nextNode();
-  }
-  return null;
-}
-
-function caretHitAt(doc: Document, x: number, y: number): EpubCaretHit | null {
-  const caretDoc = doc as CaretDoc;
-  if (caretDoc.caretPositionFromPoint) {
-    const pos = caretDoc.caretPositionFromPoint(x, y);
-    if (pos?.offsetNode.nodeType === Node.TEXT_NODE) {
-      return { offset: pos.offset, textNode: pos.offsetNode as Text };
-    }
-    const childText = textNodeFromCaretChild(pos?.offsetNode, pos?.offset);
-    if (childText) return childText;
-  }
-  if (caretDoc.caretRangeFromPoint) {
-    const range = caretDoc.caretRangeFromPoint(x, y);
-    if (range?.startContainer.nodeType === Node.TEXT_NODE) {
-      return { offset: range.startOffset, textNode: range.startContainer as Text };
-    }
-    const childText = textNodeFromCaretChild(range?.startContainer, range?.startOffset);
-    if (childText) return childText;
-  }
-  return null;
-}
-
-function textNodeFromCaretChild(node: Node | undefined, offset: number | undefined): EpubCaretHit | null {
-  if (!node || offset === undefined || node.nodeType !== Node.ELEMENT_NODE) return null;
-  const child = node.childNodes[Math.min(offset, Math.max(0, node.childNodes.length - 1))];
-  if (child?.nodeType === Node.TEXT_NODE) return { offset: 0, textNode: child as Text };
-  const walker = node.ownerDocument?.createTreeWalker(node, NodeFilter.SHOW_TEXT);
-  const textNode = walker?.nextNode();
-  return textNode?.nodeType === Node.TEXT_NODE
-    ? { offset: 0, textNode: textNode as Text }
-    : null;
-}
-
-function textNodeContainsPoint(
-  doc: Document,
-  textNode: Text,
-  x: number,
-  y: number,
-): boolean {
-  const value = textNode.nodeValue ?? "";
-  if (!value.trim()) return false;
-  const range = doc.createRange();
-  range.selectNodeContents(textNode);
-  for (const rect of range.getClientRects()) {
-    if (pointInRect(x, y, rect)) return true;
-  }
-  return false;
-}
-
-function wordAtPoint(
-  doc: Document,
-  textNode: Text,
-  text: string,
-  x: number,
-  y: number,
-  offset: number | undefined,
-): (EpubTextHit & { start: number }) | null {
-  for (const segment of new Intl.Segmenter(undefined, {
-    granularity: "word",
-  }).segment(text)) {
-    if (!segment.isWordLike) continue;
-    const start = segment.index;
-    const end = start + segment.segment.length;
-    const range = doc.createRange();
-    range.setStart(textNode, start);
-    range.setEnd(textNode, end);
-    const anchor = firstUsefulRect(range);
-    if (!anchor) continue;
-    if (offset !== undefined && offset >= start && offset <= end) {
-      return {
-        anchor,
-        range,
-        start,
-        text: segment.segment.trim(),
-      };
-    }
-    for (const rect of range.getClientRects()) {
-      if (!pointInRect(x, y, rect)) continue;
-      return {
-        anchor: rect,
-        range,
-        start,
-        text: segment.segment.trim(),
-      };
-    }
-  }
-  return null;
-}
-
-function fallbackElementHitAt(
-  doc: Document,
-  x: number,
-  y: number,
-  granularity: HoverGranularity,
-): EpubTextHit | null {
-  const element = doc.elementFromPoint(x, y);
-  const root =
-    element?.closest?.("p,li,blockquote,section,article,div,body") ?? element;
-  const text = (root as HTMLElement | null)?.innerText?.trim();
-  if (!root || !text) return null;
-  const range = doc.createRange();
-  range.selectNodeContents(root);
-  const anchor = firstUsefulRect(range) ?? root.getBoundingClientRect();
-  if (granularity === "paragraph") return { anchor, range, text };
-  const firstWord = [...new Intl.Segmenter(undefined, { granularity: "word" }).segment(text)]
-    .find((segment) => segment.isWordLike && segment.segment.trim());
-  if (!firstWord) return { anchor, range, text };
-  return {
-    anchor,
-    range,
-    text:
-      granularity === "word"
-        ? firstWord.segment.trim()
-        : sentenceContainingText(text, firstWord.index) ?? text,
-  };
-}
-
-function sentenceContainingText(text: string, offset: number): string | null {
-  for (const sent of new Intl.Segmenter(undefined, {
-    granularity: "sentence",
-  }).segment(text)) {
-    const start = sent.index;
-    const end = start + sent.segment.length;
-    if (offset >= start && offset < end) return sent.segment.trim() || null;
-  }
-  return null;
-}
-
-const BLOCK_RE =
-  /^(block|flex|grid|list-item|table(?!-cell\b|-row\b)|table-cell|table-row)$/;
-
-function paragraphHit(
-  doc: Document,
-  textNode: Text,
-  anchor: DOMRect,
-): EpubTextHit | null {
-  let element: Element | null = textNode.parentElement;
-  const win = doc.defaultView;
-  while (element && element !== doc.documentElement) {
-    const display = win?.getComputedStyle(element).display ?? "";
-    if (BLOCK_RE.test(display)) break;
-    element = element.parentElement;
-  }
-  if (!element || element === doc.documentElement || element === doc.body) {
-    return null;
-  }
-
-  const text = (element as HTMLElement).innerText?.trim();
-  if (!text) return null;
-
-  const range = doc.createRange();
-  range.selectNodeContents(element);
-  return { anchor, range, text };
+): HoverTextHit | null {
+  return hitAtInDocument(
+    doc,
+    x,
+    y,
+    state.wordSegmenter,
+    state.sentenceSegmenter,
+    state.hoverGranularity,
+  );
 }
 
 function showEpubHoverTooltip(
