@@ -1,10 +1,15 @@
 import { getSettings, watchSettings } from "@/lib/storage/settings";
-import { browser } from "wxt/browser";
+import type { UiLang } from "@/lib/languages";
+import {
+  documentViewerUrlForUrl,
+  isLikelyPdfUrl,
+} from "@/lib/document-viewer-urls";
 
 interface SnifferState {
   enabled: boolean;
   keepOriginal: boolean;
   standalone: boolean;
+  uiLang: UiLang;
 }
 
 const DOCUMENT_URL_RE = /\.(?:pdf|epub)(?:$|[?#])/i;
@@ -14,6 +19,7 @@ export function initDocumentLinkSniffer(): void {
     enabled: false,
     keepOriginal: false,
     standalone: false,
+    uiLang: "zh-Hans",
   };
 
   void getSettings()
@@ -21,6 +27,7 @@ export function initDocumentLinkSniffer(): void {
       state.enabled = settings.documentLinkSniffEnabled;
       state.keepOriginal = settings.documentLinkSniffKeepOriginal;
       state.standalone = settings.documentLinkSniffStandalone;
+      state.uiLang = settings.uiLang;
     })
     .catch((err: unknown) => {
       console.warn("[OneLingo] failed to read document sniffer settings:", err);
@@ -31,6 +38,7 @@ export function initDocumentLinkSniffer(): void {
       state.enabled = settings.documentLinkSniffEnabled;
       state.keepOriginal = settings.documentLinkSniffKeepOriginal;
       state.standalone = settings.documentLinkSniffStandalone;
+      state.uiLang = settings.uiLang;
     });
   } catch (err: unknown) {
     console.warn("[OneLingo] failed to watch document sniffer settings:", err);
@@ -47,15 +55,17 @@ export function initDocumentLinkSniffer(): void {
 
       event.preventDefault();
       event.stopPropagation();
-      location.href = viewerUrlForDocument(anchor.href);
+      location.href = viewerUrlForDocument(anchor.href, state.uiLang);
     },
     true,
   );
 }
 
-function viewerUrlForDocument(url: string): string {
-  return browser.runtime.getURL(
-    `/viewer.html?url=${encodeURIComponent(url)}&format=auto`,
+function viewerUrlForDocument(url: string, uiLang: UiLang): string {
+  return documentViewerUrlForUrl(
+    url,
+    isLikelyPdfUrl(url) ? "pdf" : "auto",
+    uiLang,
   );
 }
 

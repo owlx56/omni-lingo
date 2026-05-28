@@ -6,10 +6,14 @@ import {
   Show,
   type JSX,
 } from "solid-js";
-import { browser } from "wxt/browser";
 import ePub from "epubjs";
 import type { Book, Rendition } from "epubjs";
 import { loadDocument, storeDocument } from "@/lib/document-store";
+import {
+  pdfViewerUrlForFile,
+  pdfViewerUrlForStoredKey,
+  readerShellUrlForStoredKey,
+} from "@/lib/document-viewer-urls";
 import { useT } from "@/lib/i18n";
 import type { UiLang } from "@/lib/languages";
 import { sendMessage } from "@/lib/messaging";
@@ -57,9 +61,6 @@ function App(): JSX.Element {
   let bookRef: Book | undefined;
   let renditionRef: Rendition | undefined;
   let stopThemeSync: (() => void) | undefined;
-
-  const pdfViewerUrl = (fileUrl: string): string =>
-    `${browser.runtime.getURL("/")}pdf/web/viewer.html?file=${encodeURIComponent(fileUrl)}`;
 
   createEffect(() => {
     const lang = settings().uiLang;
@@ -117,7 +118,7 @@ function App(): JSX.Element {
       setDocTitle(doc.name.replace(/\.(pdf|epub)$/i, "") || "Document");
       setDocFormat(doc.format);
       if (doc.format === "pdf") {
-        renderPdf(doc.data);
+        location.replace(pdfViewerUrlForStoredKey(key, settings().uiLang));
       } else {
         await renderEpub(doc.data);
       }
@@ -135,37 +136,18 @@ function App(): JSX.Element {
       const doc = await fetchDocumentFromUrl(url, formatHint);
       setDocFormat(doc.format);
       setDocTitle(doc.name.replace(/\.(pdf|epub)$/i, "") || "Document");
-      const key = await storeDocument(doc.data, doc.format, doc.name);
-      const viewerUrl = browser.runtime.getURL(
-        `/viewer.html?key=${encodeURIComponent(key)}`,
-      );
-      history.replaceState(null, "", viewerUrl);
       if (doc.format === "pdf") {
-        renderPdf(doc.data);
-      } else {
-        await renderEpub(doc.data);
+        location.replace(pdfViewerUrlForFile(doc.url, settings().uiLang));
+        return;
       }
+      const key = await storeDocument(doc.data, doc.format, doc.name);
+      const viewerUrl = readerShellUrlForStoredKey(key);
+      history.replaceState(null, "", viewerUrl);
+      await renderEpub(doc.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setState("error");
     }
-  };
-
-  const renderPdf = (data: ArrayBuffer): void => {
-    const blob = new Blob([data], { type: "application/pdf" });
-    const objectUrl = URL.createObjectURL(blob);
-    setState("ready");
-    stopThemeSync?.();
-    stopThemeSync = undefined;
-    requestAnimationFrame(() => {
-      const iframe = document.getElementById(
-        "pdf-frame",
-      ) as HTMLIFrameElement | null;
-      if (iframe) {
-        stopThemeSync = syncPdfFrameTheme(iframe, settings().uiLang);
-        iframe.src = pdfViewerUrl(objectUrl);
-      }
-    });
   };
 
   const renderEpub = async (data: ArrayBuffer): Promise<void> => {
@@ -226,14 +208,6 @@ function App(): JSX.Element {
         <div class="viewer-loading">{t("viewer.status.loading")}</div>
       </Show>
 
-      <Show when={state() === "ready" && docFormat() === "pdf"}>
-        <iframe
-          class="viewer-pdf-frame"
-          id="pdf-frame"
-          title={docTitle()}
-        />
-      </Show>
-
       <Show when={state() === "ready" && docFormat() === "epub"}>
         <header class="epub-toolbar">
           <button class="epub-nav-button" onClick={goPrev} type="button">
@@ -249,41 +223,6 @@ function App(): JSX.Element {
       </Show>
     </main>
   );
-}
-
-function syncPdfFrameTheme(
-  iframe: HTMLIFrameElement,
-  initialUiLang: UiLang,
-): () => void {
-  let currentTheme = getEffectiveTheme();
-  let currentUiLang: UiLang = initialUiLang;
-  const syncFrame = (): void => {
-    try {
-      const doc = iframe.contentDocument;
-      if (doc) {
-        applyThemeToDocument(doc, currentTheme);
-        applyLanguageToDocument(doc, currentUiLang);
-      }
-    } catch {
-      // The bundled PDF.js frame is same-origin; keep this defensive for reloads.
-    }
-  };
-  const onLoad = (): void => syncFrame();
-  iframe.addEventListener("load", onLoad);
-  const stopThemeWatch = watchEffectiveTheme((theme) => {
-    currentTheme = theme;
-    syncFrame();
-  });
-  const stopSettingsWatch = watchSettings((settings) => {
-    currentUiLang = settings.uiLang;
-    syncFrame();
-  });
-  syncFrame();
-  return () => {
-    iframe.removeEventListener("load", onLoad);
-    stopThemeWatch();
-    stopSettingsWatch();
-  };
 }
 
 function syncRenditionDocumentPrefs(

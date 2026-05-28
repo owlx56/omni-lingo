@@ -11,18 +11,26 @@ import {
   type Settings,
 } from "@/lib/storage/settings";
 import { browser, type Browser } from "wxt/browser";
+import type { UiLang } from "@/lib/languages";
+import {
+  documentViewerUrlForUrl,
+  isPdfViewerUrl,
+  isReaderShellUrl,
+  pdfViewerUrlForSniff,
+  readerShellUrlForSniff,
+  type ViewerFormat,
+} from "@/lib/document-viewer-urls";
 
 const OPEN_LINK_IN_VIEWER_MENU = "onelingo-open-link-in-viewer";
 const OPEN_PAGE_IN_VIEWER_MENU = "onelingo-open-page-in-viewer";
 const OPEN_IN_VIEWER_TITLE = "Open in OneLingo Reader";
 const DOCUMENT_URL_RE = /\.(?:pdf|epub)(?:$|[?#])/i;
-const SNIFFED_VIEWER_PATH = "/viewer.html?sniff=1";
 const SNIFFED_DOCUMENT_STORAGE_PREFIX = "onelingo:sniffed-document:";
-const DOCUMENT_SNIFF_RULE_IDS = [42001, 42002, 42003, 42004];
+const DOCUMENT_SNIFF_RULE_IDS = [42001, 42002, 42003, 42004, 42005, 42006];
 const DOCUMENT_SNIFF_BYPASS_RULE_ID_START = 42100;
 const DOCUMENT_SNIFF_BYPASS_RULE_ID_COUNT = 32;
-const HTTP_DOCUMENT_URL_REGEX =
-  "^https?://.*\\.(?:[Pp][Dd][Ff]|[Ee][Pp][Uu][Bb])(?:$|[?#].*)?";
+const HTTP_PDF_URL_REGEX = "^https?://.*\\.[Pp][Dd][Ff](?:$|[?#].*)?";
+const HTTP_EPUB_URL_REGEX = "^https?://.*\\.[Ee][Pp][Uu][Bb](?:$|[?#].*)?";
 const DOCUMENT_RESPONSE_TYPES = new Set([
   "application/pdf",
   "application/epub+zip",
@@ -34,6 +42,7 @@ interface DocumentSniffState {
   dnrEnabled: boolean;
   keepOriginal: boolean;
   standalone: boolean;
+  uiLang: UiLang;
   openedKeys: Set<string>;
   pendingOpens: Map<number, PendingDocumentOpen>;
   nextBypassRuleId: number;
@@ -174,6 +183,7 @@ export default defineBackground(() => {
       keepOriginal: keepOriginal ?? documentSniffer.keepOriginal,
       standalone: standalone ?? documentSniffer.standalone,
       sourceTabId,
+      state: documentSniffer,
     });
     return { opened: true };
   });
@@ -192,14 +202,20 @@ export default defineBackground(() => {
     if (documentSniffer.keepOriginal) {
       await openDocumentViewer(pending.url, {
         active: false,
+        format: sniffedFormatFromSender(sender),
         keepOriginal: true,
         standalone: documentSniffer.standalone,
+        state: documentSniffer,
       });
       await installTemporaryDocumentBypassRule(documentSniffer, pending.url, tabId);
       return { action: "bypass", url: pending.url };
     }
     if (documentSniffer.standalone) {
-      await openDocumentViewer(pending.url, { standalone: true });
+      await openDocumentViewer(pending.url, {
+        format: sniffedFormatFromSender(sender),
+        standalone: true,
+        state: documentSniffer,
+      });
       await browser.tabs.remove(tabId);
       return { action: "handled" };
     }
@@ -213,6 +229,7 @@ function initDocumentLinkSniffer(): DocumentSniffState {
     enabled: false,
     keepOriginal: false,
     standalone: false,
+    uiLang: "zh-Hans",
     openedKeys: new Set(),
     pendingOpens: new Map(),
     nextBypassRuleId: DOCUMENT_SNIFF_BYPASS_RULE_ID_START,
@@ -224,6 +241,7 @@ function initDocumentLinkSniffer(): DocumentSniffState {
     state.enabled = settings.documentLinkSniffEnabled;
     state.keepOriginal = settings.documentLinkSniffKeepOriginal;
     state.standalone = settings.documentLinkSniffStandalone;
+    state.uiLang = settings.uiLang;
     queueDocumentSniffRulesUpdate(state);
   };
 
@@ -318,9 +336,8 @@ async function syncDocumentSniffRules(state: DocumentSniffState): Promise<void> 
 }
 
 function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
-  const redirect = {
-    url: browser.runtime.getURL(SNIFFED_VIEWER_PATH),
-  };
+  const pdfRedirect = { url: pdfViewerUrlForSniff() };
+  const readerRedirect = { url: readerShellUrlForSniff() };
   const resourceTypes: Array<`${Browser.declarativeNetRequest.ResourceType}`> = [
     "main_frame",
   ];
@@ -328,16 +345,16 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
     {
       id: DOCUMENT_SNIFF_RULE_IDS[0]!,
       priority: 1,
-      action: { type: "redirect", redirect },
+      action: { type: "redirect", redirect: pdfRedirect },
       condition: {
-        regexFilter: HTTP_DOCUMENT_URL_REGEX,
+        regexFilter: HTTP_PDF_URL_REGEX,
         resourceTypes,
       },
     },
     {
       id: DOCUMENT_SNIFF_RULE_IDS[1]!,
       priority: 1,
-      action: { type: "redirect", redirect },
+      action: { type: "redirect", redirect: pdfRedirect },
       condition: {
         regexFilter: "^https?://.*",
         resourceTypes,
@@ -347,7 +364,16 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
     {
       id: DOCUMENT_SNIFF_RULE_IDS[2]!,
       priority: 1,
-      action: { type: "redirect", redirect },
+      action: { type: "redirect", redirect: readerRedirect },
+      condition: {
+        regexFilter: HTTP_EPUB_URL_REGEX,
+        resourceTypes,
+      },
+    },
+    {
+      id: DOCUMENT_SNIFF_RULE_IDS[3]!,
+      priority: 1,
+      action: { type: "redirect", redirect: readerRedirect },
       condition: {
         regexFilter: "^https?://.*",
         resourceTypes,
@@ -355,11 +381,23 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
       },
     },
     {
-      id: DOCUMENT_SNIFF_RULE_IDS[3]!,
+      id: DOCUMENT_SNIFF_RULE_IDS[4]!,
       priority: 1,
-      action: { type: "redirect", redirect },
+      action: { type: "redirect", redirect: pdfRedirect },
       condition: {
-        regexFilter: HTTP_DOCUMENT_URL_REGEX,
+        regexFilter: HTTP_PDF_URL_REGEX,
+        resourceTypes,
+        responseHeaders: [
+          { header: "content-type", values: ["application/octet-stream*"] },
+        ],
+      },
+    },
+    {
+      id: DOCUMENT_SNIFF_RULE_IDS[5]!,
+      priority: 1,
+      action: { type: "redirect", redirect: readerRedirect },
+      condition: {
+        regexFilter: HTTP_EPUB_URL_REGEX,
         resourceTypes,
         responseHeaders: [
           { header: "content-type", values: ["application/octet-stream*"] },
@@ -546,17 +584,27 @@ async function removeContextMenu(id: string): Promise<void> {
   }
 }
 
-function openDocumentViewer(
+async function openDocumentViewer(
   url: string,
   options: {
     active?: boolean;
+    format?: ViewerFormat;
     keepOriginal?: boolean;
     standalone?: boolean;
     sourceTabId?: number;
     state?: DocumentSniffState;
   } = {},
 ): Promise<unknown> {
-  const viewerUrl = viewerUrlForDocument(url);
+  const uiLang =
+    options.state?.uiLang ??
+    (await getSettings()
+      .then((settings) => settings.uiLang)
+      .catch(() => undefined));
+  const viewerUrl = viewerUrlForDocument(
+    url,
+    options.format ?? "auto",
+    uiLang,
+  );
   if (options.standalone) {
     const opened = browser.windows.create({
       focused: true,
@@ -584,10 +632,12 @@ function openDocumentViewer(
   return browser.tabs.create({ url: viewerUrl });
 }
 
-function viewerUrlForDocument(url: string): string {
-  return browser.runtime.getURL(
-    `/viewer.html?url=${encodeURIComponent(url)}&format=auto`,
-  );
+function viewerUrlForDocument(
+  url: string,
+  format: ViewerFormat,
+  uiLang: UiLang | undefined,
+): string {
+  return documentViewerUrlForUrl(url, format, uiLang);
 }
 
 function isDocumentUrl(url: string): boolean {
@@ -639,5 +689,12 @@ function isDocumentResponse(
 }
 
 function isExtensionViewerUrl(url: string): boolean {
-  return url.startsWith(browser.runtime.getURL("/viewer.html"));
+  return isReaderShellUrl(url) || isPdfViewerUrl(url);
+}
+
+function sniffedFormatFromSender(
+  sender: Browser.runtime.MessageSender,
+): ViewerFormat {
+  const url = sender.url ?? sender.tab?.url ?? "";
+  return isPdfViewerUrl(url) ? "pdf" : "auto";
 }

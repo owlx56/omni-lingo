@@ -35,6 +35,27 @@ function addFileAsset(
   });
 }
 
+function addTextAsset(
+  files: PublicAssetFile[],
+  contents: string,
+  relativeDest: string,
+): void {
+  files.push({
+    contents,
+    relativeDest: toPublicPath(relativeDest),
+  });
+}
+
+function patchPdfJsCanvasReadback(contents: string): string {
+  const target = 'context: canvas.getContext("2d")';
+  const replacement =
+    'context: canvas.getContext("2d", { willReadFrequently: true })';
+  if (!contents.includes(target)) {
+    throw new Error("Unable to patch PDF.js canvas factory for readback hints.");
+  }
+  return contents.replace(target, replacement);
+}
+
 async function addDirectoryAssets(
   files: PublicAssetFile[],
   absoluteSrcDir: string,
@@ -76,7 +97,15 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
     relativeDest: "pdf/PDFJS_VERSION",
   });
 
-  for (const file of ["pdf.js", "pdf.worker.js", "pdf.sandbox.js"]) {
+  addTextAsset(
+    files,
+    patchPdfJsCanvasReadback(
+      await readFile(join(PDFJS_DIST_DIR, "build", "pdf.js"), "utf8"),
+    ),
+    "pdf/build/pdf.js",
+  );
+
+  for (const file of ["pdf.worker.js", "pdf.sandbox.js"]) {
     addFileAsset(files, join(PDFJS_DIST_DIR, "build", file), `pdf/build/${file}`);
   }
 
@@ -104,11 +133,17 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
     "pdf/web/images",
   );
   await addOptionalDirectoryAssets(files, PDF_VIEWER_IMAGE_DIR, "pdf/web/images");
+  await addOptionalDirectoryAssets(
+    files,
+    join(PDF_VIEWER_ASSET_DIR, "locale"),
+    "pdf/web/locale",
+  );
   await addDirectoryAssets(files, INTER_FONT_DIR, "pdf/web/fonts/inter");
 
   for (const file of [
     "locales.generated.mjs",
     "viewer.html",
+    "viewer.js",
     "viewer.mjs",
     "viewer.css",
     "onelingo-viewer.css",

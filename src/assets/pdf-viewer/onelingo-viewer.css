@@ -78,11 +78,7 @@ body {
   background: var(--body-bg-color);
 }
 
-.textLayer {
-  font-family: sans-serif;
-  letter-spacing: normal;
-}
-
+.textLayer,
 .textLayer span,
 .textLayer br {
   letter-spacing: normal;
@@ -516,12 +512,6 @@ html.handTool #viewerContainer.handToolActive {
   background: var(--onelingo-accent);
 }
 
-.pdfViewer .page {
-  border: 1px solid var(--onelingo-border);
-  border-radius: 2px;
-  box-shadow: 0 1px 2px rgba(31, 30, 29, 0.12);
-}
-
 #sidebarContainer,
 #secondaryToolbar,
 .findbar,
@@ -910,10 +900,6 @@ html.sidebarResizing * {
   border-radius: 8px;
   font-size: 14px;
   line-height: 1.45;
-}
-
-html[data-theme="dark"] .pdfViewer .page {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 html[data-theme="dark"] #sidebarContainer {

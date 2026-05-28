@@ -942,7 +942,7 @@ async function renderThumbnail(item) {
     canvas.height = Math.floor(scaledViewport.height * outputScale);
     canvas.style.width = `${Math.floor(scaledViewport.width)}px`;
     canvas.style.height = `${Math.floor(scaledViewport.height)}px`;
-    const context = canvas.getContext("2d");
+    const context = canvas.getContext("2d", { willReadFrequently: true });
     context.setTransform(outputScale, 0, 0, outputScale, 0, 0);
     await page.render({ canvasContext: context, viewport: scaledViewport }).promise;
     item.querySelector(".thumbnailCanvasSlot")?.replaceChildren(canvas);

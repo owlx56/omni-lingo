@@ -57,6 +57,13 @@ import {
 } from "@/lib/ui/controls";
 import { browser } from "wxt/browser";
 import { storeDocument } from "@/lib/document-store";
+import {
+  isLikelyPdfUrl,
+  pdfViewerUrlForFile,
+  pdfViewerUrlForStoredKey,
+  readerShellUrlForDocument,
+  readerShellUrlForStoredKey,
+} from "@/lib/document-viewer-urls";
 
 
 type TabId = "account" | "hover" | "selection" | "immersive" | "fileplus" | "about";
@@ -624,9 +631,10 @@ function App() {
     try {
       const data = await file.arrayBuffer();
       const key = await storeDocument(data, kind, file.name);
-      const viewerUrl = browser.runtime.getURL(
-        `/viewer.html?key=${encodeURIComponent(key)}`,
-      );
+      const viewerUrl =
+        kind === "pdf"
+          ? pdfViewerUrlForStoredKey(key, settings().uiLang)
+          : readerShellUrlForStoredKey(key);
       await browser.tabs.create({ url: viewerUrl });
     } finally {
       setFpBusy(false);
@@ -637,9 +645,9 @@ function App() {
     const nextUrl = fpUrl().trim();
     if (!nextUrl) return;
     await browser.tabs.create({
-      url: browser.runtime.getURL(
-        `/viewer.html?url=${encodeURIComponent(nextUrl)}&format=auto`,
-      ),
+      url: isLikelyPdfUrl(nextUrl)
+        ? pdfViewerUrlForFile(nextUrl, settings().uiLang)
+        : readerShellUrlForDocument(nextUrl, "auto"),
     });
   };
 
