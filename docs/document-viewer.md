@@ -53,6 +53,8 @@ PDF reader 使用 `pdfjs-dist` npm 依赖，并加载官方 PDF.js `viewer.html`
 - `src/assets/pdf-viewer/locale/` 下的官方 viewer locale
 - `src/assets/pdf-viewer/` 下的官方 viewer 文件和 OneLingo bridge 相关静态文件
 
+复制 `src/assets/pdf-viewer/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。这样可以兼容官方 `viewer.html` / `viewer.js` 仍会请求的历史或新增 locale key，避免运行时出现 `#... is undefined.` warning。
+
 `prepare:publicPaths` 会把 `pdf/web/viewer.html` 加入 public path。改 PDF.js 版本时更新 `package.json` 的 `pdfjs-dist`，然后同步官方 `viewer.html` / `viewer.js` / `viewer.css`，确认 `viewer.js` 仍禁用 `validateFileURL(file)` 以允许扩展页打开 blob / file 文档；不要手改 `.output/`。
 
 ## Reader 翻译

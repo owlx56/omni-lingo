@@ -19,6 +19,23 @@ const PDFJS_DIST_DIR = join(ROOT_DIR, "node_modules", "pdfjs-dist");
 const PDF_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "pdf-viewer");
 const PDF_VIEWER_IMAGE_DIR = join(PDF_VIEWER_ASSET_DIR, "images");
 const INTER_FONT_DIR = join(ROOT_DIR, "src", "assets", "fonts", "inter");
+const PDF_VIEWER_LOCALE_ALIASES: Record<string, string[]> = {
+  "bookmark1.title": ["bookmark.title"],
+  bookmark1_label: ["bookmark_label"],
+  "save.title": ["download.title"],
+  save_label: ["download_label"],
+  "editor_free_text2.title": ["editor_free_text.title"],
+  editor_free_text2_label: ["editor_free_text_label"],
+  editor_free_text2_aria_label: ["editor_free_text_aria_label"],
+  "editor_ink2.title": ["editor_ink.title"],
+  editor_ink2_label: ["editor_ink_label"],
+  editor_ink2_aria_label: ["editor_ink_aria_label"],
+};
+
+type ViewerProperties = {
+  keysInOrder: string[];
+  values: Map<string, string>;
+};
 
 function toPublicPath(path: string): string {
   return path.replaceAll("\\", "/");
@@ -56,6 +73,58 @@ function patchPdfJsCanvasReadback(contents: string): string {
   return contents.replace(target, replacement);
 }
 
+function patchPdfViewerLocaleContents(
+  contents: string,
+  fallbackProps: ViewerProperties,
+): string {
+  const localeProps = parseViewerProperties(contents);
+  const missingKeys = fallbackProps.keysInOrder.filter(
+    (key) => !localeProps.values.has(key),
+  );
+  if (missingKeys.length === 0) return contents;
+
+  const lines = missingKeys
+    .map((key) => {
+      const value = resolveViewerLocaleFallbackValue(key, localeProps, fallbackProps);
+      return value === null ? null : `${key}=${value}`;
+    })
+    .filter((line): line is string => line !== null);
+  if (lines.length === 0) return contents;
+
+  return `${contents.replace(/\s*$/, "")}\n${lines.join("\n")}\n`;
+}
+
+function parseViewerProperties(contents: string): ViewerProperties {
+  const keysInOrder: string[] = [];
+  const values = new Map<string, string>();
+
+  for (const line of contents.split(/\r?\n/)) {
+    if (!line || /^\s*[#!]/.test(line)) continue;
+    const match = line.match(/^([^=:\s]+(?:\s+[^=:\s]+)?)\s*[=:]\s*(.*)$/);
+    if (!match) continue;
+    const rawKey = match[1];
+    const value = match[2];
+    if (rawKey === undefined || value === undefined) continue;
+    const key = rawKey.trim();
+    if (!values.has(key)) keysInOrder.push(key);
+    values.set(key, value);
+  }
+
+  return { keysInOrder, values };
+}
+
+function resolveViewerLocaleFallbackValue(
+  key: string,
+  localeProps: ViewerProperties,
+  fallbackProps: ViewerProperties,
+): string | null {
+  for (const alias of PDF_VIEWER_LOCALE_ALIASES[key] ?? []) {
+    const aliased = localeProps.values.get(alias);
+    if (aliased !== undefined) return aliased;
+  }
+  return fallbackProps.values.get(key) ?? null;
+}
+
 async function addDirectoryAssets(
   files: PublicAssetFile[],
   absoluteSrcDir: string,
@@ -84,6 +153,62 @@ async function addOptionalDirectoryAssets(
     return;
   }
   await addDirectoryAssets(files, absoluteSrcDir, relativeDestDir);
+}
+
+async function addPdfViewerLocaleAssets(files: PublicAssetFile[]): Promise<void> {
+  const localeDir = join(PDF_VIEWER_ASSET_DIR, "locale");
+  try {
+    await access(localeDir);
+  } catch {
+    return;
+  }
+
+  const fallbackProps = parseViewerProperties(
+    await readFile(join(localeDir, "en-US", "viewer.properties"), "utf8"),
+  );
+  await addPatchedLocaleDirectoryAssets(
+    files,
+    localeDir,
+    "pdf/web/locale",
+    fallbackProps,
+  );
+}
+
+async function addPatchedLocaleDirectoryAssets(
+  files: PublicAssetFile[],
+  absoluteSrcDir: string,
+  relativeDestDir: string,
+  fallbackProps: ViewerProperties,
+): Promise<void> {
+  const entries = await readdir(absoluteSrcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const absoluteSrc = join(absoluteSrcDir, entry.name);
+    const relativeDest = join(relativeDestDir, entry.name);
+    if (entry.isDirectory()) {
+      await addPatchedLocaleDirectoryAssets(
+        files,
+        absoluteSrc,
+        relativeDest,
+        fallbackProps,
+      );
+      continue;
+    }
+    if (!entry.isFile()) continue;
+
+    if (entry.name === "viewer.properties") {
+      addTextAsset(
+        files,
+        patchPdfViewerLocaleContents(
+          await readFile(absoluteSrc, "utf8"),
+          fallbackProps,
+        ),
+        relativeDest,
+      );
+      continue;
+    }
+
+    addFileAsset(files, absoluteSrc, relativeDest);
+  }
 }
 
 async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void> {
@@ -133,11 +258,7 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
     "pdf/web/images",
   );
   await addOptionalDirectoryAssets(files, PDF_VIEWER_IMAGE_DIR, "pdf/web/images");
-  await addOptionalDirectoryAssets(
-    files,
-    join(PDF_VIEWER_ASSET_DIR, "locale"),
-    "pdf/web/locale",
-  );
+  await addPdfViewerLocaleAssets(files);
   await addDirectoryAssets(files, INTER_FONT_DIR, "pdf/web/fonts/inter");
 
   for (const file of [
