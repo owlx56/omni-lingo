@@ -1,0 +1,135 @@
+:root {
+    --ui-font-family:
+        "Inter",
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        sans-serif;
+    font-family: var(--ui-font-family);
+    color: var(--text);
+    background: var(--bg);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-text-size-adjust: 100%;
+}
+
+:root,
+:root[data-theme="light"] {
+    --bg: #f8f8f6;
+    --surface: #ffffff;
+    --surface-alt: #ece9e1;
+    --text: #1f1e1d;
+    --text-muted: #6f6e6a;
+    --border: #e2dfd5;
+    --danger: #b42318;
+    color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+    --bg: #1f1f1e;
+    --surface: #232323;
+    --surface-alt: #2c2c2b;
+    --text: #ebe8df;
+    --text-muted: #a3a09a;
+    --border: #2f2f2e;
+    --danger: #ffb4a8;
+    color-scheme: dark;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+button {
+    font: inherit;
+}
+
+html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ui-font-family);
+}
+
+#root {
+    width: 100%;
+    height: 100%;
+}
+
+.viewer-root {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
+.viewer-loading,
+.viewer-error {
+    display: grid;
+    place-content: center;
+    width: 100%;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 15px;
+}
+
+.viewer-error {
+    color: var(--danger);
+}
+
+.epub-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+}
+
+.epub-toolbar-title {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.epub-toolbar-location {
+    font-size: 12px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.epub-nav-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text);
+    font-size: 20px;
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.epub-nav-button:hover {
+    background: var(--surface-alt);
+}
+
+.epub-render-area {
+    flex: 1;
+    min-height: 0;
+    background: var(--surface);
+}

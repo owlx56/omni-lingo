@@ -58,11 +58,9 @@ import {
 import { browser } from "wxt/browser";
 import { storeDocument } from "@/lib/document-store";
 import {
-  isLikelyPdfUrl,
-  pdfViewerUrlForFile,
+  documentViewerUrlForUrl,
+  epubViewerUrlForStoredKey,
   pdfViewerUrlForStoredKey,
-  readerShellUrlForDocument,
-  readerShellUrlForStoredKey,
 } from "@/lib/document-viewer-urls";
 
 
@@ -634,7 +632,7 @@ function App() {
       const viewerUrl =
         kind === "pdf"
           ? pdfViewerUrlForStoredKey(key, settings().uiLang)
-          : readerShellUrlForStoredKey(key);
+          : epubViewerUrlForStoredKey(key);
       await browser.tabs.create({ url: viewerUrl });
     } finally {
       setFpBusy(false);
@@ -645,9 +643,7 @@ function App() {
     const nextUrl = fpUrl().trim();
     if (!nextUrl) return;
     await browser.tabs.create({
-      url: isLikelyPdfUrl(nextUrl)
-        ? pdfViewerUrlForFile(nextUrl, settings().uiLang)
-        : readerShellUrlForDocument(nextUrl, "auto"),
+      url: documentViewerUrlForUrl(nextUrl, "auto", settings().uiLang),
     });
   };
 

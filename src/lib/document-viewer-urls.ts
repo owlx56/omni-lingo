@@ -5,6 +5,7 @@ export type DocumentFormat = "pdf" | "epub";
 export type ViewerFormat = DocumentFormat | "auto";
 
 const PDF_VIEWER_PATH = "pdf/web/viewer.html";
+const EPUB_VIEWER_PATH = "epub/web/viewer.html";
 const READER_SHELL_PATH = "viewer.html";
 const PDF_URL_RE = /\.pdf(?:$|[?#].*)?/i;
 const EPUB_URL_RE = /\.epub(?:$|[?#].*)?/i;
@@ -33,6 +34,24 @@ export function pdfViewerUrlForSniff(uiLang?: UiLang): string {
   return url.href;
 }
 
+export function epubViewerUrlForFile(fileUrl: string): string {
+  const url = epubViewerBaseUrl();
+  url.searchParams.set("url", fileUrl);
+  return url.href;
+}
+
+export function epubViewerUrlForStoredKey(key: string): string {
+  const url = epubViewerBaseUrl();
+  url.searchParams.set("key", key);
+  return url.href;
+}
+
+export function epubViewerUrlForSniff(): string {
+  const url = epubViewerBaseUrl();
+  url.searchParams.set("onelingo-sniff", "1");
+  return url.href;
+}
+
 export function readerShellUrlForDocument(
   documentUrl: string,
   format: ViewerFormat = "auto",
@@ -43,18 +62,6 @@ export function readerShellUrlForDocument(
   return url.href;
 }
 
-export function readerShellUrlForStoredKey(key: string): string {
-  const url = readerShellBaseUrl();
-  url.searchParams.set("key", key);
-  return url.href;
-}
-
-export function readerShellUrlForSniff(): string {
-  const url = readerShellBaseUrl();
-  url.searchParams.set("sniff", "1");
-  return url.href;
-}
-
 export function documentViewerUrlForUrl(
   documentUrl: string,
   format: ViewerFormat,
@@ -62,6 +69,12 @@ export function documentViewerUrlForUrl(
 ): string {
   if (format === "pdf" || (format === "auto" && isLikelyPdfUrl(documentUrl))) {
     return pdfViewerUrlForFile(documentUrl, uiLang);
+  }
+  if (
+    format === "epub" ||
+    (format === "auto" && isLikelyEpubUrl(documentUrl))
+  ) {
+    return epubViewerUrlForFile(documentUrl);
   }
   return readerShellUrlForDocument(documentUrl, format);
 }
@@ -76,6 +89,10 @@ export function isLikelyEpubUrl(url: string): boolean {
 
 export function isPdfViewerUrl(url: string): boolean {
   return url.startsWith(pdfViewerBaseUrl().href);
+}
+
+export function isEpubViewerUrl(url: string): boolean {
+  return url.startsWith(epubViewerBaseUrl().href);
 }
 
 export function isReaderShellUrl(url: string): boolean {
@@ -101,6 +118,10 @@ export function pdfJsLocale(uiLang: UiLang): string {
 
 function pdfViewerBaseUrl(): URL {
   return new URL(PDF_VIEWER_PATH, browser.runtime.getURL("/"));
+}
+
+function epubViewerBaseUrl(): URL {
+  return new URL(EPUB_VIEWER_PATH, browser.runtime.getURL("/"));
 }
 
 function readerShellBaseUrl(): URL {

@@ -14,10 +14,11 @@ import { browser, type Browser } from "wxt/browser";
 import type { UiLang } from "@/lib/languages";
 import {
   documentViewerUrlForUrl,
+  epubViewerUrlForSniff,
+  isEpubViewerUrl,
   isPdfViewerUrl,
   isReaderShellUrl,
   pdfViewerUrlForSniff,
-  readerShellUrlForSniff,
   type ViewerFormat,
 } from "@/lib/document-viewer-urls";
 
@@ -337,7 +338,7 @@ async function syncDocumentSniffRules(state: DocumentSniffState): Promise<void> 
 
 function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
   const pdfRedirect = { url: pdfViewerUrlForSniff() };
-  const readerRedirect = { url: readerShellUrlForSniff() };
+  const epubRedirect = { url: epubViewerUrlForSniff() };
   const resourceTypes: Array<`${Browser.declarativeNetRequest.ResourceType}`> = [
     "main_frame",
   ];
@@ -364,7 +365,7 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
     {
       id: DOCUMENT_SNIFF_RULE_IDS[2]!,
       priority: 1,
-      action: { type: "redirect", redirect: readerRedirect },
+      action: { type: "redirect", redirect: epubRedirect },
       condition: {
         regexFilter: HTTP_EPUB_URL_REGEX,
         resourceTypes,
@@ -373,7 +374,7 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
     {
       id: DOCUMENT_SNIFF_RULE_IDS[3]!,
       priority: 1,
-      action: { type: "redirect", redirect: readerRedirect },
+      action: { type: "redirect", redirect: epubRedirect },
       condition: {
         regexFilter: "^https?://.*",
         resourceTypes,
@@ -395,7 +396,7 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
     {
       id: DOCUMENT_SNIFF_RULE_IDS[5]!,
       priority: 1,
-      action: { type: "redirect", redirect: readerRedirect },
+      action: { type: "redirect", redirect: epubRedirect },
       condition: {
         regexFilter: HTTP_EPUB_URL_REGEX,
         resourceTypes,
@@ -689,12 +690,13 @@ function isDocumentResponse(
 }
 
 function isExtensionViewerUrl(url: string): boolean {
-  return isReaderShellUrl(url) || isPdfViewerUrl(url);
+  return isReaderShellUrl(url) || isPdfViewerUrl(url) || isEpubViewerUrl(url);
 }
 
 function sniffedFormatFromSender(
   sender: Browser.runtime.MessageSender,
 ): ViewerFormat {
   const url = sender.url ?? sender.tab?.url ?? "";
+  if (isEpubViewerUrl(url)) return "epub";
   return isPdfViewerUrl(url) ? "pdf" : "auto";
 }

@@ -6,20 +6,24 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 
 | 文件 | 职责 |
 | --- | --- |
-| `src/entrypoints/viewer/App.tsx` | `/viewer.html` 的 Solid 壳；接收 `key`、`url`、`sniff=1`；拉取远程文档、存储 EPUB，并把 PDF 重定向到顶层官方 PDF.js viewer |
-| `src/entrypoints/viewer/epub-bridge.ts` | EPUB iframe 内 hover / selection 桥接；直接绑定 EPUB 内容文档 |
-| `src/entrypoints/pdf-bridge.ts` | PDF.js reader 内 hover、selection 状态桥接、主题同步和 reader UI 标记 |
+| `src/entrypoints/viewer/App.tsx` | `/viewer.html` 兼容路由壳；只负责本地 key、远程 URL、旧 sniff 链接的格式解析和转跳 |
+| `src/entrypoints/pdf-viewer.ts` | 输出 `/pdf-viewer.js` 的薄入口；实际代码在 `src/entrypoints/pdf/bridge.ts` |
+| `src/entrypoints/pdf/bridge.ts` | PDF.js reader 内 hover、selection 状态桥接、主题同步和 reader UI 标记 |
+| `src/entrypoints/epub-viewer.ts` | 输出 `/epub-viewer.js` 的薄入口；挂载 EPUB Solid viewer |
+| `src/entrypoints/epub/App.tsx` | EPUB reader UI；接收 `key`、`url`、`onelingo-sniff=1` 并用 `epubjs` 渲染 |
+| `src/entrypoints/epub/bridge.ts` | EPUB iframe 内 hover / selection 桥接；直接绑定 EPUB 内容文档 |
 | `src/assets/pdf-viewer/upstream/` | 由 `scripts/update-pdfjs.ts` 从 GitHub `pdfjs-*-dist.zip` 生成的官方 PDF.js release dist；不要手改 |
+| `src/assets/epub-viewer/` | OneLingo EPUB 静态 shell，构建时复制到 `/epub/web/` |
 | `src/assets/pdf-viewer/locales.generated.mjs` | 由 `scripts/generate-i18n.ts` 生成的 PDF reader 静态语言包 |
 | `src/features/document-sniffer.ts` | content script 层的页面内 PDF / EPUB 链接点击拦截 |
 | `src/entrypoints/background.ts` | 地址栏 / 主框架文件导航嗅探、右键菜单、保留原页面、独立窗口逻辑 |
 | `src/lib/document-store.ts` | reader 页面 IndexedDB 文档暂存，避免把大文件塞进 URL |
 
-`src/features/document-viewer/` 仍保留早期解析型 reader 的类型和 EPUB 解析 helper。当前 PDF 不在这里解析，PDF 由打包的 PDF.js viewer 处理；当前 EPUB 主路径由 `epubjs` 在 `src/entrypoints/viewer/App.tsx` 渲染。
+`src/features/document-viewer/` 仍保留早期解析型 reader 的类型和 EPUB 解析 helper。当前 PDF 不在这里解析，PDF 由打包的 PDF.js viewer 处理；当前 EPUB 主路径由 `epubjs` 在 `src/entrypoints/epub/App.tsx` 渲染。
 
 ## 打开流程
 
-EPUB 始终进入 `/viewer.html`，PDF 最终必须进入顶层 `/pdf/web/viewer.html`，不要再嵌进 iframe：
+PDF 最终必须进入顶层 `/pdf/web/viewer.html`，EPUB 最终进入 `/epub/web/viewer.html`。`/viewer.html` 只保留为兼容路由和 HTML shell 探测入口，不再承载 EPUB UI：
 
 ```text
 options / context menu / sniffer
@@ -27,11 +31,16 @@ options / context menu / sniffer
   -> local PDF: storeDocument() IndexedDB
   -> /pdf/web/viewer.html?onelingo-key=...
   -> PDF DNR sniff: /pdf/web/viewer.html?onelingo-sniff=1
-  -> EPUB / unknown URL: /viewer.html?url=...&format=auto
-  -> EPUB: storeDocument() + epubjs renderTo(#epub-render)
+  -> EPUB URL: /epub/web/viewer.html?url=...
+  -> local EPUB: storeDocument() IndexedDB
+  -> /epub/web/viewer.html?key=...
+  -> EPUB DNR sniff: /epub/web/viewer.html?onelingo-sniff=1
+  -> unknown URL / HTML shell: /viewer.html?url=...&format=auto
+  -> discovered PDF: /pdf/web/viewer.html?file=...
+  -> discovered EPUB: storeDocument() + /epub/web/viewer.html?key=...
 ```
 
-本地 PDF 从 options 进入时先 `storeDocument()`，然后由顶层 PDF.js viewer 内的 `pdf-bridge.ts` 用 `onelingo-key` 读取 IndexedDB 并调用 `PDFViewerApplication.open({ data })`。远程 PDF URL 直接作为官方 viewer 的 `file` 参数打开，和 Saladict 一样。远程 URL 如果不能从扩展入口判断格式，会先进入 `/viewer.html` 做 HTML shell 发现；发现 PDF 后立即重定向到顶层官方 viewer，发现 EPUB 后走 EPUB rendition。`fetchResolvableResource()` 会尝试从 iframe / embed / object / anchor / script 中发现嵌套的 PDF / EPUB 链接，最多递归 `MAX_URL_RESOLVE_DEPTH`。
+本地 PDF 从 options 进入时先 `storeDocument()`，然后由顶层 PDF.js viewer 内的 `pdf/bridge.ts` 用 `onelingo-key` 读取 IndexedDB 并调用 `PDFViewerApplication.open({ data })`。远程 PDF URL 直接作为官方 viewer 的 `file` 参数打开，和 Saladict 一样。远程 EPUB URL 进入 `/epub/web/viewer.html?url=...` 后由 EPUB viewer 拉取、存储并渲染；本地 EPUB 直接用 `key` 打开。远程 URL 如果不能从扩展入口判断格式，会先进入 `/viewer.html` 做 HTML shell 发现；发现 PDF 后立即重定向到顶层官方 viewer，发现 EPUB 后存储再进入 EPUB viewer。`fetchResolvableResource()` 会尝试从 iframe / embed / object / anchor / script 中发现嵌套的 PDF / EPUB 链接，最多递归 `MAX_URL_RESOLVE_DEPTH`。
 
 ## PDF.js 资产
 
@@ -49,16 +58,16 @@ PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上�
 
 旧版 PDF.js 使用 `src/assets/pdf-viewer/upstream/web/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。新版 PDF.js 使用 Fluent `viewer.ftl` / `locale.json` 时直接复制官方 locale 目录。
 
-`prepare:publicPaths` 会把 `pdf/web/viewer.html` 加入 public path。改 PDF.js 版本时只运行 `bun run pdfjs:update -- --version <version>` 或 `bun run pdfjs:update -- --latest`，让脚本重建 `src/assets/pdf-viewer/upstream/` 和 `PDFJS_RELEASE.json`；不要手改 upstream 或 `.output/`。`wxt.config.ts` 会在复制时注入 `/pdf-bridge.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
+`prepare:publicPaths` 会把 `pdf/web/viewer.html` 和 `epub/web/viewer.html` 加入 public path。改 PDF.js 版本时只运行 `bun run pdfjs:update -- --version <version>` 或 `bun run pdfjs:update -- --latest`，让脚本重建 `src/assets/pdf-viewer/upstream/` 和 `PDFJS_RELEASE.json`；不要手改 upstream 或 `.output/`。`wxt.config.ts` 会在复制时注入 `/pdf-viewer.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
 
 ## Reader 翻译
 
 普通网页、PDF reader、EPUB reader 要尽量共享行为：
 
 - selection UI 走 `src/features/selection/`，不要在 reader 里复制一套“译”按钮逻辑。
-- PDF reader 通过 `src/entrypoints/pdf-bridge.ts` 调用 `initHover()` 和 `initSelection()`，并实现 `readPageFeatureStatus` / `updatePageFeaturePrefs`。
+- PDF reader 通过 `src/entrypoints/pdf/bridge.ts` 调用 `initHover()` 和 `initSelection()`，并实现 `readPageFeatureStatus` / `updatePageFeaturePrefs`。
 - PDF hover 与普通网页共用 `src/features/hover/`。在顶层官方 PDF.js viewer 下，这套通用 hover 已验证可与 Less Translate 保持同等精度；不要为了 PDF 单独恢复 token split、overlay underline 或改写 textLayer DOM。PDF.js 的双击选词和浏览器原生选区依赖原始 textLayer 结构，所以仍然不要包 `all: unset` wrapper / token span。
-- EPUB reader 因内容在 epubjs iframe 中，需要 `src/entrypoints/viewer/epub-bridge.ts` 在 iframe 文档里转接 hover / selection。当前 EPUB hover 已复用 `src/features/hover/` 的共享 controller；`epub-bridge.ts` 只保留 iframe document 绑定、坐标换算和 EPUB.js `selectedRange` 接线。
+- EPUB reader 因内容在 epubjs iframe 中，需要 `src/entrypoints/epub/bridge.ts` 在 iframe 文档里转接 hover / selection。当前 EPUB hover 已复用 `src/features/hover/` 的共享 controller；`bridge.ts` 只保留 iframe document 绑定、坐标换算和 EPUB.js `selectedRange` 接线。
 - reader UI 元素要标记 `data-onelingo-reader-ui`，hover / selection 命中测试必须避开工具栏、侧栏、弹层和菜单。
 
 修改 selection 行为时，先改 `src/features/selection/` 的共享路径，再检查普通网页、PDF reader、EPUB reader 三处是否同样生效。
@@ -67,7 +76,7 @@ PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上�
 
 文件链接嗅探有两层，缺一层都会出现行为差异：
 
-- content script：`src/features/document-sniffer.ts` 拦截普通网页中的 `<a href="...pdf|epub">` 点击。仅在不保留原页面且不独立窗口时，PDF 直接跳到 `/pdf/web/viewer.html?file=...`，EPUB / 未知格式才跳到 `/viewer.html?url=...`。
+- content script：`src/features/document-sniffer.ts` 拦截普通网页中的 `<a href="...pdf|epub">` 点击。仅在不保留原页面且不独立窗口时，PDF 直接跳到 `/pdf/web/viewer.html?file=...`，EPUB 直接跳到 `/epub/web/viewer.html?url=...`，未知格式才跳到 `/viewer.html?url=...`。
 - background：`src/entrypoints/background.ts` 用 DNR / webRequest 处理地址栏输入、主框架跳转、content-type 是 PDF / EPUB 但 URL 不带扩展名的情况，以及 `file://` 导航。
 
 相关设置在 `src/lib/storage/settings.ts`：
@@ -87,7 +96,7 @@ options、popup、EPUB reader、PDF reader 的文案源都在 `src/lib/i18n/cata
 - EPUB / Solid reader UI 通过 `useT()` 读取 `viewer.*` key。
 - PDF 静态 reader 使用 `pdfViewer.*` key。
 - `scripts/generate-i18n.ts` 生成 `src/lib/i18n/locales/*.ts` 和 `src/assets/pdf-viewer/locales.generated.mjs`。
-- PDF 官方 viewer 通过 URL hash 的 `locale` 初始化语言；`src/entrypoints/viewer/App.tsx` 负责把 OneLingo `uiLang` 映射到 PDF.js locale。已打开 PDF tab 会继续同步 `lang` / `dir`，但官方 viewer 文案不会热切换，刷新后生效。
+- PDF 官方 viewer 通过 URL hash 的 `locale` 初始化语言；`src/lib/document-viewer-urls.ts` 负责把 OneLingo `uiLang` 映射到 PDF.js locale。已打开 PDF tab 会继续同步 `lang` / `dir`，但官方 viewer 文案不会热切换，刷新后生效。
 
 新增 reader 文案时只改 `catalog.ts`，然后运行：
 
@@ -104,9 +113,9 @@ options、popup、EPUB reader、PDF reader 使用打包的 Inter 字体。字体
 
 主题同步路径：
 
-- `/viewer.html` 自身通过 `useSettings()` / `watchEffectiveTheme()` 更新。
-- 顶层 PDF viewer 内部由 `pdf-bridge.ts` `initTheme()` 并监听主题变化。
-- EPUB 内容文档通过 `syncRenditionDocumentPrefs()` 和 `rendition.hooks.content` 注入 `onelingo-epub-theme`。
+- `/viewer.html` 路由壳通过 `useSettings()` / `initTheme()` 更新。
+- 顶层 PDF viewer 内部由 `/pdf-viewer.js` 调用 `initTheme()` 并监听主题变化。
+- EPUB viewer 自身由 `/epub-viewer.js` 初始化主题；EPUB 内容文档通过 `syncRenditionDocumentPrefs()` 和 `rendition.hooks.content` 注入 `onelingo-epub-theme`。
 
 修主题 bug 时要检查已打开的 PDF / EPUB tab，无需刷新 tab 就应该响应主语言和主题切换。
 

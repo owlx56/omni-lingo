@@ -18,10 +18,13 @@
 src/entrypoints/
   background.ts  -> 消息处理、引擎调用、缓存访问
   content.ts     -> content script bootstrap
-  pdf-bridge.ts  -> PDF.js reader 内 hover / selection / theme 桥接
+  pdf-viewer.ts  -> 输出 /pdf-viewer.js 的薄入口
+  pdf/           -> PDF.js reader 内 hover / selection / theme 桥接
+  epub-viewer.ts -> 输出 /epub-viewer.js 的薄入口
+  epub/          -> EPUB reader UI 和 iframe 内容桥接
   popup/         -> popup UI
   options/       -> options UI
-  viewer/        -> PDF / EPUB 阅读器壳和 EPUB bridge
+  viewer/        -> /viewer.html 兼容路由和 HTML shell 探测
 
 src/features/
   hover/         -> 悬停识别、Highlight API 下划线、Minimal tooltip 流程
@@ -45,6 +48,7 @@ src/ui/          -> Solid UI 和 Shadow DOM 挂载辅助
 src/assets/
   fonts/inter/   -> options / popup / viewer 使用的打包 Inter 字体
   pdf-viewer/    -> PDF.js release upstream、生成 locale 和 reader 静态资源
+  epub-viewer/   -> EPUB viewer 静态 shell，构建时复制到 /epub/web/
 scripts/
   generate-i18n.ts -> 从 catalog 生成 locale wrapper 和 PDF viewer locale
   update-pdfjs.ts  -> 从 GitHub release dist zip 更新 PDF.js upstream
@@ -63,7 +67,7 @@ scripts/
 交互 UI 可以使用 Solid：
 
 - popup 和 options 页；
-- `/viewer.html` reader 壳；
+- `/viewer.html` reader 兼容路由壳；
 - Rich 翻译卡片；
 - 悬浮控制；
 - 设置界面。
@@ -108,27 +112,27 @@ options 和 popup 的通用控件放在 `src/lib/ui/controls.tsx`，样式放在
 
 ## PDF / EPUB Reader
 
-阅读器详细边界见 [document-viewer.md](document-viewer.md)。当前实现分为两层：
+阅读器详细边界见 [document-viewer.md](document-viewer.md)。当前实现分为三个公开入口：
 
-- `/viewer.html`：Solid reader 壳，处理本地文件 key、远程 URL、sniffer 消费、主题 / 语言同步，并把 PDF 重定向到顶层官方 viewer。
+- `/viewer.html`：Solid 兼容路由壳，处理旧本地 key、远程 URL、旧 sniffer 链接和 HTML shell 探测；最终转到 PDF 或 EPUB viewer。
 - `/pdf/web/viewer.html`：构建时公开的顶层 PDF.js reader。HTML / JS / CSS / runtime 都来自 `src/assets/pdf-viewer/upstream/` 的同一个 GitHub release dist。
+- `/epub/web/viewer.html`：构建时公开的 OneLingo EPUB reader shell。HTML / CSS 来自 `src/assets/epub-viewer/`，运行时由 `/epub-viewer.js` 挂载 `src/entrypoints/epub/`。
 
 PDF 打开路径：
 
 ```text
-/viewer.html?key=... or ?url=...
-  -> ArrayBuffer / IndexedDB
+local key or direct URL
   -> /pdf/web/viewer.html?file=... or ?onelingo-key=...
-  -> src/entrypoints/pdf-bridge.ts 在顶层 PDF.js viewer 内初始化 hover / selection
+  -> src/entrypoints/pdf/bridge.ts 在顶层 PDF.js viewer 内初始化 hover / selection
 ```
 
 EPUB 打开路径：
 
 ```text
-/viewer.html?key=... or ?url=...
+/epub/web/viewer.html?key=... or ?url=...
   -> ArrayBuffer / IndexedDB
   -> epubjs renderTo(#epub-render)
-  -> epub-bridge.ts 绑定 EPUB iframe 内容文档
+  -> src/entrypoints/epub/bridge.ts 绑定 EPUB iframe 内容文档
 ```
 
 文件链接嗅探：

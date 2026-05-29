@@ -32,7 +32,7 @@ type PdfViewerWindow = Window & typeof globalThis & {
   PDFViewerApplication?: PdfViewerApplication;
 };
 
-export default defineUnlistedScript(() => {
+export function initPdfBridge(): void {
   document.documentElement.setAttribute("data-onelingo-pdf-viewer", "");
   initPdfViewerTheme();
   initPdfReaderUiBoundary();
@@ -40,7 +40,7 @@ export default defineUnlistedScript(() => {
   void bootstrapPdfDocumentOpen().catch((err: unknown) => {
     console.warn("[OneLingo] failed to bootstrap PDF document:", err);
   });
-});
+}
 
 // PDF document bootstrap: resolve stored/sniffed inputs and hand them to the
 // top-level official PDF.js viewer application.

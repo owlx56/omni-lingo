@@ -17,6 +17,7 @@ type PublicAssetFile =
 const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
 const PDF_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "pdf-viewer");
 const PDFJS_UPSTREAM_DIR = join(PDF_VIEWER_ASSET_DIR, "upstream");
+const EPUB_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "epub-viewer");
 const INTER_FONT_DIR = join(ROOT_DIR, "src", "assets", "fonts", "inter");
 const PDF_VIEWER_LOCALE_ALIASES: Record<string, string[]> = {
   "bookmark1.title": ["bookmark.title"],
@@ -80,7 +81,7 @@ function patchPdfViewerHtml(contents: string): string {
     /<title>[\s\S]*?<\/title>/,
     "<title>OneLingo PDF Viewer</title>",
   );
-  if (next.includes('src="/pdf-bridge.js"')) return next;
+  if (next.includes('src="/pdf-viewer.js"')) return next;
 
   const buildScript =
     /<script src="\.\.\/build\/pdf\.(?:js|mjs)"(?: type="module")?><\/script>/;
@@ -89,7 +90,7 @@ function patchPdfViewerHtml(contents: string): string {
   }
   next = next.replace(
     buildScript,
-    (match) => `${match}\n<script src="/pdf-bridge.js"></script>`,
+    (match) => `${match}\n<script src="/pdf-viewer.js"></script>`,
   );
   return next;
 }
@@ -288,6 +289,10 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
   await addDirectoryAssets(files, INTER_FONT_DIR, "pdf/web/fonts/inter");
 }
 
+async function addEpubViewerPublicAssets(files: PublicAssetFile[]): Promise<void> {
+  await addDirectoryAssets(files, EPUB_VIEWER_ASSET_DIR, "epub/web");
+}
+
 async function addPdfJsUpstreamAssets(
   files: PublicAssetFile[],
   absoluteSrcDir = PDFJS_UPSTREAM_DIR,
@@ -401,7 +406,9 @@ const DOCUMENT_VIEWER_WEB_ACCESSIBLE_RESOURCES = [
   "chunks/*",
   "assets/*",
   "pdf/*",
-  "pdf-bridge.js",
+  "pdf-viewer.js",
+  "epub/*",
+  "epub-viewer.js",
 ];
 
 function withUnique(list: string[] | undefined, value: string): string[] {
@@ -515,9 +522,13 @@ export default defineConfig({
       if (!paths.includes("pdf/web/viewer.html")) {
         paths.push("pdf/web/viewer.html");
       }
+      if (!paths.includes("epub/web/viewer.html")) {
+        paths.push("epub/web/viewer.html");
+      }
     },
     "build:publicAssets": async (_wxt, files) => {
       await addPdfViewerPublicAssets(files);
+      await addEpubViewerPublicAssets(files);
     },
   },
   webExt: {

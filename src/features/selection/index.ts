@@ -16,7 +16,6 @@ import {
   watchSettings,
 } from "@/lib/storage/settings";
 import { getHost, getShadowRoot } from "@/ui/shadow-root";
-import { mountCard } from "./SelectionCard";
 import { setSelText, setSelTarget, setSelResult } from "./card-store";
 
 const LOGO_ATTR = "data-onelingo-logo";
@@ -61,6 +60,9 @@ let selectionState: State | null = null;
 let selectionSettingsStarted = false;
 let selectionMouseupStarted = false;
 let selectionDismissStarted = false;
+let selectionCardModulePromise:
+  | Promise<typeof import("./SelectionCard")>
+  | null = null;
 
 export function initSelection(options: InitSelectionOptions = {}): void {
   const s = ensureSelectionState();
@@ -439,10 +441,21 @@ function showCard(s: State): void {
   }
 
   if (!s.cardMounted) {
-    mountCard(el);
     s.cardMounted = true;
+    void mountSelectionCard(el)
+      .then(() => {
+        if (s.card === el && s.cardVisible) positionCard(s, el);
+      })
+      .catch((err: unknown) => {
+        s.cardMounted = false;
+        console.warn("[OneLingo] failed to mount selection card:", err);
+      });
   }
 
+  positionCard(s, el);
+}
+
+function positionCard(s: State, el: HTMLDivElement): void {
   el.style.visibility = "hidden";
   el.style.display = "block";
   const tw = el.offsetWidth;
@@ -459,6 +472,12 @@ function showCard(s: State): void {
   el.style.left = `${left}px`;
   el.style.top = `${top}px`;
   el.style.visibility = "visible";
+}
+
+async function mountSelectionCard(container: HTMLElement): Promise<void> {
+  selectionCardModulePromise ??= import("./SelectionCard");
+  const { mountCard } = await selectionCardModulePromise;
+  mountCard(container);
 }
 
 // ─── 收起 ─────────────────────────────────────────────
