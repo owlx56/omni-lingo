@@ -15,8 +15,13 @@ type PublicAssetFile =
     };
 
 const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
-const PDF_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "pdf-viewer");
-const PDFJS_UPSTREAM_DIR = join(PDF_VIEWER_ASSET_DIR, "upstream");
+const PDFJS_DIST_PACKAGE_DIR = join(ROOT_DIR, "vendor", "pdfjs-dist");
+const PDFJS_DIST_DIR = join(PDFJS_DIST_PACKAGE_DIR, "dist");
+const PDFJS_RELEASE_LOCK_PATH = join(
+  PDFJS_DIST_PACKAGE_DIR,
+  "pdfjs-release.lock.json",
+);
+const PDFJS_RELEASE_META_PATH = join(PDFJS_DIST_DIR, "PDFJS_RELEASE.json");
 const EPUB_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "epub-viewer");
 const INTER_FONT_DIR = join(ROOT_DIR, "src", "assets", "fonts", "inter");
 const PDF_VIEWER_LOCALE_ALIASES: Record<string, string[]> = {
@@ -35,6 +40,16 @@ const PDF_VIEWER_LOCALE_ALIASES: Record<string, string[]> = {
 type ViewerProperties = {
   keysInOrder: string[];
   values: Map<string, string>;
+};
+
+type PdfJsReleaseMetadata = {
+  source: "github-release-dist";
+  version: string;
+  tag: string;
+  releaseName: string;
+  assetName: string;
+  browserDownloadUrl: string;
+  sha256: string;
 };
 
 function toPublicPath(path: string): string {
@@ -205,7 +220,7 @@ async function addDirectoryAssets(
 }
 
 async function addPdfViewerLocaleAssets(files: PublicAssetFile[]): Promise<void> {
-  const localeDir = join(PDFJS_UPSTREAM_DIR, "web", "locale");
+  const localeDir = join(PDFJS_DIST_DIR, "web", "locale");
   try {
     await access(localeDir);
   } catch {
@@ -269,18 +284,17 @@ async function addPatchedLocaleDirectoryAssets(
 }
 
 async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void> {
-  const release = JSON.parse(
-    await readFile(join(PDFJS_UPSTREAM_DIR, "PDFJS_RELEASE.json"), "utf8"),
-  ) as { version?: string };
+  const release = await readPdfJsReleaseMetadata(PDFJS_RELEASE_META_PATH);
+  await assertPdfJsUpstreamMatchesLock(release);
 
-  addFileAsset(files, join(PDFJS_UPSTREAM_DIR, "LICENSE"), "pdf/LICENSE");
+  addFileAsset(files, join(PDFJS_DIST_DIR, "LICENSE"), "pdf/LICENSE");
   files.push({
-    contents: `${release.version ?? "unknown"}\n`,
+    contents: `${release.version}\n`,
     relativeDest: "pdf/PDFJS_VERSION",
   });
   addFileAsset(
     files,
-    join(PDFJS_UPSTREAM_DIR, "PDFJS_RELEASE.json"),
+    PDFJS_RELEASE_META_PATH,
     "pdf/PDFJS_RELEASE.json",
   );
 
@@ -289,13 +303,74 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
   await addDirectoryAssets(files, INTER_FONT_DIR, "pdf/web/fonts/inter");
 }
 
+async function assertPdfJsUpstreamMatchesLock(
+  release: PdfJsReleaseMetadata,
+): Promise<void> {
+  const lock = await readPdfJsReleaseMetadata(PDFJS_RELEASE_LOCK_PATH);
+  const mismatchedField = (
+    [
+      "source",
+      "version",
+      "tag",
+      "releaseName",
+      "assetName",
+      "browserDownloadUrl",
+      "sha256",
+    ] as const
+  ).find((field) => release[field] !== lock[field]);
+  if (!mismatchedField) return;
+
+  throw new Error(
+    `PDF.js dist does not match pdfjs-release.lock.json (${mismatchedField}). Run "bun run pdfjs:ensure".`,
+  );
+}
+
+async function readPdfJsReleaseMetadata(
+  path: string,
+): Promise<PdfJsReleaseMetadata> {
+  let contents: string;
+  try {
+    contents = await readFile(path, "utf8");
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      "code" in error &&
+      (error as NodeJS.ErrnoException).code === "ENOENT"
+    ) {
+      throw new Error(
+        `Missing PDF.js assets at ${path}. Run "bun run pdfjs:ensure".`,
+      );
+    }
+    throw error;
+  }
+
+  const parsed = JSON.parse(contents) as Partial<PdfJsReleaseMetadata>;
+  for (const field of [
+    "source",
+    "version",
+    "tag",
+    "releaseName",
+    "assetName",
+    "browserDownloadUrl",
+    "sha256",
+  ] as const) {
+    if (typeof parsed[field] !== "string" || !parsed[field]) {
+      throw new Error(`${path} is missing ${field}. Run "bun run pdfjs:ensure".`);
+    }
+  }
+  if (parsed.source !== "github-release-dist") {
+    throw new Error(`${path} has unsupported PDF.js source ${parsed.source}.`);
+  }
+  return parsed as PdfJsReleaseMetadata;
+}
+
 async function addEpubViewerPublicAssets(files: PublicAssetFile[]): Promise<void> {
   await addDirectoryAssets(files, EPUB_VIEWER_ASSET_DIR, "epub/web");
 }
 
 async function addPdfJsUpstreamAssets(
   files: PublicAssetFile[],
-  absoluteSrcDir = PDFJS_UPSTREAM_DIR,
+  absoluteSrcDir = PDFJS_DIST_DIR,
   relativeSrcDir = "",
 ): Promise<void> {
   const entries = await readdir(absoluteSrcDir, { withFileTypes: true });

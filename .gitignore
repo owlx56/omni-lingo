@@ -13,6 +13,7 @@ stats.html
 stats-*.json
 .wxt
 public/pdf
+vendor/pdfjs-dist/dist/
 web-ext.config.ts
 dist
 

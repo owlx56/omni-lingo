@@ -9,7 +9,7 @@
 - TypeScript：功能和基础设施代码。
 - Solid：只用于交互 UI。
 - Vanilla TypeScript：用于热路径和宿主页面 DOM 操作。
-- PDF.js release dist：PDF 渲染和官方 viewer 基础能力，由 `scripts/update-pdfjs.ts` 从 GitHub `pdfjs-*-dist.zip` 生成到 `src/assets/pdf-viewer/upstream/`，构建时复制到扩展 public assets。
+- PDF.js release dist：PDF 渲染和官方 viewer 基础能力，由 Bun workspace 包 `@onelingo/pdfjs-dist` 管理；版本锁在 `vendor/pdfjs-dist/pdfjs-release.lock.json`，由 `scripts/update-pdfjs.ts` 从 GitHub `pdfjs-*-dist.zip` 生成到 ignored 的 `vendor/pdfjs-dist/dist/`，构建时复制到扩展 public assets。
 - epubjs：EPUB 渲染。
 
 ## 顶层流向
@@ -47,11 +47,13 @@ src/engines/     -> 翻译引擎适配
 src/ui/          -> Solid UI 和 Shadow DOM 挂载辅助
 src/assets/
   fonts/inter/   -> options / popup / viewer 使用的打包 Inter 字体
-  pdf-viewer/    -> PDF.js release upstream、生成 locale 和 reader 静态资源
+  pdf-viewer/    -> 生成的 PDF reader 静态语言包
   epub-viewer/   -> EPUB viewer 静态 shell，构建时复制到 /epub/web/
+vendor/
+  pdfjs-dist/    -> Bun workspace 包，锁定并生成官方 PDF.js release dist
 scripts/
   generate-i18n.ts -> 从 catalog 生成 locale wrapper 和 PDF viewer locale
-  update-pdfjs.ts  -> 从 GitHub release dist zip 更新 PDF.js upstream
+  update-pdfjs.ts  -> 从 GitHub release dist zip 确保或更新 PDF.js dist
 ```
 
 ## 运行时边界
@@ -115,7 +117,7 @@ options 和 popup 的通用控件放在 `src/lib/ui/controls.tsx`，样式放在
 阅读器详细边界见 [document-viewer.md](document-viewer.md)。当前实现分为三个公开入口：
 
 - `/viewer.html`：Solid 兼容路由壳，处理旧本地 key、远程 URL、旧 sniffer 链接和 HTML shell 探测；最终转到 PDF 或 EPUB viewer。
-- `/pdf/web/viewer.html`：构建时公开的顶层 PDF.js reader。HTML / JS / CSS / runtime 都来自 `src/assets/pdf-viewer/upstream/` 的同一个 GitHub release dist。
+- `/pdf/web/viewer.html`：构建时公开的顶层 PDF.js reader。HTML / JS / CSS / runtime 都来自 `vendor/pdfjs-dist/dist/` 里按 lock 生成的同一个 GitHub release dist。
 - `/epub/web/viewer.html`：构建时公开的 OneLingo EPUB reader shell。HTML / CSS 来自 `src/assets/epub-viewer/`，运行时由 `/epub-viewer.js` 挂载 `src/entrypoints/epub/`。
 
 PDF 打开路径：
@@ -142,7 +144,7 @@ EPUB 打开路径：
 - `documentLinkSniffKeepOriginal` 会打开 reader 新 tab，并给原 tab 临时安装 allow rule 放行原 PDF 页面。
 - `documentLinkSniffStandalone` 才使用 popup window；普通保留原页面必须是新 tab。
 
-构建资产由 `wxt.config.ts` 的 `build:publicAssets` 复制。不要编辑 `.output/`，不要手改 `src/assets/pdf-viewer/upstream/`；升级 PDF.js 必须通过 `bun run pdfjs:update -- --version <version>`。
+构建资产由 `wxt.config.ts` 的 `build:publicAssets` 复制。不要编辑 `.output/`，不要手改 `vendor/pdfjs-dist/dist/`；缺失本地 PDF.js assets 时运行 `bun run pdfjs:ensure`，升级 PDF.js 必须通过 `bun run pdfjs:update -- --version <version>` 或 `--latest`。
 
 ## 全文翻译 Immersive
 

@@ -29,7 +29,7 @@ OneLingo（一译）是跨 Chrome / Firefox / Safari 的浏览器翻译拓展。
 - `uiLang` 是 options / popup 的界面语言；hover / selection / immersive 目标语言默认与它一致，用户修改某个功能目标语言后该功能独立保存。
 - UI 文案源在 `src/lib/i18n/catalog.ts`，options / popup / EPUB / PDF reader 都从这里派生；`messages.ts`、`locales/*.ts` 和 `src/assets/pdf-viewer/locales.generated.mjs` 是类型/兼容/静态 viewer 产物。
 - 通用控件放在 `src/lib/ui/controls.tsx` 和 `src/lib/ui/controls.css`；改 options / popup 下拉菜单、开关、色板时优先复用这里。
-- PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上游来源；通过 `bun run pdfjs:update -- --version <version>` 重建 `src/assets/pdf-viewer/upstream/`，构建时由 `wxt.config.ts` 复制并注入 OneLingo bridge。不要手改 upstream 或 `.output/`。
+- PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上游来源；Bun workspace 包在 `vendor/pdfjs-dist/`，版本锁在 `vendor/pdfjs-dist/pdfjs-release.lock.json`，本地 `vendor/pdfjs-dist/dist/` 由 `bun run pdfjs:ensure` 生成且不提交。升级版本只用 `bun run pdfjs:update -- --version <version>` 或 `--latest`。不要手改 dist 或 `.output/`。
 - PDF hover 直接复用 `src/features/hover/` 的通用逻辑；不要再维护一套 PDF-specific hover hit test / token split / overlay underline。
 - EPUB reader 在 `src/entrypoints/viewer/` 使用 `epubjs` 渲染，`epub-bridge.ts` 负责把 hover / selection 行为接进 EPUB iframe。
 - 文件链接嗅探分两层：`src/features/document-sniffer.ts` 处理页面内普通链接点击；`src/entrypoints/background.ts` 用 DNR / webRequest 处理地址栏和主框架 PDF / EPUB 导航。
