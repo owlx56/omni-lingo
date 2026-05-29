@@ -211,8 +211,16 @@ async function addPdfViewerLocaleAssets(files: PublicAssetFile[]): Promise<void>
     return;
   }
 
+  const legacyFallbackPath = join(localeDir, "en-US", "viewer.properties");
+  try {
+    await access(legacyFallbackPath);
+  } catch {
+    await addDirectoryAssets(files, localeDir, "pdf/web/locale");
+    return;
+  }
+
   const fallbackProps = parseViewerProperties(
-    await readFile(join(localeDir, "en-US", "viewer.properties"), "utf8"),
+    await readFile(legacyFallbackPath, "utf8"),
   );
   await addPatchedLocaleDirectoryAssets(
     files,

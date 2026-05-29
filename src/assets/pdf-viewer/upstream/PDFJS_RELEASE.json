@@ -1,9 +1,9 @@
 {
   "source": "github-release-dist",
-  "version": "3.3.122",
-  "tag": "v3.3.122",
-  "releaseName": "v3.3.122",
-  "assetName": "pdfjs-3.3.122-dist.zip",
-  "browserDownloadUrl": "https://github.com/mozilla/pdf.js/releases/download/v3.3.122/pdfjs-3.3.122-dist.zip",
-  "sha256": "20d831bbb91c1230275cd96b67f710c56017a37e67af7ad06e0d8a6204d8eeac"
+  "version": "5.7.284",
+  "tag": "v5.7.284",
+  "releaseName": "v5.7.284",
+  "assetName": "pdfjs-5.7.284-dist.zip",
+  "browserDownloadUrl": "https://github.com/mozilla/pdf.js/releases/download/v5.7.284/pdfjs-5.7.284-dist.zip",
+  "sha256": "6d1b81252d76358df5831567d7d551f40ebae0cd8e0a554694bc4df0d3db8715"
 }

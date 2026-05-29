@@ -16,7 +16,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
-const DEFAULT_PDFJS_VERSION = "3.3.122";
+const DEFAULT_PDFJS_VERSION = "5.7.284";
 const PDFJS_LATEST_RELEASE_URL =
   "https://api.github.com/repos/mozilla/pdf.js/releases/latest";
 const pdfJsReleaseUrl = (tag: string): string =>

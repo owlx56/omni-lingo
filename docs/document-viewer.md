@@ -35,7 +35,7 @@ options / context menu / sniffer
 
 ## PDF.js 资产
 
-PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上游来源，并加载官方 PDF.js `viewer.html` / `viewer.js|mjs` / `viewer.css` shell。当前固定在 `3.3.122`，和 Less Translate 的 PDF viewer 版本一致；不要再用自定义 `PDFViewer` 外壳替代官方 viewer，也不要把官方 viewer 放进 OneLingo iframe，否则 Chrome / Less / Saladict 一致的双击选词边界会重新偏移。
+PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上游来源，并加载官方 PDF.js `viewer.html` / `viewer.js|mjs` / `viewer.css` shell。当前固定在 `5.7.284`；不要再用自定义 `PDFViewer` 外壳替代官方 viewer，也不要把官方 viewer 放进 OneLingo iframe，否则 Chrome / Less / Saladict 一致的双击选词边界会重新偏移。
 
 `wxt.config.ts` 的 `build:publicAssets` 会复制：
 
@@ -47,7 +47,7 @@ PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上�
 - `src/assets/pdf-viewer/upstream/web/cmaps/`、`standard_fonts/`、`wasm/`、`iccs/`、`images/`
 - `src/assets/fonts/inter/`
 
-复制 `src/assets/pdf-viewer/upstream/web/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。这样可以兼容官方 `viewer.html` / `viewer.js|mjs` 仍会请求的历史或新增 locale key，避免运行时出现 `#... is undefined.` warning。
+旧版 PDF.js 使用 `src/assets/pdf-viewer/upstream/web/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。新版 PDF.js 使用 Fluent `viewer.ftl` / `locale.json` 时直接复制官方 locale 目录。
 
 `prepare:publicPaths` 会把 `pdf/web/viewer.html` 加入 public path。改 PDF.js 版本时只运行 `bun run pdfjs:update -- --version <version>` 或 `bun run pdfjs:update -- --latest`，让脚本重建 `src/assets/pdf-viewer/upstream/` 和 `PDFJS_RELEASE.json`；不要手改 upstream 或 `.output/`。`wxt.config.ts` 会在复制时注入 `/pdf-bridge.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
 
