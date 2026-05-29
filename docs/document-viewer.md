@@ -9,10 +9,7 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 | `src/entrypoints/viewer/App.tsx` | `/viewer.html` 的 Solid 壳；接收 `key`、`url`、`sniff=1`；拉取远程文档、存储 EPUB，并把 PDF 重定向到顶层官方 PDF.js viewer |
 | `src/entrypoints/viewer/epub-bridge.ts` | EPUB iframe 内 hover / selection 桥接；直接绑定 EPUB 内容文档 |
 | `src/entrypoints/pdf-bridge.ts` | PDF.js reader 内 hover、selection 状态桥接、主题同步和 reader UI 标记 |
-| `src/assets/pdf-viewer/viewer.html` | 官方 PDF.js viewer shell，保留 Less Translate / Saladict 同类 textLayer / selection 环境 |
-| `src/assets/pdf-viewer/viewer.js` | 官方 PDF.js viewer application bundle，仅做扩展 blob/file URL 兼容补丁 |
-| `src/assets/pdf-viewer/viewer.css` | 官方 PDF.js viewer 样式；不要用 OneLingo 全局字体/布局覆盖 textLayer |
-| `src/assets/pdf-viewer/onelingo-viewer.css` | 早期 OneLingo 自定义 PDF shell 样式，官方 viewer 路径不加载 |
+| `src/assets/pdf-viewer/upstream/` | 由 `scripts/update-pdfjs.ts` 从 GitHub `pdfjs-*-dist.zip` 生成的官方 PDF.js release dist；不要手改 |
 | `src/assets/pdf-viewer/locales.generated.mjs` | 由 `scripts/generate-i18n.ts` 生成的 PDF reader 静态语言包 |
 | `src/features/document-sniffer.ts` | content script 层的页面内 PDF / EPUB 链接点击拦截 |
 | `src/entrypoints/background.ts` | 地址栏 / 主框架文件导航嗅探、右键菜单、保留原页面、独立窗口逻辑 |
@@ -38,24 +35,21 @@ options / context menu / sniffer
 
 ## PDF.js 资产
 
-PDF reader 使用 `pdfjs-dist` npm 依赖，并加载官方 PDF.js `viewer.html` / `viewer.js` / `viewer.css` shell。当前固定在 `3.3.122`，和 Less Translate 的 PDF viewer 版本一致；不要再用自定义 `PDFViewer` 外壳替代官方 viewer，也不要把官方 viewer 放进 OneLingo iframe，否则 Chrome / Less / Saladict 一致的双击选词边界会重新偏移。
+PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上游来源，并加载官方 PDF.js `viewer.html` / `viewer.js|mjs` / `viewer.css` shell。当前固定在 `3.3.122`，和 Less Translate 的 PDF viewer 版本一致；不要再用自定义 `PDFViewer` 外壳替代官方 viewer，也不要把官方 viewer 放进 OneLingo iframe，否则 Chrome / Less / Saladict 一致的双击选词边界会重新偏移。
 
 `wxt.config.ts` 的 `build:publicAssets` 会复制：
 
-- `node_modules/pdfjs-dist/build/pdf.js`
-- `pdf.worker.js`
-- `pdf.sandbox.js`
-- `web/pdf_viewer.js`
-- `web/pdf_viewer.css`
-- `cmaps/`、`image_decoders/`、`standard_fonts/`、`web/images/`
+- `src/assets/pdf-viewer/upstream/build/` 下的 PDF.js runtime、worker、sandbox
+- `src/assets/pdf-viewer/upstream/web/viewer.html`
+- `src/assets/pdf-viewer/upstream/web/viewer.js|mjs`
+- `src/assets/pdf-viewer/upstream/web/viewer.css`
+- `src/assets/pdf-viewer/upstream/web/locale/`
+- `src/assets/pdf-viewer/upstream/web/cmaps/`、`standard_fonts/`、`wasm/`、`iccs/`、`images/`
 - `src/assets/fonts/inter/`
-- `src/assets/pdf-viewer/images/` 下的官方 viewer 图标
-- `src/assets/pdf-viewer/locale/` 下的官方 viewer locale
-- `src/assets/pdf-viewer/` 下的官方 viewer 文件和 OneLingo bridge 相关静态文件
 
-复制 `src/assets/pdf-viewer/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。这样可以兼容官方 `viewer.html` / `viewer.js` 仍会请求的历史或新增 locale key，避免运行时出现 `#... is undefined.` warning。
+复制 `src/assets/pdf-viewer/upstream/web/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。这样可以兼容官方 `viewer.html` / `viewer.js|mjs` 仍会请求的历史或新增 locale key，避免运行时出现 `#... is undefined.` warning。
 
-`prepare:publicPaths` 会把 `pdf/web/viewer.html` 加入 public path。改 PDF.js 版本时更新 `package.json` 的 `pdfjs-dist`，然后同步官方 `viewer.html` / `viewer.js` / `viewer.css`，确认 `viewer.js` 仍禁用 `validateFileURL(file)` 以允许扩展页打开 blob / file 文档；不要手改 `.output/`。
+`prepare:publicPaths` 会把 `pdf/web/viewer.html` 加入 public path。改 PDF.js 版本时只运行 `bun run pdfjs:update -- --version <version>` 或 `bun run pdfjs:update -- --latest`，让脚本重建 `src/assets/pdf-viewer/upstream/` 和 `PDFJS_RELEASE.json`；不要手改 upstream 或 `.output/`。`wxt.config.ts` 会在复制时注入 `/pdf-bridge.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
 
 ## Reader 翻译
 

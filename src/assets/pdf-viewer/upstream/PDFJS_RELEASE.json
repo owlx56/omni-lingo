@@ -1,0 +1,9 @@
+{
+  "source": "github-release-dist",
+  "version": "3.3.122",
+  "tag": "v3.3.122",
+  "releaseName": "v3.3.122",
+  "assetName": "pdfjs-3.3.122-dist.zip",
+  "browserDownloadUrl": "https://github.com/mozilla/pdf.js/releases/download/v3.3.122/pdfjs-3.3.122-dist.zip",
+  "sha256": "20d831bbb91c1230275cd96b67f710c56017a37e67af7ad06e0d8a6204d8eeac"
+}

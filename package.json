@@ -10,6 +10,7 @@
     "build": "bun --bun node_modules/wxt/bin/wxt.mjs build",
     "build:firefox": "bun --bun node_modules/wxt/bin/wxt.mjs build -b firefox",
     "i18n:generate": "bun scripts/generate-i18n.ts",
+    "pdfjs:update": "bun scripts/update-pdfjs.ts",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",
@@ -17,7 +18,6 @@
   },
   "dependencies": {
     "epubjs": "^0.3.93",
-    "pdfjs-dist": "3.3.122",
     "solid-js": "^1.9.11"
   },
   "devDependencies": {

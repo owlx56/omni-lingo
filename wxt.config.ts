@@ -15,9 +15,8 @@ type PublicAssetFile =
     };
 
 const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
-const PDFJS_DIST_DIR = join(ROOT_DIR, "node_modules", "pdfjs-dist");
 const PDF_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "pdf-viewer");
-const PDF_VIEWER_IMAGE_DIR = join(PDF_VIEWER_ASSET_DIR, "images");
+const PDFJS_UPSTREAM_DIR = join(PDF_VIEWER_ASSET_DIR, "upstream");
 const INTER_FONT_DIR = join(ROOT_DIR, "src", "assets", "fonts", "inter");
 const PDF_VIEWER_LOCALE_ALIASES: Record<string, string[]> = {
   "bookmark1.title": ["bookmark.title"],
@@ -67,10 +66,72 @@ function patchPdfJsCanvasReadback(contents: string): string {
   const target = 'context: canvas.getContext("2d")';
   const replacement =
     'context: canvas.getContext("2d", { willReadFrequently: true })';
-  if (!contents.includes(target)) {
+  if (contents.includes(target)) {
+    return contents.replace(target, replacement);
+  }
+  if (!contents.includes("willReadFrequently")) {
     throw new Error("Unable to patch PDF.js canvas factory for readback hints.");
   }
-  return contents.replace(target, replacement);
+  return contents;
+}
+
+function patchPdfViewerHtml(contents: string): string {
+  let next = contents.replace(
+    /<title>[\s\S]*?<\/title>/,
+    "<title>OneLingo PDF Viewer</title>",
+  );
+  if (next.includes('src="/pdf-bridge.js"')) return next;
+
+  const buildScript =
+    /<script src="\.\.\/build\/pdf\.(?:js|mjs)"(?: type="module")?><\/script>/;
+  if (!buildScript.test(next)) {
+    throw new Error("Unable to locate PDF.js build script in viewer.html.");
+  }
+  next = next.replace(
+    buildScript,
+    (match) => `${match}\n<script src="/pdf-bridge.js"></script>`,
+  );
+  return next;
+}
+
+function patchPdfViewerScript(contents: string, filename: string): string {
+  let next = contents.startsWith("/* OneLingo:")
+    ? contents
+    : `/* OneLingo: official PDF.js viewer, patched at build time. */\n${contents}`;
+
+  const defaultUrl =
+    /defaultOptions\.defaultUrl\s*=\s*\{[\s\S]*?value:\s*(['"])(?:[^'"]*?\.pdf|[^'"]+)\1,[\s\S]*?kind:\s*OptionKind\.VIEWER[\s\S]*?\};/;
+  if (!defaultUrl.test(next)) {
+    throw new Error(`Unable to locate default PDF URL in ${filename}.`);
+  }
+  next = next.replace(defaultUrl, (match) =>
+    match.replace(/value:\s*(['"])(?:[^'"]*?\.pdf|[^'"]+)\1/, 'value: ""'),
+  );
+
+  if (!next.includes("OneLingo: extension viewer opens external file URLs")) {
+    const validateCall = "validateFileURL(file);";
+    if (!next.includes(validateCall)) {
+      throw new Error(`Unable to locate validateFileURL(file) in ${filename}.`);
+    }
+    next = next.replace(
+      validateCall,
+      "/* OneLingo: extension viewer opens external file URLs. */",
+    );
+  }
+
+  if (!next.includes("window.PDFViewerApplication")) {
+    const exportLine = "exports.PDFViewerApplication = PDFViewerApplication;";
+    if (next.includes(exportLine)) {
+      next = next.replace(
+        exportLine,
+        `${exportLine}\nwindow.PDFViewerApplication = PDFViewerApplication;`,
+      );
+    } else if (!/\bPDFViewerApplication\s*=\s*\{/.test(next)) {
+      throw new Error(`Unable to expose PDFViewerApplication in ${filename}.`);
+    }
+  }
+
+  return next;
 }
 
 function patchPdfViewerLocaleContents(
@@ -142,21 +203,8 @@ async function addDirectoryAssets(
   }
 }
 
-async function addOptionalDirectoryAssets(
-  files: PublicAssetFile[],
-  absoluteSrcDir: string,
-  relativeDestDir: string,
-): Promise<void> {
-  try {
-    await access(absoluteSrcDir);
-  } catch {
-    return;
-  }
-  await addDirectoryAssets(files, absoluteSrcDir, relativeDestDir);
-}
-
 async function addPdfViewerLocaleAssets(files: PublicAssetFile[]): Promise<void> {
-  const localeDir = join(PDF_VIEWER_ASSET_DIR, "locale");
+  const localeDir = join(PDFJS_UPSTREAM_DIR, "web", "locale");
   try {
     await access(localeDir);
   } catch {
@@ -212,65 +260,77 @@ async function addPatchedLocaleDirectoryAssets(
 }
 
 async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void> {
-  const packageJson = JSON.parse(
-    await readFile(join(PDFJS_DIST_DIR, "package.json"), "utf8"),
+  const release = JSON.parse(
+    await readFile(join(PDFJS_UPSTREAM_DIR, "PDFJS_RELEASE.json"), "utf8"),
   ) as { version?: string };
 
-  addFileAsset(files, join(PDFJS_DIST_DIR, "LICENSE"), "pdf/LICENSE");
+  addFileAsset(files, join(PDFJS_UPSTREAM_DIR, "LICENSE"), "pdf/LICENSE");
   files.push({
-    contents: `${packageJson.version ?? "unknown"}\n`,
+    contents: `${release.version ?? "unknown"}\n`,
     relativeDest: "pdf/PDFJS_VERSION",
   });
-
-  addTextAsset(
-    files,
-    patchPdfJsCanvasReadback(
-      await readFile(join(PDFJS_DIST_DIR, "build", "pdf.js"), "utf8"),
-    ),
-    "pdf/build/pdf.js",
-  );
-
-  for (const file of ["pdf.worker.js", "pdf.sandbox.js"]) {
-    addFileAsset(files, join(PDFJS_DIST_DIR, "build", file), `pdf/build/${file}`);
-  }
-
   addFileAsset(
     files,
-    join(PDFJS_DIST_DIR, "web", "pdf_viewer.js"),
-    "pdf/web/pdf_viewer.js",
-  );
-  addFileAsset(
-    files,
-    join(PDFJS_DIST_DIR, "web", "pdf_viewer.css"),
-    "pdf/web/pdf_viewer.css",
+    join(PDFJS_UPSTREAM_DIR, "PDFJS_RELEASE.json"),
+    "pdf/PDFJS_RELEASE.json",
   );
 
-  for (const dir of ["cmaps", "image_decoders", "standard_fonts"]) {
-    await addOptionalDirectoryAssets(
-      files,
-      join(PDFJS_DIST_DIR, dir),
-      `pdf/web/${dir}`,
-    );
-  }
-  await addDirectoryAssets(
-    files,
-    join(PDFJS_DIST_DIR, "web", "images"),
-    "pdf/web/images",
-  );
-  await addOptionalDirectoryAssets(files, PDF_VIEWER_IMAGE_DIR, "pdf/web/images");
+  await addPdfJsUpstreamAssets(files);
   await addPdfViewerLocaleAssets(files);
   await addDirectoryAssets(files, INTER_FONT_DIR, "pdf/web/fonts/inter");
+}
 
-  for (const file of [
-    "locales.generated.mjs",
-    "viewer.html",
-    "viewer.js",
-    "viewer.mjs",
-    "viewer.css",
-    "onelingo-viewer.css",
-  ]) {
-    addFileAsset(files, join(PDF_VIEWER_ASSET_DIR, file), `pdf/web/${file}`);
+async function addPdfJsUpstreamAssets(
+  files: PublicAssetFile[],
+  absoluteSrcDir = PDFJS_UPSTREAM_DIR,
+  relativeSrcDir = "",
+): Promise<void> {
+  const entries = await readdir(absoluteSrcDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const absoluteSrc = join(absoluteSrcDir, entry.name);
+    const relativeSrc = join(relativeSrcDir, entry.name);
+    if (entry.isDirectory()) {
+      if (relativeSrc === join("web", "locale")) continue;
+      await addPdfJsUpstreamAssets(files, absoluteSrc, relativeSrc);
+      continue;
+    }
+    if (!entry.isFile() || entry.name.endsWith(".map")) continue;
+    if (relativeSrc === "PDFJS_RELEASE.json" || relativeSrc === "LICENSE") continue;
+    await addPdfJsUpstreamFileAsset(files, absoluteSrc, relativeSrc);
   }
+}
+
+async function addPdfJsUpstreamFileAsset(
+  files: PublicAssetFile[],
+  absoluteSrc: string,
+  relativeSrc: string,
+): Promise<void> {
+  const relativeDest = join("pdf", relativeSrc);
+  if (/^build[\\/]pdf\.(?:js|mjs)$/.test(relativeSrc)) {
+    addTextAsset(
+      files,
+      patchPdfJsCanvasReadback(await readFile(absoluteSrc, "utf8")),
+      relativeDest,
+    );
+    return;
+  }
+  if (relativeSrc === join("web", "viewer.html")) {
+    addTextAsset(
+      files,
+      patchPdfViewerHtml(await readFile(absoluteSrc, "utf8")),
+      relativeDest,
+    );
+    return;
+  }
+  if (/^web[\\/]viewer\.(?:js|mjs)$/.test(relativeSrc)) {
+    addTextAsset(
+      files,
+      patchPdfViewerScript(await readFile(absoluteSrc, "utf8"), relativeSrc),
+      relativeDest,
+    );
+    return;
+  }
+  addFileAsset(files, absoluteSrc, relativeDest);
 }
 
 function ensureCspDirectiveSource(
