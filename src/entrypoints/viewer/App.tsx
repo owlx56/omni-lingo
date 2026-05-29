@@ -5,9 +5,10 @@ import {
   Show,
   type JSX,
 } from "solid-js";
-import { loadDocument, storeDocument } from "@/lib/document-store";
+import { loadDocument } from "@/lib/document-store";
 import { fetchDocumentFromUrl } from "@/lib/document-resolver";
 import {
+  epubViewerUrlForFile,
   epubViewerUrlForStoredKey,
   pdfViewerUrlForFile,
   pdfViewerUrlForStoredKey,
@@ -38,7 +39,7 @@ function App(): JSX.Element {
 
   const init = async (): Promise<void> => {
     const params = new URLSearchParams(location.search);
-    const key = params.get("key");
+    const key = params.get("onelingo-key");
     const url = params.get("url");
 
     if (key) {
@@ -99,8 +100,7 @@ function App(): JSX.Element {
         location.replace(pdfViewerUrlForFile(doc.url, settings().uiLang));
         return;
       }
-      const key = await storeDocument(doc.data, doc.format, doc.name);
-      location.replace(epubViewerUrlForStoredKey(key));
+      location.replace(epubViewerUrlForFile(doc.url));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setState("error");

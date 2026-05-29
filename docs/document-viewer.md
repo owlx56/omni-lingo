@@ -6,11 +6,11 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 
 | 文件 | 职责 |
 | --- | --- |
-| `src/entrypoints/viewer/App.tsx` | `/viewer.html` 兼容路由壳；只负责本地 key、远程 URL、旧 sniff 链接的格式解析和转跳 |
+| `src/entrypoints/viewer/App.tsx` | `/viewer.html` 兼容路由壳；只负责本地 `onelingo-key`、远程 URL、旧 sniff 链接的格式解析和转跳 |
 | `src/entrypoints/pdf-viewer.ts` | 输出 `/pdf-viewer.js` 的薄入口；实际代码在 `src/entrypoints/pdf/bridge.ts` |
 | `src/entrypoints/pdf/bridge.ts` | PDF.js reader 内 hover、selection 状态桥接、主题同步和 reader UI 标记 |
 | `src/entrypoints/epub-viewer.ts` | 输出 `/epub-viewer.js` 的薄入口；挂载 EPUB Solid viewer |
-| `src/entrypoints/epub/App.tsx` | EPUB reader UI；接收 `key`、`url`、`onelingo-sniff=1` 并用 `epubjs` 渲染 |
+| `src/entrypoints/epub/App.tsx` | EPUB reader UI；接收 `onelingo-key`、`file`、`onelingo-sniff=1` 并用 `epubjs` 渲染 |
 | `src/entrypoints/epub/bridge.ts` | EPUB iframe 内 hover / selection 桥接；直接绑定 EPUB 内容文档 |
 | `src/assets/pdf-viewer/upstream/` | 由 `scripts/update-pdfjs.ts` 从 GitHub `pdfjs-*-dist.zip` 生成的官方 PDF.js release dist；不要手改 |
 | `src/assets/epub-viewer/` | OneLingo EPUB 静态 shell，构建时复制到 `/epub/web/` |
@@ -31,16 +31,16 @@ options / context menu / sniffer
   -> local PDF: storeDocument() IndexedDB
   -> /pdf/web/viewer.html?onelingo-key=...
   -> PDF DNR sniff: /pdf/web/viewer.html?onelingo-sniff=1
-  -> EPUB URL: /epub/web/viewer.html?url=...
+  -> EPUB URL: /epub/web/viewer.html?file=...
   -> local EPUB: storeDocument() IndexedDB
-  -> /epub/web/viewer.html?key=...
+  -> /epub/web/viewer.html?onelingo-key=...
   -> EPUB DNR sniff: /epub/web/viewer.html?onelingo-sniff=1
   -> unknown URL / HTML shell: /viewer.html?url=...&format=auto
   -> discovered PDF: /pdf/web/viewer.html?file=...
-  -> discovered EPUB: storeDocument() + /epub/web/viewer.html?key=...
+  -> discovered EPUB: /epub/web/viewer.html?file=...
 ```
 
-本地 PDF 从 options 进入时先 `storeDocument()`，然后由顶层 PDF.js viewer 内的 `pdf/bridge.ts` 用 `onelingo-key` 读取 IndexedDB 并调用 `PDFViewerApplication.open({ data })`。远程 PDF URL 直接作为官方 viewer 的 `file` 参数打开，和 Saladict 一样。远程 EPUB URL 进入 `/epub/web/viewer.html?url=...` 后由 EPUB viewer 拉取、存储并渲染；本地 EPUB 直接用 `key` 打开。远程 URL 如果不能从扩展入口判断格式，会先进入 `/viewer.html` 做 HTML shell 发现；发现 PDF 后立即重定向到顶层官方 viewer，发现 EPUB 后存储再进入 EPUB viewer。`fetchResolvableResource()` 会尝试从 iframe / embed / object / anchor / script 中发现嵌套的 PDF / EPUB 链接，最多递归 `MAX_URL_RESOLVE_DEPTH`。
+本地 PDF 从 options 进入时先 `storeDocument()`，然后由顶层 PDF.js viewer 内的 `pdf/bridge.ts` 用 `onelingo-key` 读取 IndexedDB 并调用 `PDFViewerApplication.open({ data })`。远程 PDF URL 直接作为官方 viewer 的 `file` 参数打开，和 Saladict 一样。远程 EPUB URL 进入 `/epub/web/viewer.html?file=...` 后由 EPUB viewer 拉取并渲染；本地 EPUB 也用 `onelingo-key` 打开。远程 URL 如果不能从扩展入口判断格式，会先进入 `/viewer.html` 做 HTML shell 发现；发现 PDF 后立即重定向到顶层官方 viewer，发现 EPUB 后重定向到 EPUB viewer 的 `file` 入口。`fetchResolvableResource()` 会尝试从 iframe / embed / object / anchor / script 中发现嵌套的 PDF / EPUB 链接，最多递归 `MAX_URL_RESOLVE_DEPTH`。
 
 ## PDF.js 资产
 
@@ -76,7 +76,7 @@ PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上�
 
 文件链接嗅探有两层，缺一层都会出现行为差异：
 
-- content script：`src/features/document-sniffer.ts` 拦截普通网页中的 `<a href="...pdf|epub">` 点击。仅在不保留原页面且不独立窗口时，PDF 直接跳到 `/pdf/web/viewer.html?file=...`，EPUB 直接跳到 `/epub/web/viewer.html?url=...`，未知格式才跳到 `/viewer.html?url=...`。
+- content script：`src/features/document-sniffer.ts` 拦截普通网页中的 `<a href="...pdf|epub">` 点击。仅在不保留原页面且不独立窗口时，PDF 直接跳到 `/pdf/web/viewer.html?file=...`，EPUB 直接跳到 `/epub/web/viewer.html?file=...`，未知格式才跳到 `/viewer.html?url=...`。
 - background：`src/entrypoints/background.ts` 用 DNR / webRequest 处理地址栏输入、主框架跳转、content-type 是 PDF / EPUB 但 URL 不带扩展名的情况，以及 `file://` 导航。
 
 相关设置在 `src/lib/storage/settings.ts`：

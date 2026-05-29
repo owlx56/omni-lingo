@@ -129,7 +129,7 @@ local key or direct URL
 EPUB 打开路径：
 
 ```text
-/epub/web/viewer.html?key=... or ?url=...
+/epub/web/viewer.html?onelingo-key=... or ?file=...
   -> ArrayBuffer / IndexedDB
   -> epubjs renderTo(#epub-render)
   -> src/entrypoints/epub/bridge.ts 绑定 EPUB iframe 内容文档

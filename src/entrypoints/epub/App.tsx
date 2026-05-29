@@ -8,10 +8,10 @@ import {
 } from "solid-js";
 import ePub from "epubjs";
 import type { Book, Rendition } from "epubjs";
-import { loadDocument, storeDocument } from "@/lib/document-store";
+import { loadDocument } from "@/lib/document-store";
 import { fetchDocumentFromUrl } from "@/lib/document-resolver";
 import {
-  epubViewerUrlForStoredKey,
+  epubViewerUrlForFile,
   pdfViewerUrlForFile,
   pdfViewerUrlForStoredKey,
   type DocumentFormat,
@@ -65,14 +65,14 @@ function App(): JSX.Element {
 
   const init = async (): Promise<void> => {
     const params = new URLSearchParams(location.search);
-    const key = params.get("key");
-    const url = params.get("url");
+    const key = params.get("onelingo-key");
+    const file = params.get("file");
 
     if (key) {
       await loadFromStore(key);
-    } else if (url) {
+    } else if (file) {
       const format = (params.get("format") ?? "auto") as ViewerFormat;
-      await loadFromUrl(url, format);
+      await loadFromUrl(file, format);
     } else if (
       params.get("onelingo-sniff") === "1" ||
       params.get("sniff") === "1"
@@ -128,8 +128,7 @@ function App(): JSX.Element {
         location.replace(pdfViewerUrlForFile(doc.url, settings().uiLang));
         return;
       }
-      const key = await storeDocument(doc.data, doc.format, doc.name);
-      const viewerUrl = epubViewerUrlForStoredKey(key);
+      const viewerUrl = epubViewerUrlForFile(doc.url);
       history.replaceState(null, "", viewerUrl);
       await renderEpub(doc.data);
     } catch (err) {

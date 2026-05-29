@@ -7,6 +7,7 @@ export type ViewerFormat = DocumentFormat | "auto";
 const PDF_VIEWER_PATH = "pdf/web/viewer.html";
 const EPUB_VIEWER_PATH = "epub/web/viewer.html";
 const READER_SHELL_PATH = "viewer.html";
+const STORED_DOCUMENT_KEY_PARAM = "onelingo-key";
 const PDF_URL_RE = /\.pdf(?:$|[?#].*)?/i;
 const EPUB_URL_RE = /\.epub(?:$|[?#].*)?/i;
 
@@ -22,7 +23,7 @@ export function pdfViewerUrlForStoredKey(
   uiLang?: UiLang,
 ): string {
   const url = pdfViewerBaseUrl();
-  url.searchParams.set("onelingo-key", key);
+  url.searchParams.set(STORED_DOCUMENT_KEY_PARAM, key);
   applyPdfLocale(url, uiLang);
   return url.href;
 }
@@ -36,13 +37,13 @@ export function pdfViewerUrlForSniff(uiLang?: UiLang): string {
 
 export function epubViewerUrlForFile(fileUrl: string): string {
   const url = epubViewerBaseUrl();
-  url.searchParams.set("url", fileUrl);
+  url.searchParams.set("file", fileUrl);
   return url.href;
 }
 
 export function epubViewerUrlForStoredKey(key: string): string {
   const url = epubViewerBaseUrl();
-  url.searchParams.set("key", key);
+  url.searchParams.set(STORED_DOCUMENT_KEY_PARAM, key);
   return url.href;
 }
 
