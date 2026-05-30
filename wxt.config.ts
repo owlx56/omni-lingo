@@ -1,8 +1,11 @@
 import { defineConfig } from "wxt";
 import { access, readdir, readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import "./scripts/generate-i18n";
+
+const PDFJS_PACKAGE_NAME = "@onelingo/pdfjs-dist";
 
 type PublicAssetFile =
   | {
@@ -14,9 +17,16 @@ type PublicAssetFile =
       relativeDest: string;
     };
 
+type PdfJsDistPackage = {
+  packageDir: string;
+  distDir: string;
+};
+
 const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
-const PDFJS_DIST_PACKAGE_DIR = join(ROOT_DIR, "vendor", "pdfjs-dist");
-const PDFJS_DIST_DIR = join(PDFJS_DIST_PACKAGE_DIR, "dist");
+const require = createRequire(import.meta.url);
+const PDFJS_DIST_PACKAGE = resolvePdfJsDistPackage();
+const PDFJS_DIST_PACKAGE_DIR = PDFJS_DIST_PACKAGE.packageDir;
+const PDFJS_DIST_DIR = PDFJS_DIST_PACKAGE.distDir;
 const PDFJS_RELEASE_LOCK_PATH = join(
   PDFJS_DIST_PACKAGE_DIR,
   "pdfjs-release.lock.json",
@@ -51,6 +61,43 @@ type PdfJsReleaseMetadata = {
   browserDownloadUrl: string;
   sha256: string;
 };
+
+function tryResolvePdfJsPath(path: string): string | null {
+  try {
+    return require.resolve(path);
+  } catch (error) {
+    const code =
+      typeof error === "object" && error !== null && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+    if (
+      code === "MODULE_NOT_FOUND" ||
+      String(error).includes("Cannot find module")
+    ) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function resolvePdfJsDistPackage(): PdfJsDistPackage {
+  const packageJsonPath = tryResolvePdfJsPath(`${PDFJS_PACKAGE_NAME}/package.json`);
+
+  const packageDistBuildPath =
+    tryResolvePdfJsPath(`${PDFJS_PACKAGE_NAME}/dist/build/pdf.mjs`) ??
+    tryResolvePdfJsPath(`${PDFJS_PACKAGE_NAME}/dist/build/pdf.js`);
+  if (packageJsonPath && packageDistBuildPath) {
+    return {
+      packageDir: dirname(packageJsonPath),
+      distDir: dirname(dirname(packageDistBuildPath)),
+    };
+  }
+
+  throw new Error(
+    `Unable to locate PDF.js dist assets in ${PDFJS_PACKAGE_NAME}. ` +
+      "Expected package shell layout with dist/build/pdf.mjs.",
+  );
+}
 
 function toPublicPath(path: string): string {
   return path.replaceAll("\\", "/");
@@ -284,17 +331,16 @@ async function addPatchedLocaleDirectoryAssets(
 }
 
 async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void> {
-  const release = await readPdfJsReleaseMetadata(PDFJS_RELEASE_META_PATH);
-  await assertPdfJsUpstreamMatchesLock(release);
+  const release = await readPdfJsReleaseMetadata();
 
   addFileAsset(files, join(PDFJS_DIST_DIR, "LICENSE"), "pdf/LICENSE");
   files.push({
     contents: `${release.version}\n`,
     relativeDest: "pdf/PDFJS_VERSION",
   });
-  addFileAsset(
+  addTextAsset(
     files,
-    PDFJS_RELEASE_META_PATH,
+    `${JSON.stringify(release, null, 2)}\n`,
     "pdf/PDFJS_RELEASE.json",
   );
 
@@ -303,10 +349,16 @@ async function addPdfViewerPublicAssets(files: PublicAssetFile[]): Promise<void>
   await addDirectoryAssets(files, INTER_FONT_DIR, "pdf/web/fonts/inter");
 }
 
+async function readPdfJsReleaseMetadata(): Promise<PdfJsReleaseMetadata> {
+  const release = await readPdfJsReleaseMetadataFile(PDFJS_RELEASE_META_PATH);
+  await assertPdfJsUpstreamMatchesLock(release);
+  return release;
+}
+
 async function assertPdfJsUpstreamMatchesLock(
   release: PdfJsReleaseMetadata,
 ): Promise<void> {
-  const lock = await readPdfJsReleaseMetadata(PDFJS_RELEASE_LOCK_PATH);
+  const lock = await readPdfJsReleaseMetadataFile(PDFJS_RELEASE_LOCK_PATH);
   const mismatchedField = (
     [
       "source",
@@ -321,11 +373,11 @@ async function assertPdfJsUpstreamMatchesLock(
   if (!mismatchedField) return;
 
   throw new Error(
-    `PDF.js dist does not match pdfjs-release.lock.json (${mismatchedField}). Run "bun run pdfjs:ensure".`,
+    `PDF.js dist package metadata mismatch (${mismatchedField}). Update @onelingo/pdfjs-dist.`,
   );
 }
 
-async function readPdfJsReleaseMetadata(
+async function readPdfJsReleaseMetadataFile(
   path: string,
 ): Promise<PdfJsReleaseMetadata> {
   let contents: string;
@@ -338,28 +390,41 @@ async function readPdfJsReleaseMetadata(
       (error as NodeJS.ErrnoException).code === "ENOENT"
     ) {
       throw new Error(
-        `Missing PDF.js assets at ${path}. Run "bun run pdfjs:ensure".`,
+        `Missing PDF.js assets at ${path}. Check @onelingo/pdfjs-dist installation.`,
       );
     }
     throw error;
   }
 
   const parsed = JSON.parse(contents) as Partial<PdfJsReleaseMetadata>;
-  for (const field of [
+  const requiredFields = [
     "source",
     "version",
+  ] as const;
+  for (const field of requiredFields) {
+    if (typeof parsed[field] !== "string" || !parsed[field]) {
+      throw new Error(
+        `${path} is missing ${field}. Check @onelingo/pdfjs-dist installation.`,
+      );
+    }
+  }
+  if (parsed.source !== "github-release-dist") {
+    throw new Error(`${path} has unsupported PDF.js source ${parsed.source}.`);
+  }
+
+  const requiredReleaseFields = [
     "tag",
     "releaseName",
     "assetName",
     "browserDownloadUrl",
     "sha256",
-  ] as const) {
+  ] as const;
+  for (const field of requiredReleaseFields) {
     if (typeof parsed[field] !== "string" || !parsed[field]) {
-      throw new Error(`${path} is missing ${field}. Run "bun run pdfjs:ensure".`);
+      throw new Error(
+        `${path} is missing ${field}. Check @onelingo/pdfjs-dist installation.`,
+      );
     }
-  }
-  if (parsed.source !== "github-release-dist") {
-    throw new Error(`${path} has unsupported PDF.js source ${parsed.source}.`);
   }
   return parsed as PdfJsReleaseMetadata;
 }
@@ -383,6 +448,7 @@ async function addPdfJsUpstreamAssets(
       continue;
     }
     if (!entry.isFile() || entry.name.endsWith(".map")) continue;
+    if (entry.name.startsWith(".")) continue;
     if (relativeSrc === "PDFJS_RELEASE.json" || relativeSrc === "LICENSE") continue;
     await addPdfJsUpstreamFileAsset(files, absoluteSrc, relativeSrc);
   }

@@ -3,9 +3,6 @@
   "description": "manifest.json description",
   "private": true,
   "version": "0.0.0",
-  "workspaces": [
-    "vendor/*"
-  ],
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -13,14 +10,10 @@
     "build": "bun --bun node_modules/wxt/bin/wxt.mjs build",
     "build:firefox": "bun --bun node_modules/wxt/bin/wxt.mjs build -b firefox",
     "i18n:generate": "bun scripts/generate-i18n.ts",
-    "pdfjs:ensure": "bun scripts/update-pdfjs.ts --ensure",
-    "pdfjs:update": "bun scripts/update-pdfjs.ts",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "bun --bun node_modules/typescript/bin/tsc --noEmit",
-    "prebuild": "bun scripts/update-pdfjs.ts --ensure",
-    "prebuild:firefox": "bun scripts/update-pdfjs.ts --ensure",
-    "postinstall": "bun scripts/update-pdfjs.ts --ensure && bun --bun node_modules/wxt/bin/wxt.mjs prepare"
+    "postinstall": "bun --bun node_modules/wxt/bin/wxt.mjs prepare"
   },
   "dependencies": {
     "epubjs": "^0.3.93",
@@ -28,7 +21,7 @@
   },
   "devDependencies": {
     "@wxt-dev/module-solid": "^1.1.4",
-    "@onelingo/pdfjs-dist": "workspace:*",
+    "@onelingo/pdfjs-dist": "git@github.com:owlx56/pdfjs-dist.git#v5.7.284",
     "typescript": "^5.9.3",
     "wxt": "^0.20.23"
   }

@@ -12,9 +12,8 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 | `src/entrypoints/epub-viewer.ts` | 输出 `/epub-viewer.js` 的薄入口；挂载 EPUB Solid viewer |
 | `src/entrypoints/epub/App.tsx` | EPUB reader UI；接收 `onelingo-key`、`file`、`onelingo-sniff=1` 并用 `epubjs` 渲染 |
 | `src/entrypoints/epub/bridge.ts` | EPUB iframe 内 hover / selection 桥接；直接绑定 EPUB 内容文档 |
-| `vendor/pdfjs-dist/package.json` | Bun workspace 包 `@onelingo/pdfjs-dist`；让 PDF.js release dist 以本地包身份接入依赖图 |
-| `vendor/pdfjs-dist/pdfjs-release.lock.json` | 提交到仓库的 PDF.js release 锁；记录版本、下载 URL 和 sha256 |
-| `vendor/pdfjs-dist/dist/` | ignored 本地生成目录；由 `scripts/update-pdfjs.ts` 从 GitHub `pdfjs-*-dist.zip` 按 lock 恢复官方 PDF.js release dist；不要手改 |
+| `@onelingo/pdfjs-dist` | 私有 Git 依赖仓库 `owlx56/pdfjs-dist`；根目录是 package shell，官方 `pdfjs-*-dist.zip` 展开内容放在 `dist/` |
+| `package.json` / `bun.lock` | OneLingo 只在这里锁定 `@onelingo/pdfjs-dist` 的具体 Git tag；当前为 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284` |
 | `src/assets/epub-viewer/` | OneLingo EPUB 静态 shell，构建时复制到 `/epub/web/` |
 | `src/assets/pdf-viewer/locales.generated.mjs` | 由 `scripts/generate-i18n.ts` 生成的 PDF reader 静态语言包 |
 | `src/features/document-sniffer.ts` | content script 层的页面内 PDF / EPUB 链接点击拦截 |
@@ -46,23 +45,23 @@ options / context menu / sniffer
 
 ## PDF.js 资产
 
-PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上游来源，并加载官方 PDF.js `viewer.html` / `viewer.js|mjs` / `viewer.css` shell。当前 lock 固定在 `5.7.284`；不要再用自定义 `PDFViewer` 外壳替代官方 viewer，也不要把官方 viewer 放进 OneLingo iframe，否则 Chrome / Less / Saladict 一致的双击选词边界会重新偏移。
+PDF reader 使用 `@onelingo/pdfjs-dist` 私有 Git 依赖提供 GitHub release `pdfjs-*-dist.zip` 的展开内容，并加载官方 PDF.js `viewer.html` / `viewer.js|mjs` / `viewer.css` shell。当前依赖锁定在 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，PDF.js 版本为 `5.7.284`；不要再用自定义 `PDFViewer` 外壳替代官方 viewer，也不要把官方 viewer 放进 OneLingo iframe，否则 Chrome / Less / Saladict 一致的双击选词边界会重新偏移。
 
-`vendor/pdfjs-dist/dist/` 不提交到 git。新 clone、CI 或本地目录丢失时运行 `bun run pdfjs:ensure`，脚本会读取 `vendor/pdfjs-dist/pdfjs-release.lock.json`，按锁定 URL 下载 release zip，校验 sha256，然后恢复 dist。`bun run pdfjs:update -- --version <version>` 和 `bun run pdfjs:update -- --latest` 才会改变 lock，并同步 `vendor/pdfjs-dist/package.json` 的版本。
+OneLingo 不再下载或解压 PDF.js release zip。私有 `owlx56/pdfjs-dist` 仓库负责用脚本/CI 同步 Mozilla release zip；OneLingo 只在 `package.json` / `bun.lock` 中锁定该 Git 依赖的具体 tag。升级 PDF.js 时，先更新自建仓库，再更新 OneLingo 依赖引用并运行 `bun install`。
 
 `wxt.config.ts` 的 `build:publicAssets` 会复制：
 
-- `vendor/pdfjs-dist/dist/build/` 下的 PDF.js runtime、worker、sandbox
-- `vendor/pdfjs-dist/dist/web/viewer.html`
-- `vendor/pdfjs-dist/dist/web/viewer.js|mjs`
-- `vendor/pdfjs-dist/dist/web/viewer.css`
-- `vendor/pdfjs-dist/dist/web/locale/`
-- `vendor/pdfjs-dist/dist/web/cmaps/`、`standard_fonts/`、`wasm/`、`iccs/`、`images/`
+- `@onelingo/pdfjs-dist/dist/build/` 下的 PDF.js runtime、worker、sandbox
+- `@onelingo/pdfjs-dist/dist/web/viewer.html`
+- `@onelingo/pdfjs-dist/dist/web/viewer.js|mjs`
+- `@onelingo/pdfjs-dist/dist/web/viewer.css`
+- `@onelingo/pdfjs-dist/dist/web/locale/`
+- `@onelingo/pdfjs-dist/dist/web/cmaps/`、`standard_fonts/`、`wasm/`、`iccs/`、`images/`
 - `src/assets/fonts/inter/`
 
-旧版 PDF.js 使用 `vendor/pdfjs-dist/dist/web/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。新版 PDF.js 使用 Fluent `viewer.ftl` / `locale.json` 时直接复制官方 locale 目录。
+旧版 PDF.js 使用 `@onelingo/pdfjs-dist/dist/web/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。新版 PDF.js 使用 Fluent `viewer.ftl` / `locale.json` 时直接复制官方 locale 目录。
 
-`prepare:publicPaths` 会把 `pdf/web/viewer.html` 和 `epub/web/viewer.html` 加入 public path。`wxt.config.ts` 会在复制前校验 `vendor/pdfjs-dist/dist/PDFJS_RELEASE.json` 与 `vendor/pdfjs-dist/pdfjs-release.lock.json` 完全一致；不一致时运行 `bun run pdfjs:ensure`。改 PDF.js 版本时只运行 `bun run pdfjs:update -- --version <version>` 或 `--latest`，让脚本更新 lock 并重建 `vendor/pdfjs-dist/dist/`；不要手改 dist 或 `.output/`。`wxt.config.ts` 会在复制时注入 `/pdf-viewer.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
+`prepare:publicPaths` 会把 `pdf/web/viewer.html` 和 `epub/web/viewer.html` 加入 public path。`wxt.config.ts` 会通过 Node 模块解析定位已安装的 `@onelingo/pdfjs-dist`，只接受包壳里的 `dist/build/pdf.mjs` / `dist/build/pdf.js` 布局，并用 `dist/PDFJS_RELEASE.json` 和 `pdfjs-release.lock.json` 做一致性校验。`wxt.config.ts` 会在复制时注入 `/pdf-viewer.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
 
 ## Reader 翻译
 
@@ -140,7 +139,6 @@ options、popup、EPUB reader、PDF reader 使用打包的 Inter 字体。字体
 
 ```powershell
 bun run i18n:generate
-bun run pdfjs:ensure
 bun test .\src\lib\i18n\index.test.js
 bun run compile
 bun run build

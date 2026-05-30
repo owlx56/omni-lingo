@@ -9,15 +9,11 @@
         "solid-js": "^1.9.11",
       },
       "devDependencies": {
-        "@onelingo/pdfjs-dist": "workspace:*",
+        "@onelingo/pdfjs-dist": "git@github.com:owlx56/pdfjs-dist.git#v5.7.284",
         "@wxt-dev/module-solid": "^1.1.4",
         "typescript": "^5.9.3",
         "wxt": "^0.20.23",
       },
-    },
-    "vendor/pdfjs-dist": {
-      "name": "@onelingo/pdfjs-dist",
-      "version": "5.7.284",
     },
   },
   "packages": {
@@ -141,7 +137,7 @@
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.1.4", "", { "dependencies": { "@tybys/wasm-util": "^0.10.1" }, "peerDependencies": { "@emnapi/core": "^1.7.1", "@emnapi/runtime": "^1.7.1" } }, "sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow=="],
 
-    "@onelingo/pdfjs-dist": ["@onelingo/pdfjs-dist@workspace:vendor/pdfjs-dist"],
+    "@onelingo/pdfjs-dist": ["@onelingo/pdfjs-dist@git+ssh://git@github.com:owlx56/pdfjs-dist.git#f6d13992bc15c5d736a70ff31e0297a3993be88b", {}, "f6d13992bc15c5d736a70ff31e0297a3993be88b"],
 
     "@oxc-project/types": ["@oxc-project/types@0.124.0", "", {}, "sha512-VBFWMTBvHxS11Z5Lvlr3IWgrwhMTXV+Md+EQF0Xf60+wAdsGFTBx7X7K/hP4pi8N7dcm1RvcHwDxZ16Qx8keUg=="],
 

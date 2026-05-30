@@ -79,7 +79,7 @@ options / popup / EPUB viewer / PDF viewer 的界面文案都走 `src/lib/i18n/c
 
 文档阅读器边界见 `docs/document-viewer.md`。简要规则：
 
-- PDF reader 使用 GitHub release 的 `pdfjs-*-dist.zip` 作为唯一 PDF.js 上游来源；Bun workspace 包在 `vendor/pdfjs-dist/`，版本锁在 `vendor/pdfjs-dist/pdfjs-release.lock.json`，本地 `vendor/pdfjs-dist/dist/` 由 `bun run pdfjs:ensure` 生成且不提交。升级版本只用 `bun run pdfjs:update -- --version <version>` 或 `--latest`。不要手改 dist 或 `.output/`。
+- PDF reader 使用 `@onelingo/pdfjs-dist` 私有 Git 依赖提供官方 GitHub release `pdfjs-*-dist.zip` 的展开内容；当前锁定 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，依赖根目录是包壳，官方 release dist 在 `dist/build/`、`dist/web/`、`dist/LICENSE`。不要手改已安装依赖或 `.output/`。
 - PDF 内置 viewer 必须保持官方 PDF.js `viewer.html` / `viewer.js` / `viewer.css` 的布局和 textLayer 环境，避免自定义 `PDFViewer` 外壳导致双击选词边界和 hover 精度偏移。
 - PDF hover 默认直接复用 `src/features/hover/` 的通用逻辑。遇到 PDF hover 精度问题，先检查是否仍在顶层官方 viewer 里运行，再检查 reader UI 边界和 textLayer 命中；不要先验地恢复 PDF-specific hover 分支。
 - EPUB 主路径使用 `epubjs`，reader shell 公开为 `/epub/web/viewer.html`，实现放在 `src/entrypoints/epub/App.tsx`，iframe 内容桥接在 `src/entrypoints/epub/bridge.ts`；hover 编排优先复用 `src/features/hover/`，bridge 只保留 iframe 文档绑定和坐标转换。
