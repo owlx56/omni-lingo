@@ -16,7 +16,7 @@
     "postinstall": "bun --bun node_modules/wxt/bin/wxt.mjs prepare"
   },
   "dependencies": {
-    "epubjs": "^0.3.93",
+    "epubjs": "git+ssh://git@github.com/futurepress/epub.js.git#master",
     "solid-js": "^1.9.11"
   },
   "devDependencies": {
