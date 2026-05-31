@@ -221,6 +221,105 @@ function patchPdfViewerScript(contents: string, filename: string): string {
   return next;
 }
 
+function patchFoliatePaginatorScript(contents: string): string {
+  let next = contents;
+
+  const goToNeedle =
+    "    async #goTo({ index, anchor, select}) {\n" +
+    "        if (index === this.#index) await this.#display({ index, anchor, select })\n";
+  if (next.includes(goToNeedle)) {
+    next = next.replace(
+      goToNeedle,
+      "    async #goTo({ index, anchor, select}) {\n" +
+        "        if (index == null || !this.sections[index]) return\n" +
+        "        if (index === this.#index) await this.#display({ index, anchor, select })\n",
+    );
+  }
+
+  const publicGoToNeedle =
+    "    async goTo(target) {\n" +
+    "        if (this.#locked) return\n" +
+    "        const resolved = await target\n" +
+    "        if (this.#canGoToIndex(resolved.index)) return this.#goTo(resolved)\n" +
+    "    }";
+  if (next.includes(publicGoToNeedle)) {
+    next = next.replace(
+      publicGoToNeedle,
+      "    async goTo(target) {\n" +
+        "        if (this.#locked) return\n" +
+        "        const resolved = await target\n" +
+        "        if (!resolved || !this.#canGoToIndex(resolved.index)) return\n" +
+        "        return this.#goTo(resolved)\n" +
+        "    }",
+    );
+  }
+
+  const turnPageNeedle =
+    "    async #turnPage(dir, distance) {\n" +
+    "        if (this.#locked) return\n" +
+    "        this.#locked = true\n" +
+    "        const prev = dir === -1\n" +
+    "        const shouldGo = await (prev ? this.#scrollPrev(distance) : this.#scrollNext(distance))\n" +
+    "        if (shouldGo) await this.#goTo({\n" +
+    "            index: this.#adjacentIndex(dir),\n" +
+    "            anchor: prev ? () => 1 : () => 0,\n" +
+    "        })\n" +
+    "        if (shouldGo || !this.hasAttribute('animated')) await wait(100)\n" +
+    "        this.#locked = false\n" +
+    "    }";
+  if (next.includes(turnPageNeedle)) {
+    next = next.replace(
+      turnPageNeedle,
+      "    async #turnPage(dir, distance) {\n" +
+        "        if (this.#locked) return\n" +
+        "        this.#locked = true\n" +
+        "        try {\n" +
+        "            const prev = dir === -1\n" +
+        "            const shouldGo = await (prev ? this.#scrollPrev(distance) : this.#scrollNext(distance))\n" +
+        "            if (shouldGo) {\n" +
+        "                const index = this.#adjacentIndex(dir)\n" +
+        "                if (index == null) return\n" +
+        "                await this.#goTo({\n" +
+        "                    index,\n" +
+        "                    anchor: prev ? () => 1 : () => 0,\n" +
+        "                })\n" +
+        "            }\n" +
+        "            if (shouldGo || !this.hasAttribute('animated')) await wait(100)\n" +
+        "        } finally {\n" +
+        "            this.#locked = false\n" +
+        "        }\n" +
+        "    }",
+    );
+  }
+
+  if (!next.includes("if (index == null || !this.sections[index]) return")) {
+    throw new Error("Unable to patch Foliate paginator navigation guards.");
+  }
+  return next;
+}
+
+function patchFoliateIframeSandbox(contents: string): string {
+  const replacement =
+    "        this.#iframe.setAttribute('sandbox',\n" +
+    "            /AppleWebKit/.test(navigator.userAgent) &&\n" +
+    "            !/(Chrome|Chromium|Edg|OPR)/.test(navigator.userAgent)\n" +
+    "                ? 'allow-same-origin allow-scripts'\n" +
+    "                : 'allow-same-origin')";
+  const paginatorNeedle =
+    "        this.#iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts')";
+  const fixedLayoutNeedle =
+    "        iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts')";
+
+  let next = contents;
+  if (next.includes(paginatorNeedle)) {
+    next = next.replace(paginatorNeedle, replacement);
+  }
+  if (next.includes(fixedLayoutNeedle)) {
+    next = next.replace(fixedLayoutNeedle, replacement.replace("this.#iframe", "iframe"));
+  }
+  return next;
+}
+
 function patchPdfViewerLocaleContents(
   contents: string,
   fallbackProps: ViewerProperties,
@@ -459,9 +558,28 @@ async function addEpubViewerPublicAssets(files: PublicAssetFile[]): Promise<void
 
 async function addFoliateJsPublicAssets(files: PublicAssetFile[]): Promise<void> {
   for (const relativePath of FOLIATE_JS_RUNTIME_FILES) {
+    const absoluteSrc = join(FOLIATE_JS_PACKAGE_DIR, relativePath);
+    if (relativePath === "paginator.js") {
+      addTextAsset(
+        files,
+        patchFoliateIframeSandbox(
+          patchFoliatePaginatorScript(await readFile(absoluteSrc, "utf8")),
+        ),
+        join(FOLIATE_JS_PUBLIC_DIR, relativePath),
+      );
+      continue;
+    }
+    if (relativePath === "fixed-layout.js") {
+      addTextAsset(
+        files,
+        patchFoliateIframeSandbox(await readFile(absoluteSrc, "utf8")),
+        join(FOLIATE_JS_PUBLIC_DIR, relativePath),
+      );
+      continue;
+    }
     addFileAsset(
       files,
-      join(FOLIATE_JS_PACKAGE_DIR, relativePath),
+      absoluteSrc,
       join(FOLIATE_JS_PUBLIC_DIR, relativePath),
     );
   }
