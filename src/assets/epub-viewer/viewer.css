@@ -180,6 +180,14 @@ body {
     background: var(--surface);
 }
 
+.epub-shell > .viewer-loading,
+.epub-shell > .viewer-error {
+    position: absolute;
+    inset: 0;
+    z-index: 40;
+    background: var(--surface);
+}
+
 .epub-sidebar {
     position: absolute;
     z-index: 20;

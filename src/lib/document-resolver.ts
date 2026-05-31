@@ -23,7 +23,7 @@ export async function fetchDocumentFromUrl(
   const resource = await fetchResolvableResource(url, preferred, 0);
   const format = inferFetchedFormat(resource, preferred);
   if (!format) {
-    throw new Error("Unsupported document URL. Expected a PDF or EPUB file.");
+    throw new Error("Unsupported document URL. Expected a PDF or foliate book file.");
   }
   return {
     data: resource.data,
@@ -133,7 +133,9 @@ function discoverUrlInScript(
 
   if (!options.allowLooseDocumentUrl) return null;
 
-  const docUrlMatch = source.match(/["']([^"']+\.(?:pdf|epub)(?:[?#][^"']*)?)["']/i);
+  const docUrlMatch = source.match(
+    /["']([^"']+\.(?:pdf|epub|mobi|azw3|kf8|fb2|fb2\.zip|fbz)(?:[?#][^"']*)?)["']/i,
+  );
   const docUrl = absoluteUrl(docUrlMatch?.[1] ?? null, baseUrl);
   return docUrl && looksLikeDocumentUrl(docUrl, preferred) ? docUrl : null;
 }
@@ -145,10 +147,24 @@ function inferFetchedFormat(
   const mime = resource.mimeType.toLowerCase();
   const lowerUrl = resource.url.split(/[?#]/)[0]?.toLowerCase() ?? "";
   if (mime === "application/pdf" || lowerUrl.endsWith(".pdf")) return "pdf";
-  if (mime === "application/epub+zip" || lowerUrl.endsWith(".epub")) return "epub";
+  if (
+    mime === "application/epub+zip" ||
+    mime === "application/x-fictionbook+xml" ||
+    mime === "application/x-zip-compressed-fb2" ||
+    lowerUrl.endsWith(".epub") ||
+    lowerUrl.endsWith(".mobi") ||
+    lowerUrl.endsWith(".azw3") ||
+    lowerUrl.endsWith(".kf8") ||
+    lowerUrl.endsWith(".fb2") ||
+    lowerUrl.endsWith(".fb2.zip") ||
+    lowerUrl.endsWith(".fbz")
+  ) {
+    return "foliate";
+  }
   const prefix = new TextDecoder("latin1").decode(resource.data.slice(0, 8));
   if (prefix.startsWith("%PDF")) return "pdf";
-  if (prefix.startsWith("PK")) return "epub";
+  if (prefix.startsWith("BOOK")) return "foliate";
+  if (prefix.startsWith("PK")) return "foliate";
   return null;
 }
 
@@ -173,8 +189,27 @@ function looksLikeDocumentOrHtmlShell(
 function looksLikeDocumentUrl(url: string, preferred: ViewerFormat): boolean {
   const lower = url.split(/[?#]/)[0]?.toLowerCase() ?? "";
   if (preferred === "pdf") return lower.endsWith(".pdf");
-  if (preferred === "epub") return lower.endsWith(".epub");
-  return lower.endsWith(".pdf") || lower.endsWith(".epub");
+  if (preferred === "foliate" || preferred === "epub") {
+    return (
+      lower.endsWith(".epub") ||
+      lower.endsWith(".mobi") ||
+      lower.endsWith(".azw3") ||
+      lower.endsWith(".kf8") ||
+      lower.endsWith(".fb2") ||
+      lower.endsWith(".fb2.zip") ||
+      lower.endsWith(".fbz")
+    );
+  }
+  return (
+    lower.endsWith(".pdf") ||
+    lower.endsWith(".epub") ||
+    lower.endsWith(".mobi") ||
+    lower.endsWith(".azw3") ||
+    lower.endsWith(".kf8") ||
+    lower.endsWith(".fb2") ||
+    lower.endsWith(".fb2.zip") ||
+    lower.endsWith(".fbz")
+  );
 }
 
 function absoluteUrl(raw: string | null | undefined, baseUrl: string): string | null {

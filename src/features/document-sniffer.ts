@@ -3,6 +3,7 @@ import type { UiLang } from "@/lib/languages";
 import {
   documentViewerUrlForUrl,
   isLikelyPdfUrl,
+  isLikelyFoliateUrl,
 } from "@/lib/document-viewer-urls";
 
 interface SnifferState {
@@ -12,7 +13,7 @@ interface SnifferState {
   uiLang: UiLang;
 }
 
-const DOCUMENT_URL_RE = /\.(?:pdf|epub)(?:$|[?#])/i;
+const DOCUMENT_URL_RE = /\.(?:pdf|epub|mobi|azw3|kf8|fb2|fb2\.zip|fbz)(?:$|[?#])/i;
 
 export function initDocumentLinkSniffer(): void {
   const state: SnifferState = {
@@ -64,7 +65,7 @@ export function initDocumentLinkSniffer(): void {
 function viewerUrlForDocument(url: string, uiLang: UiLang): string {
   return documentViewerUrlForUrl(
     url,
-    isLikelyPdfUrl(url) ? "pdf" : "auto",
+    isLikelyPdfUrl(url) ? "pdf" : isLikelyFoliateUrl(url) ? "foliate" : "auto",
     uiLang,
   );
 }

@@ -14,8 +14,8 @@ import { browser, type Browser } from "wxt/browser";
 import type { UiLang } from "@/lib/languages";
 import {
   documentViewerUrlForUrl,
-  epubViewerUrlForSniff,
-  isEpubViewerUrl,
+  foliateViewerUrlForSniff,
+  isFoliateViewerUrl,
   isPdfViewerUrl,
   isReaderShellUrl,
   pdfViewerUrlForSniff,
@@ -25,17 +25,20 @@ import {
 const OPEN_LINK_IN_VIEWER_MENU = "onelingo-open-link-in-viewer";
 const OPEN_PAGE_IN_VIEWER_MENU = "onelingo-open-page-in-viewer";
 const OPEN_IN_VIEWER_TITLE = "Open in OneLingo Reader";
-const DOCUMENT_URL_RE = /\.(?:pdf|epub)(?:$|[?#])/i;
+const DOCUMENT_URL_RE = /\.(?:pdf|epub|mobi|azw3|kf8|fb2|fb2\.zip|fbz)(?:$|[?#])/i;
 const SNIFFED_DOCUMENT_STORAGE_PREFIX = "onelingo:sniffed-document:";
 const DOCUMENT_SNIFF_RULE_IDS = [42001, 42002, 42003, 42004, 42005, 42006];
 const DOCUMENT_SNIFF_BYPASS_RULE_ID_START = 42100;
 const DOCUMENT_SNIFF_BYPASS_RULE_ID_COUNT = 32;
 const HTTP_PDF_URL_REGEX = "^https?://.*\\.[Pp][Dd][Ff](?:$|[?#].*)?";
-const HTTP_EPUB_URL_REGEX = "^https?://.*\\.[Ee][Pp][Uu][Bb](?:$|[?#].*)?";
+const HTTP_FOLIATE_URL_REGEX =
+  "^https?://.*\\.(?:[Ee][Pp][Uu][Bb]|[Mm][Oo][Bb][Ii]|[Aa][Zz][Ww]3|[Kk][Ff]8|[Ff][Bb]2(?:\\.zip)?|[Ff][Bb][Zz])(?:$|[?#].*)?";
 const DOCUMENT_RESPONSE_TYPES = new Set([
   "application/pdf",
   "application/epub+zip",
   "application/x-pdf",
+  "application/x-fictionbook+xml",
+  "application/x-zip-compressed-fb2",
 ]);
 
 interface DocumentSniffState {
@@ -338,7 +341,7 @@ async function syncDocumentSniffRules(state: DocumentSniffState): Promise<void> 
 
 function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
   const pdfRedirect = { url: pdfViewerUrlForSniff() };
-  const epubRedirect = { url: epubViewerUrlForSniff() };
+  const foliateRedirect = { url: foliateViewerUrlForSniff() };
   const resourceTypes: Array<`${Browser.declarativeNetRequest.ResourceType}`> = [
     "main_frame",
   ];
@@ -365,20 +368,26 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
     {
       id: DOCUMENT_SNIFF_RULE_IDS[2]!,
       priority: 1,
-      action: { type: "redirect", redirect: epubRedirect },
+      action: { type: "redirect", redirect: foliateRedirect },
       condition: {
-        regexFilter: HTTP_EPUB_URL_REGEX,
+        regexFilter: HTTP_FOLIATE_URL_REGEX,
         resourceTypes,
       },
     },
     {
       id: DOCUMENT_SNIFF_RULE_IDS[3]!,
       priority: 1,
-      action: { type: "redirect", redirect: epubRedirect },
+      action: { type: "redirect", redirect: foliateRedirect },
       condition: {
         regexFilter: "^https?://.*",
         resourceTypes,
-        responseHeaders: [{ header: "content-type", values: ["*epub*"] }],
+        responseHeaders: [
+          { header: "content-type", values: ["*epub*"] },
+          { header: "content-type", values: ["*fictionbook*"] },
+          { header: "content-type", values: ["*fb2*"] },
+          { header: "content-type", values: ["*mobi*"] },
+          { header: "content-type", values: ["*amazon.ebook*"] },
+        ],
       },
     },
     {
@@ -396,9 +405,9 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
     {
       id: DOCUMENT_SNIFF_RULE_IDS[5]!,
       priority: 1,
-      action: { type: "redirect", redirect: epubRedirect },
+      action: { type: "redirect", redirect: foliateRedirect },
       condition: {
-        regexFilter: HTTP_EPUB_URL_REGEX,
+        regexFilter: HTTP_FOLIATE_URL_REGEX,
         resourceTypes,
         responseHeaders: [
           { header: "content-type", values: ["application/octet-stream*"] },
@@ -690,13 +699,13 @@ function isDocumentResponse(
 }
 
 function isExtensionViewerUrl(url: string): boolean {
-  return isReaderShellUrl(url) || isPdfViewerUrl(url) || isEpubViewerUrl(url);
+  return isReaderShellUrl(url) || isPdfViewerUrl(url) || isFoliateViewerUrl(url);
 }
 
 function sniffedFormatFromSender(
   sender: Browser.runtime.MessageSender,
 ): ViewerFormat {
   const url = sender.url ?? sender.tab?.url ?? "";
-  if (isEpubViewerUrl(url)) return "epub";
+  if (isFoliateViewerUrl(url)) return "foliate";
   return isPdfViewerUrl(url) ? "pdf" : "auto";
 }

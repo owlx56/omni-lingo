@@ -16,7 +16,7 @@
     "postinstall": "bun --bun node_modules/wxt/bin/wxt.mjs prepare"
   },
   "dependencies": {
-    "epubjs": "github:futurepress/epub.js#master",
+    "foliate-js": "github:johnfactotum/foliate-js#78914aef4466eb960965702401634c2cb348e9b1",
     "solid-js": "^1.9.11"
   },
   "devDependencies": {

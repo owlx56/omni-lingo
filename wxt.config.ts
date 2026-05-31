@@ -27,6 +27,7 @@ const require = createRequire(import.meta.url);
 const PDFJS_DIST_PACKAGE = resolvePdfJsDistPackage();
 const PDFJS_DIST_PACKAGE_DIR = PDFJS_DIST_PACKAGE.packageDir;
 const PDFJS_DIST_DIR = PDFJS_DIST_PACKAGE.distDir;
+const FOLIATE_JS_PACKAGE_DIR = join(ROOT_DIR, "node_modules", "foliate-js");
 const PDFJS_RELEASE_LOCK_PATH = join(
   PDFJS_DIST_PACKAGE_DIR,
   "pdfjs-release.lock.json",
@@ -34,6 +35,29 @@ const PDFJS_RELEASE_LOCK_PATH = join(
 const PDFJS_RELEASE_META_PATH = join(PDFJS_DIST_DIR, "PDFJS_RELEASE.json");
 const EPUB_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "epub-viewer");
 const INTER_FONT_DIR = join(ROOT_DIR, "src", "assets", "fonts", "inter");
+const FOLIATE_JS_PUBLIC_DIR = "epub/web/foliate-js";
+const FOLIATE_JS_RUNTIME_FILES = [
+  "comic-book.js",
+  "epub.js",
+  "epubcfi.js",
+  "fb2.js",
+  "fixed-layout.js",
+  "mobi.js",
+  "overlayer.js",
+  "pdf.js",
+  "paginator.js",
+  "progress.js",
+  "search.js",
+  "text-walker.js",
+  "tts.js",
+  "view.js",
+  "vendor/fflate.js",
+  "vendor/zip.js",
+  "vendor/pdfjs/annotation_layer_builder.css",
+  "vendor/pdfjs/pdf.mjs",
+  "vendor/pdfjs/pdf.worker.mjs",
+  "vendor/pdfjs/text_layer_builder.css",
+];
 const PDF_VIEWER_LOCALE_ALIASES: Record<string, string[]> = {
   "bookmark1.title": ["bookmark.title"],
   bookmark1_label: ["bookmark_label"],
@@ -433,6 +457,26 @@ async function addEpubViewerPublicAssets(files: PublicAssetFile[]): Promise<void
   await addDirectoryAssets(files, EPUB_VIEWER_ASSET_DIR, "epub/web");
 }
 
+async function addFoliateJsPublicAssets(files: PublicAssetFile[]): Promise<void> {
+  for (const relativePath of FOLIATE_JS_RUNTIME_FILES) {
+    addFileAsset(
+      files,
+      join(FOLIATE_JS_PACKAGE_DIR, relativePath),
+      join(FOLIATE_JS_PUBLIC_DIR, relativePath),
+    );
+  }
+  await addDirectoryAssets(
+    files,
+    join(FOLIATE_JS_PACKAGE_DIR, "vendor", "pdfjs", "cmaps"),
+    join(FOLIATE_JS_PUBLIC_DIR, "vendor", "pdfjs", "cmaps"),
+  );
+  await addDirectoryAssets(
+    files,
+    join(FOLIATE_JS_PACKAGE_DIR, "vendor", "pdfjs", "standard_fonts"),
+    join(FOLIATE_JS_PUBLIC_DIR, "vendor", "pdfjs", "standard_fonts"),
+  );
+}
+
 async function addPdfJsUpstreamAssets(
   files: PublicAssetFile[],
   absoluteSrcDir = PDFJS_DIST_DIR,
@@ -666,10 +710,14 @@ export default defineConfig({
       if (!paths.includes("epub/web/viewer.html")) {
         paths.push("epub/web/viewer.html");
       }
+      if (!paths.includes("epub/web/foliate-js/view.js")) {
+        paths.push("epub/web/foliate-js/view.js");
+      }
     },
     "build:publicAssets": async (_wxt, files) => {
       await addPdfViewerPublicAssets(files);
       await addEpubViewerPublicAssets(files);
+      await addFoliateJsPublicAssets(files);
     },
   },
   webExt: {

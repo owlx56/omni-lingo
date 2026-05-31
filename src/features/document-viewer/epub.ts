@@ -124,7 +124,7 @@ export async function parseEpub(source: DocumentSource): Promise<ReaderDocument>
 
   return {
     cleanup: () => objectUrls.forEach((url) => URL.revokeObjectURL(url)),
-    kind: "epub",
+    kind: "foliate",
     sections,
     sourceName: source.name,
     title,

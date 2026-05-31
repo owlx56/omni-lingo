@@ -8,8 +8,8 @@ import {
 import { loadDocument } from "@/lib/document-store";
 import { fetchDocumentFromUrl } from "@/lib/document-resolver";
 import {
-  epubViewerUrlForFile,
-  epubViewerUrlForStoredKey,
+  foliateViewerUrlForFile,
+  foliateViewerUrlForStoredKey,
   pdfViewerUrlForFile,
   pdfViewerUrlForStoredKey,
   type ViewerFormat,
@@ -82,7 +82,7 @@ function App(): JSX.Element {
       location.replace(
         doc.format === "pdf"
           ? pdfViewerUrlForStoredKey(key, settings().uiLang)
-          : epubViewerUrlForStoredKey(key),
+          : foliateViewerUrlForStoredKey(key),
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -100,7 +100,7 @@ function App(): JSX.Element {
         location.replace(pdfViewerUrlForFile(doc.url, settings().uiLang));
         return;
       }
-      location.replace(epubViewerUrlForFile(doc.url));
+      location.replace(foliateViewerUrlForFile(doc.url));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setState("error");

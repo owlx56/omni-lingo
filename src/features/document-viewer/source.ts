@@ -2,6 +2,9 @@ import type { DocumentKind, DocumentSource, ViewerFormat } from "./types";
 
 const PDF_MAGIC = "%PDF";
 const EPUB_MIME = "application/epub+zip";
+const FB2_MIME = "application/x-fictionbook+xml";
+const FBZ_MIME = "application/x-zip-compressed-fb2";
+const MOBI_MAGIC = "BOOKMOBI";
 
 export async function sourceFromFile(file: File): Promise<DocumentSource> {
   return {
@@ -28,16 +31,33 @@ export function inferDocumentKind(
   source: DocumentSource,
   preferred: ViewerFormat,
 ): DocumentKind | null {
-  if (preferred !== "auto") return preferred;
+  if (preferred === "pdf" || preferred === "foliate") return preferred;
+  if (preferred === "epub") return "foliate";
+  if (preferred !== "auto") return null;
 
   const name = source.name.toLowerCase();
   const mime = source.mimeType?.toLowerCase() ?? "";
   if (mime === "application/pdf" || name.endsWith(".pdf")) return "pdf";
-  if (mime === EPUB_MIME || name.endsWith(".epub")) return "epub";
+  if (
+    mime === EPUB_MIME ||
+    mime === FB2_MIME ||
+    mime === FBZ_MIME ||
+    name.endsWith(".epub") ||
+    name.endsWith(".mobi") ||
+    name.endsWith(".azw3") ||
+    name.endsWith(".kf8") ||
+    name.endsWith(".fb2") ||
+    name.endsWith(".fb2.zip") ||
+    name.endsWith(".fbz")
+  ) {
+    return "foliate";
+  }
 
   const prefix = new TextDecoder("latin1").decode(source.bytes.slice(0, 8));
   if (prefix.startsWith(PDF_MAGIC)) return "pdf";
-  if (prefix.startsWith("PK")) return "epub";
+  if (prefix.startsWith(MOBI_MAGIC)) return "foliate";
+  if (prefix.startsWith("BOOK")) return "foliate";
+  if (prefix.startsWith("PK")) return "foliate";
   return null;
 }
 
@@ -46,17 +66,32 @@ export function inferDocumentKindFromName(
   mimeType: string | undefined,
   preferred: ViewerFormat,
 ): DocumentKind | null {
-  if (preferred !== "auto") return preferred;
+  if (preferred === "pdf" || preferred === "foliate") return preferred;
+  if (preferred === "epub") return "foliate";
+  if (preferred !== "auto") return null;
 
   const lowerName = name.toLowerCase();
   const lowerMime = mimeType?.toLowerCase() ?? "";
   if (lowerMime === "application/pdf" || lowerName.endsWith(".pdf")) return "pdf";
-  if (lowerMime === EPUB_MIME || lowerName.endsWith(".epub")) return "epub";
+  if (
+    lowerMime === EPUB_MIME ||
+    lowerMime === FB2_MIME ||
+    lowerMime === FBZ_MIME ||
+    lowerName.endsWith(".epub") ||
+    lowerName.endsWith(".mobi") ||
+    lowerName.endsWith(".azw3") ||
+    lowerName.endsWith(".kf8") ||
+    lowerName.endsWith(".fb2") ||
+    lowerName.endsWith(".fb2.zip") ||
+    lowerName.endsWith(".fbz")
+  ) {
+    return "foliate";
+  }
   return null;
 }
 
 export function stripDocumentExtension(name: string): string {
-  return name.replace(/\.(pdf|epub)$/i, "") || name;
+  return name.replace(/\.(pdf|epub|mobi|azw3|kf8|fb2|fb2\.zip|fbz)$/i, "") || name;
 }
 
 function nameFromUrl(rawUrl: string): string | null {

@@ -30,6 +30,6 @@ function parseByKind(
   kind: DocumentKind,
   source: DocumentSource,
 ): Promise<ReaderDocument> {
-  if (kind === "epub") return parseEpub(source);
+  if (kind === "foliate") return parseEpub(source);
   throw new Error("PDF documents are handled by the bundled PDF.js viewer");
 }

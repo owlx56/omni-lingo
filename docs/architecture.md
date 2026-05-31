@@ -10,7 +10,7 @@
 - Solid：只用于交互 UI。
 - Vanilla TypeScript：用于热路径和宿主页面 DOM 操作。
 - PDF.js release dist：PDF 渲染和官方 viewer 基础能力，由 `@onelingo/pdfjs-dist` 私有 Git 依赖提供；该自建仓库同步 Mozilla GitHub release 的 `pdfjs-*-dist.zip` 展开内容，OneLingo 通过 Bun/Git 依赖锁定到具体 tag，构建时复制到扩展 public assets。当前依赖是 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，安装后包根目录是 package shell，官方 release dist 在 `dist/`。
-- epubjs：EPUB 渲染。
+- foliate-js：EPUB / MOBI / AZW3 / FB2 渲染。
 
 ## 顶层流向
 
@@ -21,7 +21,7 @@ src/entrypoints/
   pdf-viewer.ts  -> 输出 /pdf-viewer.js 的薄入口
   pdf/           -> PDF.js reader 内 hover / selection / theme 桥接
   epub-viewer.ts -> 输出 /epub-viewer.js 的薄入口
-  epub/          -> EPUB reader UI 和 iframe 内容桥接
+  foliate/       -> Foliate reader UI 和内容桥接
   popup/         -> popup UI
   options/       -> options UI
   viewer/        -> /viewer.html 兼容路由和 HTML shell 探测
@@ -115,7 +115,7 @@ options 和 popup 的通用控件放在 `src/lib/ui/controls.tsx`，样式放在
 
 - `/viewer.html`：Solid 兼容路由壳，处理旧本地 key、远程 URL、旧 sniffer 链接和 HTML shell 探测；最终转到 PDF 或 EPUB viewer。
 - `/pdf/web/viewer.html`：构建时公开的顶层 PDF.js reader。HTML / JS / CSS / runtime 都来自已安装的 `@onelingo/pdfjs-dist` Git 依赖，也就是同一个 GitHub release dist。
-- `/epub/web/viewer.html`：构建时公开的 OneLingo EPUB reader shell。HTML / CSS 来自 `src/assets/epub-viewer/`，运行时由 `/epub-viewer.js` 挂载 `src/entrypoints/epub/`。
+- `/epub/web/viewer.html`：构建时公开的 OneLingo Foliate reader shell。HTML / CSS 来自 `src/assets/epub-viewer/`，运行时由 `/epub-viewer.js` 挂载 `src/entrypoints/foliate/`。
 
 PDF 打开路径：
 
@@ -130,8 +130,8 @@ EPUB 打开路径：
 ```text
 /epub/web/viewer.html?onelingo-key=... or ?file=...
   -> ArrayBuffer / IndexedDB
-  -> epubjs renderTo(#epub-render)
-  -> src/entrypoints/epub/bridge.ts 绑定 EPUB iframe 内容文档
+  -> foliate-view open(file)
+  -> src/entrypoints/foliate/bridge.ts 绑定内容文档
 ```
 
 文件链接嗅探：

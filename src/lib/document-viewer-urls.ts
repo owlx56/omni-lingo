@@ -1,15 +1,15 @@
 import type { UiLang } from "@/lib/languages";
 import { browser } from "wxt/browser";
 
-export type DocumentFormat = "pdf" | "epub";
-export type ViewerFormat = DocumentFormat | "auto";
+export type DocumentFormat = "pdf" | "foliate";
+export type ViewerFormat = DocumentFormat | "epub" | "auto";
 
 const PDF_VIEWER_PATH = "pdf/web/viewer.html";
-const EPUB_VIEWER_PATH = "epub/web/viewer.html";
+const FOLIATE_VIEWER_PATH = "epub/web/viewer.html";
 const READER_SHELL_PATH = "viewer.html";
 const STORED_DOCUMENT_KEY_PARAM = "onelingo-key";
 const PDF_URL_RE = /\.pdf(?:$|[?#].*)?/i;
-const EPUB_URL_RE = /\.epub(?:$|[?#].*)?/i;
+const FOLIATE_URL_RE = /\.(?:epub|mobi|azw3|kf8|fb2|fb2\.zip|fbz)(?:$|[?#].*)?/i;
 
 export function pdfViewerUrlForFile(fileUrl: string, uiLang?: UiLang): string {
   const url = pdfViewerBaseUrl();
@@ -35,22 +35,34 @@ export function pdfViewerUrlForSniff(uiLang?: UiLang): string {
   return url.href;
 }
 
-export function epubViewerUrlForFile(fileUrl: string): string {
-  const url = epubViewerBaseUrl();
+export function foliateViewerUrlForFile(fileUrl: string): string {
+  const url = foliateViewerBaseUrl();
   url.searchParams.set("file", fileUrl);
   return url.href;
 }
 
-export function epubViewerUrlForStoredKey(key: string): string {
-  const url = epubViewerBaseUrl();
+export function foliateViewerUrlForStoredKey(key: string): string {
+  const url = foliateViewerBaseUrl();
   url.searchParams.set(STORED_DOCUMENT_KEY_PARAM, key);
   return url.href;
 }
 
-export function epubViewerUrlForSniff(): string {
-  const url = epubViewerBaseUrl();
+export function foliateViewerUrlForSniff(): string {
+  const url = foliateViewerBaseUrl();
   url.searchParams.set("onelingo-sniff", "1");
   return url.href;
+}
+
+export function epubViewerUrlForFile(fileUrl: string): string {
+  return foliateViewerUrlForFile(fileUrl);
+}
+
+export function epubViewerUrlForStoredKey(key: string): string {
+  return foliateViewerUrlForStoredKey(key);
+}
+
+export function epubViewerUrlForSniff(): string {
+  return foliateViewerUrlForSniff();
 }
 
 export function readerShellUrlForDocument(
@@ -72,10 +84,11 @@ export function documentViewerUrlForUrl(
     return pdfViewerUrlForFile(documentUrl, uiLang);
   }
   if (
+    format === "foliate" ||
     format === "epub" ||
-    (format === "auto" && isLikelyEpubUrl(documentUrl))
+    (format === "auto" && isLikelyFoliateUrl(documentUrl))
   ) {
-    return epubViewerUrlForFile(documentUrl);
+    return foliateViewerUrlForFile(documentUrl);
   }
   return readerShellUrlForDocument(documentUrl, format);
 }
@@ -84,8 +97,8 @@ export function isLikelyPdfUrl(url: string): boolean {
   return testDocumentUrl(url, PDF_URL_RE);
 }
 
-export function isLikelyEpubUrl(url: string): boolean {
-  return testDocumentUrl(url, EPUB_URL_RE);
+export function isLikelyFoliateUrl(url: string): boolean {
+  return testDocumentUrl(url, FOLIATE_URL_RE);
 }
 
 export function isPdfViewerUrl(url: string): boolean {
@@ -93,7 +106,11 @@ export function isPdfViewerUrl(url: string): boolean {
 }
 
 export function isEpubViewerUrl(url: string): boolean {
-  return url.startsWith(epubViewerBaseUrl().href);
+  return isFoliateViewerUrl(url);
+}
+
+export function isFoliateViewerUrl(url: string): boolean {
+  return url.startsWith(foliateViewerBaseUrl().href);
 }
 
 export function isReaderShellUrl(url: string): boolean {
@@ -121,8 +138,8 @@ function pdfViewerBaseUrl(): URL {
   return new URL(PDF_VIEWER_PATH, browser.runtime.getURL("/"));
 }
 
-function epubViewerBaseUrl(): URL {
-  return new URL(EPUB_VIEWER_PATH, browser.runtime.getURL("/"));
+function foliateViewerBaseUrl(): URL {
+  return new URL(FOLIATE_VIEWER_PATH, browser.runtime.getURL("/"));
 }
 
 function readerShellBaseUrl(): URL {

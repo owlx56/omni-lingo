@@ -1,5 +1,5 @@
 import { render } from "solid-js/web";
-import App from "./epub/App";
+import App from "./foliate/App";
 import { initTheme } from "@/lib/theme";
 
 export default defineUnlistedScript(() => {

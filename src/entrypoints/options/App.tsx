@@ -59,7 +59,7 @@ import { browser } from "wxt/browser";
 import { storeDocument } from "@/lib/document-store";
 import {
   documentViewerUrlForUrl,
-  epubViewerUrlForStoredKey,
+  foliateViewerUrlForStoredKey,
   pdfViewerUrlForStoredKey,
 } from "@/lib/document-viewer-urls";
 
@@ -272,7 +272,8 @@ function parseFontSizeDraft(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-const ACCEPTED_FILES = ".pdf,.epub,application/pdf,application/epub+zip";
+const ACCEPTED_FILES =
+  ".pdf,.epub,.mobi,.azw3,.kf8,.fb2,.fb2.zip,.fbz,application/pdf,application/epub+zip,application/x-fictionbook+xml,application/x-zip-compressed-fb2";
 
 function App() {
   const settings = useSettings();
@@ -617,10 +618,10 @@ function App() {
     </>
   );
 
-  const inferKind = (name: string, mime?: string): "pdf" | "epub" => {
+  const inferKind = (name: string, mime?: string): "pdf" | "foliate" => {
     const lower = name.split(/[?#]/)[0]?.toLowerCase() ?? "";
     if (lower.endsWith(".pdf") || mime === "application/pdf") return "pdf";
-    return "epub";
+    return "foliate";
   };
 
   const openFile = async (file: File): Promise<void> => {
@@ -632,7 +633,7 @@ function App() {
       const viewerUrl =
         kind === "pdf"
           ? pdfViewerUrlForStoredKey(key, settings().uiLang)
-          : epubViewerUrlForStoredKey(key);
+          : foliateViewerUrlForStoredKey(key);
       await browser.tabs.create({ url: viewerUrl });
     } finally {
       setFpBusy(false);
