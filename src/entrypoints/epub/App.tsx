@@ -57,6 +57,9 @@ function App(): JSX.Element {
   let stopThemeSync: (() => void) | undefined;
   let stopBridge: (() => void) | undefined;
   let currentLocationCfi = "";
+  let pageBackStack: string[] = [];
+  let pageForwardStack: string[] = [];
+  let navigationInFlight = false;
   const readerUiAttrs = { "data-onelingo-reader-ui": "" };
 
   createEffect(() => {
@@ -210,6 +213,7 @@ function App(): JSX.Element {
     stopThemeSync = undefined;
     renditionRef?.destroy();
     renditionRef = undefined;
+    resetPageNavigation();
     setToc([]);
     setActiveHref("");
     setCurrentLocation("");
@@ -248,6 +252,7 @@ function App(): JSX.Element {
 
     stopBridge = initEpubBridge(renditionRef);
     stopThemeSync = syncRenditionDocumentPrefs(renditionRef, settings().uiLang);
+    resetPageNavigation();
     await restoreLocation(renditionRef, cfi);
   };
 
@@ -268,22 +273,65 @@ function App(): JSX.Element {
     setActiveHref(normalized);
   };
 
+  const resetPageNavigation = (): void => {
+    pageBackStack = [];
+    pageForwardStack = [];
+  };
+
+  const pushUnique = (stack: string[], cfi: string): void => {
+    if (!cfi) return;
+    if (stack[stack.length - 1] === cfi) return;
+    stack.push(cfi);
+  };
+
   const toggleSidebar = (): void => {
     setSidebarOpen((value) => !value);
   };
 
-  const goPrev = (): void => {
-    void renditionRef?.prev();
+  const goPrev = async (): Promise<void> => {
+    if (!renditionRef || navigationInFlight) return;
+    navigationInFlight = true;
+    try {
+      const current = currentLocationCfi;
+      if (current) pushUnique(pageForwardStack, current);
+      const target = pageBackStack.pop();
+      if (target) {
+        await renditionRef.display(target);
+        return;
+      }
+      await renditionRef.prev();
+    } finally {
+      navigationInFlight = false;
+    }
   };
 
-  const goNext = (): void => {
-    void renditionRef?.next();
+  const goNext = async (): Promise<void> => {
+    if (!renditionRef || navigationInFlight) return;
+    navigationInFlight = true;
+    try {
+      const current = currentLocationCfi;
+      if (current) pushUnique(pageBackStack, current);
+      const target = pageForwardStack.pop();
+      if (target) {
+        await renditionRef.display(target);
+        return;
+      }
+      await renditionRef.next();
+    } finally {
+      navigationInFlight = false;
+    }
   };
 
   const selectTocItem = async (href: string): Promise<void> => {
-    if (!renditionRef || !href) return;
-    setSidebarOpen(false);
-    await renditionRef.display(href);
+    if (!renditionRef || !href || navigationInFlight) return;
+    navigationInFlight = true;
+    try {
+      resetPageNavigation();
+      setSidebarOpen(false);
+      await renditionRef.display(href);
+    } finally {
+      navigationInFlight = false;
+    }
   };
 
   const isActiveToc = (href: string): boolean => {
