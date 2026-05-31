@@ -38,6 +38,24 @@ type TocItem = {
   label: string;
   subitems: TocItem[];
 };
+type EpubLocationSnapshot = {
+  start?: {
+    label?: string;
+    href?: string;
+    cfi?: string;
+    percentage?: number;
+  };
+  end?: {
+    cfi?: string;
+    percentage?: number;
+  };
+};
+type EpubLocationAnchor = {
+  cfi?: string;
+  percentage?: number;
+};
+
+const LOCATION_BREAK_CHARS = 80;
 
 function App(): JSX.Element {
   const t = useT();
@@ -57,9 +75,13 @@ function App(): JSX.Element {
   let stopThemeSync: (() => void) | undefined;
   let stopBridge: (() => void) | undefined;
   let currentLocationCfi = "";
+  let currentLocationPercentage: number | undefined;
   let pageBackStack: string[] = [];
   let pageForwardStack: string[] = [];
   let navigationInFlight = false;
+  let locationsReady = false;
+  let locationsGenerationToken = 0;
+  let locationsReadyPromise: Promise<void> | undefined;
   const readerUiAttrs = { "data-onelingo-reader-ui": "" };
 
   createEffect(() => {
@@ -187,10 +209,8 @@ function App(): JSX.Element {
     stopThemeSync?.();
     stopThemeSync = syncRenditionDocumentPrefs(rendition, settings().uiLang);
 
-    rendition.on("relocated", (loc: { start: { label: string; href: string; cfi: string } }) => {
-      currentLocationCfi = loc.start.cfi;
-      setCurrentLocation(loc.start.label);
-      syncActiveToc(loc.start.href);
+    rendition.on("relocated", (loc: EpubLocationSnapshot) => {
+      syncCurrentLocationSnapshot(loc);
     });
 
     rendition.on("rendered", (_section: unknown, view: unknown) => {
@@ -203,7 +223,9 @@ function App(): JSX.Element {
       }
     });
 
-    await restoreLocation(rendition, currentLocationCfi || undefined);
+    startLocationGeneration(book);
+    await restoreLocation(rendition);
+    refreshCurrentLocationSnapshot();
   };
 
   const resetReaderState = (): void => {
@@ -214,6 +236,10 @@ function App(): JSX.Element {
     renditionRef?.destroy();
     renditionRef = undefined;
     resetPageNavigation();
+    locationsGenerationToken += 1;
+    locationsReady = false;
+    locationsReadyPromise = undefined;
+    currentLocationPercentage = undefined;
     setToc([]);
     setActiveHref("");
     setCurrentLocation("");
@@ -240,7 +266,7 @@ function App(): JSX.Element {
     const el = document.getElementById("epub-render");
     if (!el) return;
 
-    const cfi = currentLocationCfi || undefined;
+    const anchor = await captureCurrentLocationAnchor();
     stopBridge?.();
     stopBridge = undefined;
     stopThemeSync?.();
@@ -252,18 +278,35 @@ function App(): JSX.Element {
 
     stopBridge = initEpubBridge(renditionRef);
     stopThemeSync = syncRenditionDocumentPrefs(renditionRef, settings().uiLang);
-    resetPageNavigation();
-    await restoreLocation(renditionRef, cfi);
+    await restoreLocation(renditionRef, anchor);
+    refreshCurrentLocationSnapshot();
   };
 
   const restoreLocation = async (
     rendition: Rendition,
-    cfi?: string,
+    anchor?: EpubLocationAnchor,
   ): Promise<void> => {
-    if (cfi) {
-      await rendition.display(cfi);
-      return;
+    if (anchor?.cfi) {
+      try {
+        await rendition.display(anchor.cfi);
+        return;
+      } catch {
+        // Fall back to percentage below.
+      }
     }
+
+    if (isFiniteNumber(anchor?.percentage)) {
+      const target = await resolveLocationPercentage(anchor.percentage);
+      if (target) {
+        try {
+          await rendition.display(target);
+          return;
+        } catch {
+          // Fall through to default display.
+        }
+      }
+    }
+
     await rendition.display();
   };
 
@@ -273,9 +316,118 @@ function App(): JSX.Element {
     setActiveHref(normalized);
   };
 
+  const syncCurrentLocationSnapshot = (location: EpubLocationSnapshot): void => {
+    const start = location.start;
+    if (!start?.cfi) return;
+
+    currentLocationCfi = start.cfi;
+    if (start.label) {
+      setCurrentLocation(start.label);
+    }
+    if (start.href) {
+      syncActiveToc(start.href);
+    }
+
+    currentLocationPercentage = deriveLocationPercentage(location);
+  };
+
+  const captureCurrentLocationAnchor = async (): Promise<EpubLocationAnchor> => {
+    if (!renditionRef) return getCurrentLocationAnchor();
+
+    const location = (await Promise.resolve(renditionRef.currentLocation())) as
+      | EpubLocationSnapshot
+      | undefined;
+    if (location?.start?.cfi) {
+      syncCurrentLocationSnapshot(location);
+      return toLocationAnchor(location);
+    }
+
+    return getCurrentLocationAnchor();
+  };
+
+  const toLocationAnchor = (location: EpubLocationSnapshot): EpubLocationAnchor => {
+    const cfi = location.start?.cfi;
+    if (!cfi) return {};
+
+    const percentage = deriveLocationPercentage(location);
+    if (isFiniteNumber(percentage)) {
+      return {
+        cfi,
+        percentage: clamp01(percentage),
+      };
+    }
+
+    return { cfi };
+  };
+
+  const refreshCurrentLocationSnapshot = (): void => {
+    if (!renditionRef) return;
+
+    const location = renditionRef.currentLocation() as EpubLocationSnapshot | undefined;
+    if (location?.start?.cfi) {
+      syncCurrentLocationSnapshot(location);
+      return;
+    }
+
+    if (!bookRef?.locations || !locationsReady || !currentLocationCfi) {
+      return;
+    }
+
+    const percentage = bookRef.locations.percentageFromCfi(currentLocationCfi);
+    currentLocationPercentage = isFiniteNumber(percentage) ? clamp01(percentage) : undefined;
+  };
+
+  const startLocationGeneration = (book: Book): void => {
+    const token = ++locationsGenerationToken;
+    locationsReady = false;
+    locationsReadyPromise = book.locations
+      .generate(LOCATION_BREAK_CHARS)
+      .then(() => {
+        if (token !== locationsGenerationToken) return;
+        locationsReady = true;
+        refreshCurrentLocationSnapshot();
+      })
+      .catch(() => {
+        if (token !== locationsGenerationToken) return;
+        locationsReady = false;
+      });
+  };
+
   const resetPageNavigation = (): void => {
     pageBackStack = [];
     pageForwardStack = [];
+  };
+
+  const getCurrentLocationAnchor = (): EpubLocationAnchor => {
+    if (!currentLocationCfi) return {};
+
+    if (locationsReady && bookRef?.locations && bookRef.locations.length()) {
+      const percentage =
+        currentLocationPercentage ?? bookRef.locations.percentageFromCfi(currentLocationCfi);
+      if (isFiniteNumber(percentage)) {
+        return {
+          cfi: currentLocationCfi,
+          percentage: clamp01(percentage),
+        };
+      }
+    }
+
+    return { cfi: currentLocationCfi };
+  };
+
+  const resolveLocationPercentage = async (percentage: number): Promise<string | undefined> => {
+    if (locationsReadyPromise) {
+      try {
+        await locationsReadyPromise;
+      } catch {
+        // Ignore location generation failures and fall back to CFI.
+      }
+    }
+
+    if (!bookRef?.locations || !bookRef.locations.length()) return undefined;
+
+    const target = bookRef.locations.cfiFromPercentage(clamp01(percentage));
+    return typeof target === "string" && target ? target : undefined;
   };
 
   const pushUnique = (stack: string[], cfi: string): void => {
@@ -573,6 +725,27 @@ function hasDocument(value: unknown): value is EpubContentDocument {
     doc !== null &&
     (doc as { nodeType?: unknown }).nodeType === Node.DOCUMENT_NODE
   );
+}
+
+function deriveLocationPercentage(location: EpubLocationSnapshot): number | undefined {
+  const start = location.start?.percentage;
+  const end = location.end?.percentage;
+
+  if (isFiniteNumber(start) && isFiniteNumber(end)) {
+    return clamp01((start + end) / 2);
+  }
+
+  if (isFiniteNumber(start)) return clamp01(start);
+  if (isFiniteNumber(end)) return clamp01(end);
+  return undefined;
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function clamp01(value: number): number {
+  return Math.min(1, Math.max(0, value));
 }
 
 function nextFrame(): Promise<void> {
