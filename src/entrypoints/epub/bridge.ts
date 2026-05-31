@@ -13,46 +13,108 @@ import {
 } from "@/features/selection";
 import type { Rendition } from "epubjs";
 
-interface EpubContents {
-  document: Document;
-}
+export type EpubTocItem = {
+  href: string;
+  label: string;
+  subitems: EpubTocItem[];
+};
 
 type EpubEventSource = {
   on(event: string, callback: (...args: unknown[]) => void): void;
+  off?(event: string, callback: (...args: unknown[]) => void): void;
+};
+
+type EpubContents = {
+  document: Document;
+};
+
+type EpubBridgeCallbacks = {
+  onLocationChange?: (location: EpubLocation) => void;
+};
+
+type EpubLocation = {
+  start: {
+    cfi: string;
+    href: string;
+    label: string;
+  };
 };
 
 const boundEpubDocs = new WeakSet<Document>();
 const boundEpubContents = new WeakSet<object>();
 
-export function initEpubBridge(rendition: Rendition): void {
+export function initEpubBridge(rendition: Rendition, callbacks: EpubBridgeCallbacks = {}): () => void {
   const hover = createHoverController({
     mapAnchorRect: toParentRect,
     tooltipDocument: document,
   });
 
   initSelection({ captureDocumentSelection: false });
-  registerEpubMessageHandlers(hover);
+  const stopMessages = registerEpubMessageHandlers(hover);
+  const stopScroll = registerScrollDismiss(hover);
+  const stopHooks = registerRenditionHooks(rendition, hover, callbacks);
+  markReaderUi();
 
-  window.addEventListener(
-    "scroll",
-    () => {
-      hover.dismiss();
-      hideSelectionUi();
-    },
-    { passive: true },
-  );
+  return () => {
+    hover.dismiss();
+    hideSelectionUi();
+    stopHooks();
+    stopMessages();
+    stopScroll();
+  };
+}
 
-  rendition.hooks.content.register((contents: unknown) => {
+function registerRenditionHooks(
+  rendition: Rendition,
+  hover: HoverController,
+  callbacks: EpubBridgeCallbacks,
+): () => void {
+  const handleContent = (contents: unknown): void => {
     bindEpubContents(contents, hover);
-  });
-  rendition.on("rendered", (_section: unknown, view: unknown) => {
+  };
+  const handleRendered = (_section: unknown, view: unknown): void => {
     bindEpubContents(view, hover);
     bindRenderedContents(rendition, hover);
     bindEpubIframes(hover);
-  });
-  window.setTimeout(() => bindRenderedContents(rendition, hover), 0);
-  window.setTimeout(() => bindEpubIframes(hover), 0);
-  window.setTimeout(() => bindEpubIframes(hover), 250);
+  };
+
+  rendition.hooks.content.register(handleContent);
+  rendition.on("rendered", handleRendered);
+  const timers = [
+    window.setTimeout(() => bindRenderedContents(rendition, hover), 0),
+    window.setTimeout(() => bindEpubIframes(hover), 0),
+    window.setTimeout(() => bindEpubIframes(hover), 250),
+  ];
+
+  const handleRelocated = (location: EpubLocation): void => {
+    callbacks.onLocationChange?.(location);
+  };
+  rendition.on("relocated", handleRelocated);
+
+  return () => {
+    for (const timer of timers) window.clearTimeout(timer);
+    rendition.hooks.content.deregister(handleContent);
+    rendition.off?.("rendered", handleRendered);
+    rendition.off?.("relocated", handleRelocated);
+  };
+}
+
+function registerScrollDismiss(hover: HoverController): () => void {
+  const onScroll = (): void => {
+    hover.dismiss();
+    hideSelectionUi();
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+
+  const container = document.querySelector<HTMLElement>("#epub-render .epub-container");
+  if (container) {
+    container.addEventListener("scroll", onScroll, { passive: true });
+  }
+
+  return () => {
+    window.removeEventListener("scroll", onScroll);
+    container?.removeEventListener("scroll", onScroll);
+  };
 }
 
 function bindRenderedContents(
@@ -70,9 +132,7 @@ function bindRenderedContents(
 }
 
 function bindEpubIframes(hover: HoverController): void {
-  for (const iframe of document.querySelectorAll<HTMLIFrameElement>(
-    "#epub-render iframe",
-  )) {
+  for (const iframe of document.querySelectorAll<HTMLIFrameElement>("#epub-render iframe")) {
     try {
       if (iframe.contentDocument) {
         bindEpubContents({ document: iframe.contentDocument }, hover);
@@ -96,11 +156,7 @@ function bindEpubContents(
   doc.addEventListener("mouseup", (event) => {
     window.setTimeout(() => onEpubMouseUp(event, doc), 0);
   });
-  doc.addEventListener(
-    "mousedown",
-    () => hideSelectionUi(),
-    { capture: true },
-  );
+  doc.addEventListener("mousedown", () => hideSelectionUi(), { capture: true });
   doc.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       hover.dismiss();
@@ -166,7 +222,7 @@ function rangeLike(value: unknown): value is Range {
   );
 }
 
-function registerEpubMessageHandlers(hover: HoverController): void {
+function registerEpubMessageHandlers(hover: HoverController): () => void {
   const readFeatureStatus = (): PageFeatureStatus => ({
     fullPageClickToShowOriginal: false,
     ...hover.getEnabledStatus(),
@@ -174,8 +230,8 @@ function registerEpubMessageHandlers(hover: HoverController): void {
     hasFullPageClickToShowOriginalPref: false,
   });
 
-  onMessage("readPageFeatureStatus", () => readFeatureStatus());
-  onMessage("updatePageFeaturePrefs", (input) => {
+  const offRead = onMessage("readPageFeatureStatus", () => readFeatureStatus());
+  const offUpdate = onMessage("updatePageFeaturePrefs", (input) => {
     if (input.hoverEnabled !== undefined) {
       hover.updateEnabledPref(input.hoverEnabled);
     }
@@ -184,6 +240,11 @@ function registerEpubMessageHandlers(hover: HoverController): void {
     }
     return readFeatureStatus();
   });
+
+  return () => {
+    offRead();
+    offUpdate();
+  };
 }
 
 function onEpubMouseUp(event: MouseEvent, doc: Document): void {
@@ -251,4 +312,20 @@ function frameElementForDoc(doc: Document): HTMLElement | null {
     }
   }
   return null;
+}
+
+function markReaderUi(): void {
+  document.documentElement.setAttribute("data-onelingo-epub-viewer", "");
+  for (const selector of [
+    ".epub-toolbar",
+    ".epub-sidebar",
+    ".epub-sidebar-backdrop",
+    ".epub-mode-switch",
+    ".epub-nav-button",
+    ".epub-mode-button",
+  ]) {
+    for (const element of document.querySelectorAll(selector)) {
+      element.setAttribute("data-onelingo-reader-ui", "");
+    }
+  }
 }

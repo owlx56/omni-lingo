@@ -63,3 +63,37 @@ export function IconExternalLink(props: IconProps): JSX.Element {
     props.size ?? 14,
   );
 }
+
+export function IconSidebar(props: IconProps): JSX.Element {
+  return svg(
+    <>
+      <path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+      <path d="M9 4v16" />
+      <path d="M5 8h3" />
+      <path d="M5 12h3" />
+      <path d="M5 16h3" />
+    </>,
+    props.size ?? 16,
+  );
+}
+
+export function IconPages(props: IconProps): JSX.Element {
+  return svg(
+    <>
+      <path d="M7 5h5v14H7z" />
+      <path d="M12 5h5v14h-5z" />
+    </>,
+    props.size ?? 16,
+  );
+}
+
+export function IconScroll(props: IconProps): JSX.Element {
+  return svg(
+    <>
+      <path d="M12 4v16" />
+      <path d="M8 8l4-4 4 4" />
+      <path d="M8 16l4 4 4-4" />
+    </>,
+    props.size ?? 16,
+  );
+}

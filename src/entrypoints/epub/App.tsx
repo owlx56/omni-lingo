@@ -1,13 +1,15 @@
 import {
+  For,
+  Show,
   createEffect,
   createSignal,
   onCleanup,
   onMount,
-  Show,
   type JSX,
 } from "solid-js";
 import ePub from "epubjs";
 import type { Book, Rendition } from "epubjs";
+import { IconPages, IconScroll, IconSidebar } from "@/lib/ui/icons";
 import { loadDocument } from "@/lib/document-store";
 import { fetchDocumentFromUrl } from "@/lib/document-resolver";
 import {
@@ -20,10 +22,7 @@ import {
 import { useT } from "@/lib/i18n";
 import type { UiLang } from "@/lib/languages";
 import { sendMessage } from "@/lib/messaging";
-import {
-  useSettings,
-  watchSettings,
-} from "@/lib/storage/settings";
+import { useSettings, watchSettings } from "@/lib/storage/settings";
 import {
   applyThemeToDocument,
   getEffectiveTheme,
@@ -33,6 +32,12 @@ import {
 import { initEpubBridge } from "./bridge";
 
 type ViewState = "loading" | "ready" | "error";
+type EpubViewMode = "pages" | "scroll";
+type TocItem = {
+  href: string;
+  label: string;
+  subitems: TocItem[];
+};
 
 function App(): JSX.Element {
   const t = useT();
@@ -42,10 +47,17 @@ function App(): JSX.Element {
   const [docTitle, setDocTitle] = createSignal("");
   const [docFormat, setDocFormat] = createSignal<DocumentFormat>("epub");
   const [currentLocation, setCurrentLocation] = createSignal("");
+  const [sidebarOpen, setSidebarOpen] = createSignal(false);
+  const [viewMode, setViewMode] = createSignal<EpubViewMode>("pages");
+  const [toc, setToc] = createSignal<TocItem[]>([]);
+  const [activeHref, setActiveHref] = createSignal("");
 
   let bookRef: Book | undefined;
   let renditionRef: Rendition | undefined;
   let stopThemeSync: (() => void) | undefined;
+  let stopBridge: (() => void) | undefined;
+  let currentLocationCfi = "";
+  const readerUiAttrs = { "data-onelingo-reader-ui": "" };
 
   createEffect(() => {
     const lang = settings().uiLang;
@@ -58,6 +70,7 @@ function App(): JSX.Element {
   });
 
   onCleanup(() => {
+    stopBridge?.();
     stopThemeSync?.();
     renditionRef?.destroy();
     bookRef?.destroy();
@@ -138,6 +151,8 @@ function App(): JSX.Element {
   };
 
   const renderEpub = async (data: ArrayBuffer): Promise<void> => {
+    resetReaderState();
+
     const book = ePub(data);
     bookRef = book;
     await book.ready;
@@ -147,7 +162,7 @@ function App(): JSX.Element {
 
     setDocFormat("epub");
     setState("ready");
-    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    await nextFrame();
 
     const el = document.getElementById("epub-render");
     if (!el) {
@@ -156,60 +171,271 @@ function App(): JSX.Element {
       return;
     }
 
+    const navigation = await book.loaded.navigation;
+    setToc(normalizeToc(navigation?.toc ?? []));
+
+    const mode = viewMode();
+    const rendition = createRendition(book, el, mode);
+    renditionRef = rendition;
+
+    stopBridge?.();
+    stopBridge = initEpubBridge(rendition);
+
+    stopThemeSync?.();
+    stopThemeSync = syncRenditionDocumentPrefs(rendition, settings().uiLang);
+
+    rendition.on("relocated", (loc: { start: { label: string; href: string; cfi: string } }) => {
+      currentLocationCfi = loc.start.cfi;
+      setCurrentLocation(loc.start.label);
+      syncActiveToc(loc.start.href);
+    });
+
+    rendition.on("rendered", (_section: unknown, view: unknown) => {
+      if (view && typeof view === "object") {
+        const contents = view as { section?: { href?: string } };
+        const href = contents.section?.href ?? "";
+        if (href) {
+          syncActiveToc(href);
+        }
+      }
+    });
+
+    await restoreLocation(rendition, currentLocationCfi || undefined);
+  };
+
+  const resetReaderState = (): void => {
+    stopBridge?.();
+    stopBridge = undefined;
+    stopThemeSync?.();
+    stopThemeSync = undefined;
+    renditionRef?.destroy();
+    renditionRef = undefined;
+    setToc([]);
+    setActiveHref("");
+    setCurrentLocation("");
+    currentLocationCfi = "";
+  };
+
+  const createRendition = (
+    book: Book,
+    el: HTMLElement,
+    mode: EpubViewMode,
+  ): Rendition => {
     const rendition = book.renderTo(el, {
       width: "100%",
       height: "100%",
       spread: "none",
-      flow: "paginated",
+      manager: mode === "scroll" ? "continuous" : "default",
+      flow: mode === "scroll" ? "scrolled-doc" : "paginated",
     });
-    renditionRef = rendition;
+    return rendition;
+  };
 
-    initEpubBridge(rendition);
+  const rebuildRendition = async (mode: EpubViewMode): Promise<void> => {
+    if (!bookRef) return;
+    const el = document.getElementById("epub-render");
+    if (!el) return;
+
+    const cfi = currentLocationCfi || undefined;
+    stopBridge?.();
+    stopBridge = undefined;
     stopThemeSync?.();
-    stopThemeSync = syncRenditionDocumentPrefs(rendition, settings().uiLang);
+    stopThemeSync = undefined;
+    renditionRef?.destroy();
+    renditionRef = createRendition(bookRef, el, mode);
+    setViewMode(mode);
+    setSidebarOpen(false);
 
-    rendition.on("relocated", (loc: { start: { label: string } }) => {
-      setCurrentLocation(loc.start.label);
-    });
+    stopBridge = initEpubBridge(renditionRef);
+    stopThemeSync = syncRenditionDocumentPrefs(renditionRef, settings().uiLang);
+    await restoreLocation(renditionRef, cfi);
+  };
 
+  const restoreLocation = async (
+    rendition: Rendition,
+    cfi?: string,
+  ): Promise<void> => {
+    if (cfi) {
+      await rendition.display(cfi);
+      return;
+    }
     await rendition.display();
   };
 
+  const syncActiveToc = (href: string): void => {
+    if (!href) return;
+    const normalized = href.split("#", 1)[0] ?? href;
+    setActiveHref(normalized);
+  };
+
+  const toggleSidebar = (): void => {
+    setSidebarOpen((value) => !value);
+  };
+
   const goPrev = (): void => {
-    renditionRef?.prev();
+    void renditionRef?.prev();
   };
 
   const goNext = (): void => {
-    renditionRef?.next();
+    void renditionRef?.next();
+  };
+
+  const selectTocItem = async (href: string): Promise<void> => {
+    if (!renditionRef || !href) return;
+    setSidebarOpen(false);
+    await renditionRef.display(href);
+  };
+
+  const isActiveToc = (href: string): boolean => {
+    const normalized = href.split("#", 1)[0] ?? href;
+    return activeHref() === normalized;
   };
 
   return (
-    <main class="viewer-root">
+    <main class="viewer-root" {...readerUiAttrs}>
       <Show when={state() === "error"}>
-        <div class="viewer-error">
+        <div class="viewer-error" {...readerUiAttrs}>
           <p>{error()}</p>
         </div>
       </Show>
 
       <Show when={state() === "loading"}>
-        <div class="viewer-loading">{t("viewer.status.loading")}</div>
+        <div class="viewer-loading" {...readerUiAttrs}>
+          {t("viewer.status.loading")}
+        </div>
       </Show>
 
       <Show when={state() === "ready" && docFormat() === "epub"}>
-        <header class="epub-toolbar">
+        <header class="epub-toolbar" {...readerUiAttrs}>
+          <button
+            aria-label={sidebarOpen() ? t("viewer.sidebar.close") : t("viewer.sidebar.open")}
+            class="epub-nav-button"
+            onClick={toggleSidebar}
+            type="button"
+          >
+            <IconSidebar size={16} />
+          </button>
           <button class="epub-nav-button" onClick={goPrev} type="button">
             ‹
           </button>
           <span class="epub-toolbar-title">{docTitle()}</span>
           <span class="epub-toolbar-location">{currentLocation()}</span>
+          <div class="epub-mode-switch" role="group" aria-label={t("viewer.sections")}>
+            <button
+              classList={{ "epub-mode-button": true, "is-active": viewMode() === "pages" }}
+              onClick={() => void rebuildRendition("pages")}
+              type="button"
+            >
+              <IconPages size={14} />
+              <span>{t("viewer.mode.pages")}</span>
+            </button>
+            <button
+              classList={{ "epub-mode-button": true, "is-active": viewMode() === "scroll" }}
+              onClick={() => void rebuildRendition("scroll")}
+              type="button"
+            >
+              <IconScroll size={14} />
+              <span>{t("viewer.mode.scroll")}</span>
+            </button>
+          </div>
           <button class="epub-nav-button" onClick={goNext} type="button">
             ›
           </button>
         </header>
-        <div class="epub-render-area" id="epub-render" />
+
+        <div classList={{ "epub-shell": true, "sidebar-open": sidebarOpen() }}>
+          <aside class="epub-sidebar" {...readerUiAttrs}>
+            <div class="epub-sidebar-head">{t("viewer.sidebar.title")}</div>
+            <div class="epub-sidebar-body">
+              <Show
+                when={toc().length > 0}
+                fallback={<div class="epub-sidebar-empty">{t("viewer.sidebar.empty")}</div>}
+              >
+                <nav class="epub-toc">
+                  <For each={toc()}>
+                    {(item) => (
+                      <TocNode
+                        item={item}
+                        onSelect={selectTocItem}
+                        isActive={isActiveToc}
+                      />
+                    )}
+                  </For>
+                </nav>
+              </Show>
+            </div>
+          </aside>
+
+          <button
+            aria-hidden="true"
+            class="epub-sidebar-backdrop"
+            onClick={() => setSidebarOpen(false)}
+            tabIndex={-1}
+            type="button"
+          />
+
+          <div class="epub-render-area" id="epub-render" />
+        </div>
+      </Show>
+
+      <Show when={state() === "ready" && docFormat() !== "epub"}>
+        <div class="viewer-loading" {...readerUiAttrs}>
+          {t("viewer.status.ready")}
+        </div>
       </Show>
     </main>
   );
+}
+
+function TocNode(props: {
+  item: TocItem;
+  isActive: (href: string) => boolean;
+  onSelect: (href: string) => Promise<void>;
+}): JSX.Element {
+  return (
+    <div classList={{ "epub-toc-item": true, active: props.isActive(props.item.href) }}>
+      <button
+        class="epub-toc-link"
+        onClick={() => void props.onSelect(props.item.href)}
+        type="button"
+      >
+        {props.item.label}
+      </button>
+      <Show when={props.item.subitems.length > 0}>
+        <div class="epub-toc-children">
+          <For each={props.item.subitems}>
+            {(child) => (
+              <TocNode
+                item={child}
+                onSelect={props.onSelect}
+                isActive={props.isActive}
+              />
+            )}
+          </For>
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+function normalizeToc(items: unknown[]): TocItem[] {
+  return items
+    .map((item) => normalizeTocItem(item))
+    .filter((item): item is TocItem => Boolean(item));
+}
+
+function normalizeTocItem(value: unknown): TocItem | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as {
+    href?: unknown;
+    label?: unknown;
+    subitems?: unknown;
+  };
+  const href = typeof item.href === "string" ? item.href : "";
+  const label = typeof item.label === "string" ? item.label : href;
+  const subitems = Array.isArray(item.subitems) ? normalizeToc(item.subitems) : [];
+  if (!href && !label) return null;
+  return { href, label, subitems };
 }
 
 function syncRenditionDocumentPrefs(
@@ -299,6 +525,10 @@ function hasDocument(value: unknown): value is EpubContentDocument {
     doc !== null &&
     (doc as { nodeType?: unknown }).nodeType === Node.DOCUMENT_NODE
   );
+}
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
 
 export default App;
