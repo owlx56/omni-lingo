@@ -19,10 +19,18 @@ import {
 import { useT } from "@/lib/i18n";
 import type { UiLang } from "@/lib/languages";
 import { sendMessage } from "@/lib/messaging";
-import { useSettings } from "@/lib/storage/settings";
-import { IconPages, IconScroll, IconSidebar } from "@/lib/ui/icons";
+import {
+  getStoredSettings,
+  setSettings,
+  useSettings,
+} from "@/lib/storage/settings";
+import { IconPages, IconPin, IconScroll, IconSidebar } from "@/lib/ui/icons";
 import { initFoliateBridge } from "./bridge";
-import type { FoliateRelocateDetail, FoliateTocItem, FoliateViewElement } from "./types";
+import type {
+  FoliateRelocateDetail,
+  FoliateTocItem,
+  FoliateViewElement,
+} from "./types";
 
 type ViewState = "loading" | "ready" | "error";
 type ViewMode = "pages" | "scroll";
@@ -33,6 +41,12 @@ type ReaderSource = {
   url?: string;
 };
 
+const SIDEBAR_MIN = 0.05;
+const SIDEBAR_MAX = 0.45;
+const SIDEBAR_DEFAULT_DESKTOP = 0.15;
+const SIDEBAR_DEFAULT_MOBILE = 0.25;
+const MOBILE_BREAKPOINT = 720;
+
 function App(): JSX.Element {
   const t = useT();
   const settings = useSettings();
@@ -40,15 +54,24 @@ function App(): JSX.Element {
   const [error, setError] = createSignal("");
   const [docTitle, setDocTitle] = createSignal("");
   const [locationLabel, setLocationLabel] = createSignal("");
-  const [sidebarOpen, setSidebarOpen] = createSignal(false);
+  const [sidebarVisible, setSidebarVisible] = createSignal(false);
+  const [sidebarPinned, setSidebarPinned] = createSignal(false);
+  const [sidebarWidth, setSidebarWidth] = createSignal(
+    toPercent(SIDEBAR_DEFAULT_DESKTOP),
+  );
   const [viewMode, setViewMode] = createSignal<ViewMode>("pages");
   const [toc, setToc] = createSignal<FoliateTocItem[]>([]);
   const [activeHref, setActiveHref] = createSignal("");
+  const [isDesktop, setIsDesktop] = createSignal(isWideViewport());
+  const [isDragging, setIsDragging] = createSignal(false);
 
   let renderHost: HTMLDivElement | undefined;
   let view: FoliateViewElement | undefined;
   let stopBridge: (() => void) | undefined;
   let navigationLocked = false;
+  let resizeCleanup: (() => void) | undefined;
+  let dragCleanup: (() => void) | undefined;
+  let shellRef: HTMLDivElement | undefined;
 
   createEffect(() => {
     const lang = settings().uiLang;
@@ -56,15 +79,32 @@ function App(): JSX.Element {
     document.title = docTitle() || t("viewer.title");
   });
 
+  createEffect(() => {
+    const width = sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null;
+    syncReaderLayout(width, viewMode());
+  });
+
   onMount(() => {
+    const updateViewport = (): void => {
+      setIsDesktop(isWideViewport());
+    };
+    updateViewport();
+    window.addEventListener("resize", updateViewport);
+    resizeCleanup = () => {
+      window.removeEventListener("resize", updateViewport);
+    };
     void init();
   });
 
   onCleanup(() => {
+    resizeCleanup?.();
+    dragCleanup?.();
     stopBridge?.();
     stopBridge = undefined;
     view?.remove();
     view = undefined;
+    renderHost?.replaceChildren();
+    renderHost = undefined;
   });
 
   const init = async (): Promise<void> => {
@@ -152,6 +192,7 @@ function App(): JSX.Element {
 
   const openReader = async (source: ReaderSource): Promise<void> => {
     resetReaderState();
+    await loadSidebarPrefs();
     setDocTitle(stripDocumentName(source.name));
     setState("loading");
 
@@ -159,16 +200,16 @@ function App(): JSX.Element {
     const el = ensureViewElement();
     const file = createReaderFile(source);
     await el.open(file);
-
     el.renderer?.setAttribute("flow", viewFlow(viewMode()));
     stopBridge = initFoliateBridge(el, {
-      onLocationChange: onLocationChange,
+      onLocationChange,
     });
 
     const bookTitle = formatLanguageMap(el.book?.metadata?.title);
     if (bookTitle) setDocTitle(bookTitle);
     setToc(normalizeToc(el.book?.toc ?? []));
     setState("ready");
+    syncReaderLayout(sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null, viewMode());
 
     await nextFrame();
     await el.goToTextStart?.().catch(async () => {
@@ -185,8 +226,30 @@ function App(): JSX.Element {
     setToc([]);
     setActiveHref("");
     setLocationLabel("");
-    setSidebarOpen(false);
+    setSidebarVisible(false);
+    setIsDragging(false);
+    navigationLocked = false;
   };
+
+  const loadSidebarPrefs = async (): Promise<void> => {
+    const raw = await getStoredSettings();
+    const desktop = isWideViewport();
+    const storedPinned = raw?.foliateSidebarPinned;
+    const storedWidth = raw?.foliateSidebarWidth;
+    const nextPinned = desktop
+      ? (typeof storedPinned === "boolean" ? storedPinned : true)
+      : false;
+    const nextWidth = normalizeSidebarWidth(
+      storedWidth,
+      desktop ? SIDEBAR_DEFAULT_DESKTOP : SIDEBAR_DEFAULT_MOBILE,
+    );
+    setIsDesktop(desktop);
+    setSidebarPinned(nextPinned);
+    setSidebarVisible(nextPinned);
+    setSidebarWidth(nextWidth);
+  };
+
+  const isDockedSidebar = (): boolean => isDesktop() && sidebarPinned();
 
   const ensureViewElement = (): FoliateViewElement => {
     if (view) return view;
@@ -209,12 +272,24 @@ function App(): JSX.Element {
   };
 
   const toggleSidebar = (): void => {
-    setSidebarOpen((value) => !value);
+    setSidebarVisible((value) => !value);
+  };
+
+  const togglePinSidebar = async (): Promise<void> => {
+    if (!isDesktop()) return;
+    const nextPinned = !sidebarPinned();
+    setSidebarPinned(nextPinned);
+    setSidebarVisible(nextPinned);
+    await setSettings({
+      foliateSidebarPinned: nextPinned,
+      foliateSidebarWidth: sidebarWidth(),
+    });
   };
 
   const setMode = (nextMode: ViewMode): void => {
     setViewMode(nextMode);
     view?.renderer?.setAttribute("flow", viewFlow(nextMode));
+    syncReaderLayout(sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null, nextMode);
   };
 
   const goLeft = async (): Promise<void> => {
@@ -222,6 +297,9 @@ function App(): JSX.Element {
     navigationLocked = true;
     try {
       await view.goLeft();
+      if (!isDockedSidebar() && sidebarVisible()) {
+        setSidebarVisible(false);
+      }
     } finally {
       navigationLocked = false;
     }
@@ -232,6 +310,9 @@ function App(): JSX.Element {
     navigationLocked = true;
     try {
       await view.goRight();
+      if (!isDockedSidebar() && sidebarVisible()) {
+        setSidebarVisible(false);
+      }
     } finally {
       navigationLocked = false;
     }
@@ -241,111 +322,208 @@ function App(): JSX.Element {
     if (!view || navigationLocked || !href) return;
     navigationLocked = true;
     try {
-      setSidebarOpen(false);
       await view.goTo(href);
+      if (!isDockedSidebar() && sidebarVisible()) {
+        setSidebarVisible(false);
+      }
     } finally {
       navigationLocked = false;
     }
+  };
+
+  const startResize = (event: PointerEvent): void => {
+    if (!isDockedSidebar() || !sidebarVisible()) return;
+    const frameWidth = shellRef?.getBoundingClientRect().width ?? window.innerWidth;
+    const startX = event.clientX;
+    const startWidth = parseWidthFraction(sidebarWidth());
+    let nextWidth = sidebarWidth();
+
+    const move = (moveEvent: PointerEvent): void => {
+      const delta = moveEvent.clientX - startX;
+      const fraction = clamp(startWidth + delta / frameWidth, SIDEBAR_MIN, SIDEBAR_MAX);
+      nextWidth = toPercent(fraction);
+      setSidebarWidth(nextWidth);
+      syncReaderLayout(nextWidth, viewMode());
+    };
+
+    const stop = (): void => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+      setIsDragging(false);
+      dragCleanup = undefined;
+      void setSettings({ foliateSidebarWidth: nextWidth });
+    };
+
+    setIsDragging(true);
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+    dragCleanup = stop;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const closeSidebar = (): void => {
+    setSidebarVisible(false);
   };
 
   const isActiveToc = (href: string): boolean => activeHref() === href;
 
   return (
     <main class="viewer-root" data-onelingo-reader-ui="">
-      <header class="foliate-toolbar">
-        <button
-          aria-label={sidebarOpen() ? t("viewer.sidebar.close") : t("viewer.sidebar.open")}
-          class="foliate-nav-button"
-          disabled={state() !== "ready"}
-          onClick={toggleSidebar}
-          type="button"
-        >
-          <IconSidebar size={16} />
-        </button>
-        <button
-          class="foliate-nav-button"
-          disabled={state() !== "ready"}
-          onClick={() => void goLeft()}
-          type="button"
-        >
-          ‹
-        </button>
-        <div class="foliate-toolbar-title">{docTitle()}</div>
-        <div class="foliate-toolbar-location">{locationLabel()}</div>
-        <div class="foliate-mode-switch" role="group" aria-label={t("viewer.mode.pages")}>
-          <button
-            classList={{ "foliate-mode-button": true, "is-active": viewMode() === "pages" }}
-            disabled={state() !== "ready"}
-            onClick={() => setMode("pages")}
-            type="button"
+      <div
+        classList={{
+          "foliate-viewer-frame": true,
+          "is-dragging": isDragging(),
+        }}
+        ref={(el) => {
+          shellRef = el;
+        }}
+      >
+        <Show when={sidebarVisible()}>
+          <aside
+            classList={{
+              "foliate-sidebar": true,
+              "is-pinned": isDockedSidebar(),
+              "is-overlay": !isDockedSidebar(),
+              "is-dragging": isDragging(),
+            }}
+            style={{
+              width: isDockedSidebar() ? sidebarWidth() : "",
+            }}
           >
-            <IconPages size={14} />
-            <span>{t("viewer.mode.pages")}</span>
-          </button>
-          <button
-            classList={{ "foliate-mode-button": true, "is-active": viewMode() === "scroll" }}
-            disabled={state() !== "ready"}
-            onClick={() => setMode("scroll")}
-            type="button"
-          >
-            <IconScroll size={14} />
-            <span>{t("viewer.mode.scroll")}</span>
-          </button>
-        </div>
-        <button
-          class="foliate-nav-button"
-          disabled={state() !== "ready"}
-          onClick={() => void goRight()}
-          type="button"
-        >
-          ›
-        </button>
-      </header>
+            <div class="foliate-sidebar-head">
+              <button
+                aria-label={sidebarVisible() ? t("viewer.sidebar.close") : t("viewer.sidebar.open")}
+                class="foliate-icon-button"
+                disabled={state() !== "ready"}
+                onClick={toggleSidebar}
+                type="button"
+              >
+                <IconSidebar size={16} />
+              </button>
+              <div class="foliate-sidebar-title">{t("viewer.sidebar.title")}</div>
+              <button
+                aria-label={sidebarPinned() ? t("viewer.sidebar.unpin") : t("viewer.sidebar.pin")}
+                class="foliate-icon-button"
+                classList={{ "is-active": sidebarPinned() }}
+                disabled={state() !== "ready" || !isDesktop()}
+                onClick={() => void togglePinSidebar()}
+                type="button"
+              >
+                <IconPin size={16} />
+              </button>
+            </div>
+            <div class="foliate-sidebar-body">
+              <Show
+                when={toc().length > 0}
+                fallback={<div class="foliate-sidebar-empty">{t("viewer.sidebar.empty")}</div>}
+              >
+                <nav class="foliate-toc">
+                  <For each={toc()}>
+                    {(item) => (
+                      <TocNode item={item} isActive={isActiveToc} onSelect={goToToc} />
+                    )}
+                  </For>
+                </nav>
+              </Show>
+            </div>
+            <Show when={isDockedSidebar() && isDesktop()}>
+              <button
+                aria-label={t("viewer.sidebar.resize")}
+                class="foliate-sidebar-resize"
+                onPointerDown={startResize}
+                tabIndex={0}
+                type="button"
+              />
+            </Show>
+          </aside>
+        </Show>
 
-      <div classList={{ "foliate-shell": true, "sidebar-open": sidebarOpen() }}>
-        <aside class="foliate-sidebar">
-          <div class="foliate-sidebar-head">{t("viewer.sidebar.title")}</div>
-          <div class="foliate-sidebar-body">
-            <Show
-              when={toc().length > 0}
-              fallback={<div class="foliate-sidebar-empty">{t("viewer.sidebar.empty")}</div>}
+        <div class="foliate-main">
+          <header class="foliate-toolbar">
+            <Show when={!sidebarVisible()}>
+              <button
+                aria-label={t("viewer.sidebar.open")}
+                class="foliate-nav-button"
+                disabled={state() !== "ready"}
+                onClick={toggleSidebar}
+                type="button"
+              >
+                <IconSidebar size={16} />
+              </button>
+            </Show>
+            <button
+              class="foliate-nav-button"
+              disabled={state() !== "ready"}
+              onClick={() => void goLeft()}
+              type="button"
             >
-              <nav class="foliate-toc">
-                <For each={toc()}>
-                  {(item) => (
-                    <TocNode item={item} isActive={isActiveToc} onSelect={goToToc} />
-                  )}
-                </For>
-              </nav>
+              ‹
+            </button>
+            <div class="foliate-toolbar-title">{docTitle()}</div>
+            <div class="foliate-toolbar-location">{locationLabel()}</div>
+            <div class="foliate-mode-switch" role="group" aria-label={t("viewer.mode.pages")}>
+              <button
+                classList={{ "foliate-mode-button": true, "is-active": viewMode() === "pages" }}
+                disabled={state() !== "ready"}
+                onClick={() => setMode("pages")}
+                type="button"
+              >
+                <IconPages size={14} />
+                <span>{t("viewer.mode.pages")}</span>
+              </button>
+              <button
+                classList={{ "foliate-mode-button": true, "is-active": viewMode() === "scroll" }}
+                disabled={state() !== "ready"}
+                onClick={() => setMode("scroll")}
+                type="button"
+              >
+                <IconScroll size={14} />
+                <span>{t("viewer.mode.scroll")}</span>
+              </button>
+            </div>
+            <button
+              class="foliate-nav-button"
+              disabled={state() !== "ready"}
+              onClick={() => void goRight()}
+              type="button"
+            >
+              ›
+            </button>
+          </header>
+
+          <div class="foliate-content">
+            <div
+              class="foliate-render-area"
+              id="foliate-render"
+              ref={(el) => {
+                renderHost = el;
+              }}
+            />
+
+            <Show when={sidebarVisible() && !isDockedSidebar()}>
+              <button
+                aria-hidden="true"
+                class="foliate-sidebar-backdrop"
+                onClick={closeSidebar}
+                tabIndex={-1}
+                type="button"
+              />
+            </Show>
+
+            <Show when={state() === "loading"}>
+              <div class="viewer-loading">{t("viewer.status.loading")}</div>
+            </Show>
+
+            <Show when={state() === "error"}>
+              <div class="viewer-error">
+                <p>{error()}</p>
+              </div>
             </Show>
           </div>
-        </aside>
-
-        <button
-          aria-hidden="true"
-          class="foliate-sidebar-backdrop"
-          onClick={() => setSidebarOpen(false)}
-          tabIndex={-1}
-          type="button"
-        />
-
-        <div
-          class="foliate-render-area"
-          id="foliate-render"
-          ref={(el) => {
-            renderHost = el;
-          }}
-        />
-
-        <Show when={state() === "loading"}>
-          <div class="viewer-loading">{t("viewer.status.loading")}</div>
-        </Show>
-
-        <Show when={state() === "error"}>
-          <div class="viewer-error">
-            <p>{error()}</p>
-          </div>
-        </Show>
+        </div>
       </div>
     </main>
   );
@@ -452,6 +630,47 @@ function nextFrame(): Promise<void> {
   return new Promise((resolve) =>
     requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
   );
+}
+
+function isWideViewport(): boolean {
+  return window.innerWidth >= MOBILE_BREAKPOINT;
+}
+
+function toPercent(fraction: number): string {
+  return `${Math.round(fraction * 10000) / 100}%`;
+}
+
+function normalizeSidebarWidth(value: unknown, fallback: number): string {
+  if (typeof value !== "string") return toPercent(fallback);
+  const trimmed = value.trim();
+  if (!/^\d+(?:\.\d+)?%$/.test(trimmed)) return toPercent(fallback);
+  const fraction = Number.parseFloat(trimmed) / 100;
+  if (!Number.isFinite(fraction)) return toPercent(fallback);
+  return toPercent(clamp(fraction, SIDEBAR_MIN, SIDEBAR_MAX));
+}
+
+function parseWidthFraction(value: string): number {
+  const fraction = Number.parseFloat(value);
+  return Number.isFinite(fraction) ? fraction / 100 : SIDEBAR_DEFAULT_DESKTOP;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function syncReaderLayout(width: string | null, mode: ViewMode): void {
+  const el = document.querySelector("foliate-view") as FoliateViewElement | null;
+  const renderer = el?.renderer;
+  if (!renderer) return;
+  renderer.setAttribute("gap", mode === "scroll" ? "3%" : "4%");
+  renderer.setAttribute("max-column-count", mode === "scroll" ? "1" : "2");
+  if (mode === "pages") {
+    const sidebarFraction = width ? parseWidthFraction(width) : 0;
+    const viewport = Math.max(320, window.innerWidth);
+    const available = Math.max(360, Math.round(viewport * (1 - sidebarFraction)));
+    const maxInline = clamp(available * 0.62, 440, 760);
+    renderer.setAttribute("max-inline-size", `${Math.round(maxInline)}px`);
+  }
 }
 
 export default App;

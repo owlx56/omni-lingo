@@ -75,6 +75,8 @@ export interface Settings {
   documentLinkSniffEnabled: boolean;
   documentLinkSniffKeepOriginal: boolean;
   documentLinkSniffStandalone: boolean;
+  foliateSidebarWidth: string;
+  foliateSidebarPinned: boolean;
   translationStyle: TranslationStyle;
 }
 
@@ -110,6 +112,8 @@ const DEFAULTS: Settings = {
   documentLinkSniffEnabled: true,
   documentLinkSniffKeepOriginal: false,
   documentLinkSniffStandalone: false,
+  foliateSidebarWidth: "15%",
+  foliateSidebarPinned: true,
   translationStyle: {
     underlineStyle: "none",
     fontFamily: "inherit",
@@ -186,6 +190,13 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     legacy?.documentLinkSniffStandalone,
     DEFAULTS.documentLinkSniffStandalone,
   );
+  const foliateSidebarWidth = normalizeSidebarWidth(
+    legacy?.foliateSidebarWidth,
+  );
+  const foliateSidebarPinned = normalizeBoolean(
+    legacy?.foliateSidebarPinned,
+    DEFAULTS.foliateSidebarPinned,
+  );
   // 所有 normalize 过的字段必须在 return 末尾显式覆盖，否则 raw 里的脏值会绕开守门。
   return {
     ...DEFAULTS,
@@ -206,6 +217,8 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     documentLinkSniffEnabled,
     documentLinkSniffKeepOriginal,
     documentLinkSniffStandalone,
+    foliateSidebarWidth,
+    foliateSidebarPinned,
   };
 }
 
@@ -225,6 +238,16 @@ function normalizeTheme(value: unknown): ThemePreference {
 
 function normalizeBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function normalizeSidebarWidth(value: unknown): string {
+  if (typeof value !== "string") return DEFAULTS.foliateSidebarWidth;
+  const trimmed = value.trim();
+  if (!/^\d+(?:\.\d+)?%$/.test(trimmed)) return DEFAULTS.foliateSidebarWidth;
+  const fraction = Number.parseFloat(trimmed) / 100;
+  if (!Number.isFinite(fraction)) return DEFAULTS.foliateSidebarWidth;
+  const clamped = Math.min(0.45, Math.max(0.05, fraction));
+  return `${Math.round(clamped * 10000) / 100}%`;
 }
 
 function normalizeTranslationColor(value: unknown): TranslationColor {
@@ -293,6 +316,10 @@ export async function getSettings(): Promise<Settings> {
   return withDefaults(raw);
 }
 
+export async function getStoredSettings(): Promise<Partial<Settings> | null> {
+  return storage.getItem<Partial<Settings>>(KEY);
+}
+
 export async function setSettings(patch: SettingsPatch): Promise<void> {
   const cur = await getSettings();
   const uiLang = patch.uiLang ?? cur.uiLang;
@@ -334,6 +361,13 @@ export async function setSettings(patch: SettingsPatch): Promise<void> {
       ...cur.translationStyle,
       ...(patch.translationStyle ?? {}),
     },
+    foliateSidebarWidth: normalizeSidebarWidth(
+      patch.foliateSidebarWidth ?? cur.foliateSidebarWidth,
+    ),
+    foliateSidebarPinned: normalizeBoolean(
+      patch.foliateSidebarPinned,
+      cur.foliateSidebarPinned,
+    ),
   };
   await storage.setItem<Settings>(KEY, next);
 }

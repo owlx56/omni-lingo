@@ -97,3 +97,15 @@ export function IconScroll(props: IconProps): JSX.Element {
     props.size ?? 16,
   );
 }
+
+export function IconPin(props: IconProps): JSX.Element {
+  return svg(
+    <>
+      <path d="M14 3l7 7" />
+      <path d="M9 8l7 7" />
+      <path d="M12 11l-6 6" />
+      <path d="M15 4l5-1-1 5-4 4-5 1-4 4-2-2 4-4 1-5 4-4z" />
+    </>,
+    props.size ?? 16,
+  );
+}
