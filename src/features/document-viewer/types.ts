@@ -1,5 +1,5 @@
 export type DocumentKind = "pdf" | "foliate";
-export type ViewerFormat = "auto" | DocumentKind | "epub";
+export type ViewerFormat = "auto" | DocumentKind;
 
 export interface DocumentSource {
   bytes: ArrayBuffer;

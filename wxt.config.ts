@@ -33,31 +33,36 @@ const PDFJS_RELEASE_LOCK_PATH = join(
   "pdfjs-release.lock.json",
 );
 const PDFJS_RELEASE_META_PATH = join(PDFJS_DIST_DIR, "PDFJS_RELEASE.json");
-const EPUB_VIEWER_ASSET_DIR = join(ROOT_DIR, "src", "assets", "epub-viewer");
+const FOLIATE_VIEWER_ASSET_DIR = join(
+  ROOT_DIR,
+  "src",
+  "assets",
+  "foliate-viewer",
+);
 const INTER_FONT_DIR = join(ROOT_DIR, "src", "assets", "fonts", "inter");
-const FOLIATE_JS_PUBLIC_DIR = "epub/web/foliate-js";
+const FOLIATE_JS_PUBLIC_DIR = "foliate/web/foliate-js";
 const FOLIATE_JS_RUNTIME_FILES = [
-  "comic-book.js",
-  "epub.js",
-  "epubcfi.js",
-  "fb2.js",
-  "fixed-layout.js",
-  "mobi.js",
-  "overlayer.js",
-  "pdf.js",
-  "paginator.js",
-  "progress.js",
-  "search.js",
-  "text-walker.js",
-  "tts.js",
-  "view.js",
-  "vendor/fflate.js",
-  "vendor/zip.js",
-  "vendor/pdfjs/annotation_layer_builder.css",
-  "vendor/pdfjs/pdf.mjs",
-  "vendor/pdfjs/pdf.worker.mjs",
-  "vendor/pdfjs/text_layer_builder.css",
-];
+  ["comic-book.js", "comic-book.js"],
+  ["epub.js", "foliate.js"],
+  ["epubcfi.js", "foliatecfi.js"],
+  ["fb2.js", "fb2.js"],
+  ["fixed-layout.js", "fixed-layout.js"],
+  ["mobi.js", "mobi.js"],
+  ["overlayer.js", "overlayer.js"],
+  ["pdf.js", "pdf.js"],
+  ["paginator.js", "paginator.js"],
+  ["progress.js", "progress.js"],
+  ["search.js", "search.js"],
+  ["text-walker.js", "text-walker.js"],
+  ["tts.js", "tts.js"],
+  ["view.js", "view.js"],
+  ["vendor/fflate.js", "vendor/fflate.js"],
+  ["vendor/zip.js", "vendor/zip.js"],
+  ["vendor/pdfjs/annotation_layer_builder.css", "vendor/pdfjs/annotation_layer_builder.css"],
+  ["vendor/pdfjs/pdf.mjs", "vendor/pdfjs/pdf.mjs"],
+  ["vendor/pdfjs/pdf.worker.mjs", "vendor/pdfjs/pdf.worker.mjs"],
+  ["vendor/pdfjs/text_layer_builder.css", "vendor/pdfjs/text_layer_builder.css"],
+] as const;
 const PDF_VIEWER_LOCALE_ALIASES: Record<string, string[]> = {
   "bookmark1.title": ["bookmark.title"],
   bookmark1_label: ["bookmark_label"],
@@ -295,6 +300,26 @@ function patchFoliatePaginatorScript(contents: string): string {
   if (!next.includes("if (index == null || !this.sections[index]) return")) {
     throw new Error("Unable to patch Foliate paginator navigation guards.");
   }
+  return next;
+}
+
+function patchFoliateBookScript(contents: string): string {
+  let next = contents;
+  next = next.replaceAll("./epubcfi.js", "./foliatecfi.js");
+  next = next.replaceAll("'./epub.js'", "'./foliate.js'");
+  next = next.replaceAll('"./epub.js"', '"./foliate.js"');
+  next = next.replaceAll("./epub.js", "./foliate.js");
+  next = next.replaceAll("./epubcfi.js", "./foliatecfi.js");
+  return next;
+}
+
+function patchFoliateViewScript(contents: string): string {
+  let next = contents;
+  next = next.replaceAll("./epubcfi.js", "./foliatecfi.js");
+  next = next.replaceAll("'./epub.js'", "'./foliate.js'");
+  next = next.replaceAll('"./epub.js"', '"./foliate.js"');
+  next = next.replaceAll("./epub.js", "./foliate.js");
+  next = next.replaceAll("./epubcfi.js", "./foliatecfi.js");
   return next;
 }
 
@@ -552,35 +577,53 @@ async function readPdfJsReleaseMetadataFile(
   return parsed as PdfJsReleaseMetadata;
 }
 
-async function addEpubViewerPublicAssets(files: PublicAssetFile[]): Promise<void> {
-  await addDirectoryAssets(files, EPUB_VIEWER_ASSET_DIR, "epub/web");
+async function addFoliateViewerPublicAssets(
+  files: PublicAssetFile[],
+): Promise<void> {
+  await addDirectoryAssets(files, FOLIATE_VIEWER_ASSET_DIR, "foliate/web");
 }
 
 async function addFoliateJsPublicAssets(files: PublicAssetFile[]): Promise<void> {
-  for (const relativePath of FOLIATE_JS_RUNTIME_FILES) {
-    const absoluteSrc = join(FOLIATE_JS_PACKAGE_DIR, relativePath);
-    if (relativePath === "paginator.js") {
+  for (const [sourcePath, publicPath] of FOLIATE_JS_RUNTIME_FILES) {
+    const absoluteSrc = join(FOLIATE_JS_PACKAGE_DIR, sourcePath);
+    if (sourcePath === "paginator.js") {
       addTextAsset(
         files,
         patchFoliateIframeSandbox(
           patchFoliatePaginatorScript(await readFile(absoluteSrc, "utf8")),
         ),
-        join(FOLIATE_JS_PUBLIC_DIR, relativePath),
+        join(FOLIATE_JS_PUBLIC_DIR, publicPath),
       );
       continue;
     }
-    if (relativePath === "fixed-layout.js") {
+    if (sourcePath === "fixed-layout.js") {
       addTextAsset(
         files,
         patchFoliateIframeSandbox(await readFile(absoluteSrc, "utf8")),
-        join(FOLIATE_JS_PUBLIC_DIR, relativePath),
+        join(FOLIATE_JS_PUBLIC_DIR, publicPath),
+      );
+      continue;
+    }
+    if (sourcePath === "view.js") {
+      addTextAsset(
+        files,
+        patchFoliateViewScript(await readFile(absoluteSrc, "utf8")),
+        join(FOLIATE_JS_PUBLIC_DIR, publicPath),
+      );
+      continue;
+    }
+    if (sourcePath === "epub.js") {
+      addTextAsset(
+        files,
+        patchFoliateBookScript(await readFile(absoluteSrc, "utf8")),
+        join(FOLIATE_JS_PUBLIC_DIR, publicPath),
       );
       continue;
     }
     addFileAsset(
       files,
       absoluteSrc,
-      join(FOLIATE_JS_PUBLIC_DIR, relativePath),
+      join(FOLIATE_JS_PUBLIC_DIR, publicPath),
     );
   }
   await addDirectoryAssets(
@@ -710,8 +753,8 @@ const DOCUMENT_VIEWER_WEB_ACCESSIBLE_RESOURCES = [
   "assets/*",
   "pdf/*",
   "pdf-viewer.js",
-  "epub/*",
-  "epub-viewer.js",
+  "foliate/*",
+  "foliate-viewer.js",
 ];
 
 function withUnique(list: string[] | undefined, value: string): string[] {
@@ -825,16 +868,16 @@ export default defineConfig({
       if (!paths.includes("pdf/web/viewer.html")) {
         paths.push("pdf/web/viewer.html");
       }
-      if (!paths.includes("epub/web/viewer.html")) {
-        paths.push("epub/web/viewer.html");
+      if (!paths.includes("foliate/web/viewer.html")) {
+        paths.push("foliate/web/viewer.html");
       }
-      if (!paths.includes("epub/web/foliate-js/view.js")) {
-        paths.push("epub/web/foliate-js/view.js");
+      if (!paths.includes("foliate/web/foliate-js/view.js")) {
+        paths.push("foliate/web/foliate-js/view.js");
       }
     },
     "build:publicAssets": async (_wxt, files) => {
       await addPdfViewerPublicAssets(files);
-      await addEpubViewerPublicAssets(files);
+      await addFoliateViewerPublicAssets(files);
       await addFoliateJsPublicAssets(files);
     },
   },

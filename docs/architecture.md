@@ -20,7 +20,7 @@ src/entrypoints/
   content.ts     -> content script bootstrap
   pdf-viewer.ts  -> 输出 /pdf-viewer.js 的薄入口
   pdf/           -> PDF.js reader 内 hover / selection / theme 桥接
-  epub-viewer.ts -> 输出 /epub-viewer.js 的薄入口
+  foliate-viewer.ts -> 输出 /foliate-viewer.js 的薄入口
   foliate/       -> Foliate reader UI 和内容桥接
   popup/         -> popup UI
   options/       -> options UI
@@ -48,7 +48,7 @@ src/ui/          -> Solid UI 和 Shadow DOM 挂载辅助
 src/assets/
   fonts/inter/   -> options / popup / viewer 使用的打包 Inter 字体
   pdf-viewer/    -> 生成的 PDF reader 静态语言包
-  epub-viewer/   -> EPUB viewer 静态 shell，构建时复制到 /epub/web/
+  foliate-viewer/   -> EPUB viewer 静态 shell，构建时复制到 /foliate/web/
 scripts/
   generate-i18n.ts -> 从 catalog 生成 locale wrapper 和 PDF viewer locale
 ```
@@ -115,7 +115,7 @@ options 和 popup 的通用控件放在 `src/lib/ui/controls.tsx`，样式放在
 
 - `/viewer.html`：Solid 兼容路由壳，处理旧本地 key、远程 URL、旧 sniffer 链接和 HTML shell 探测；最终转到 PDF 或 EPUB viewer。
 - `/pdf/web/viewer.html`：构建时公开的顶层 PDF.js reader。HTML / JS / CSS / runtime 都来自已安装的 `@onelingo/pdfjs-dist` Git 依赖，也就是同一个 GitHub release dist。
-- `/epub/web/viewer.html`：构建时公开的 OneLingo Foliate reader shell。HTML / CSS 来自 `src/assets/epub-viewer/`，运行时由 `/epub-viewer.js` 挂载 `src/entrypoints/foliate/`。
+- `/foliate/web/viewer.html`：构建时公开的 OneLingo Foliate reader shell。HTML / CSS 来自 `src/assets/foliate-viewer/`，运行时由 `/foliate-viewer.js` 挂载 `src/entrypoints/foliate/`。
 
 PDF 打开路径：
 
@@ -128,7 +128,7 @@ local key or direct URL
 EPUB 打开路径：
 
 ```text
-/epub/web/viewer.html?onelingo-key=... or ?file=...
+/foliate/web/viewer.html?onelingo-key=... or ?file=...
   -> ArrayBuffer / IndexedDB
   -> foliate-view open(file)
   -> src/entrypoints/foliate/bridge.ts 绑定内容文档
@@ -204,3 +204,4 @@ Windows 上如果 package-script shim 失败，直接通过 Bun 调本地工具�
 & 'C:\Users\owlx\scoop\shims\bun.exe' .\node_modules\typescript\bin\tsc --noEmit
 & 'C:\Users\owlx\scoop\shims\bun.exe' .\node_modules\wxt\bin\wxt.mjs build
 ```
+

@@ -2,10 +2,10 @@ import type { UiLang } from "@/lib/languages";
 import { browser } from "wxt/browser";
 
 export type DocumentFormat = "pdf" | "foliate";
-export type ViewerFormat = DocumentFormat | "epub" | "auto";
+export type ViewerFormat = DocumentFormat | "auto";
 
 const PDF_VIEWER_PATH = "pdf/web/viewer.html";
-const FOLIATE_VIEWER_PATH = "epub/web/viewer.html";
+const FOLIATE_VIEWER_PATH = "foliate/web/viewer.html";
 const READER_SHELL_PATH = "viewer.html";
 const STORED_DOCUMENT_KEY_PARAM = "onelingo-key";
 const PDF_URL_RE = /\.pdf(?:$|[?#].*)?/i;
@@ -53,18 +53,6 @@ export function foliateViewerUrlForSniff(): string {
   return url.href;
 }
 
-export function epubViewerUrlForFile(fileUrl: string): string {
-  return foliateViewerUrlForFile(fileUrl);
-}
-
-export function epubViewerUrlForStoredKey(key: string): string {
-  return foliateViewerUrlForStoredKey(key);
-}
-
-export function epubViewerUrlForSniff(): string {
-  return foliateViewerUrlForSniff();
-}
-
 export function readerShellUrlForDocument(
   documentUrl: string,
   format: ViewerFormat = "auto",
@@ -84,9 +72,7 @@ export function documentViewerUrlForUrl(
     return pdfViewerUrlForFile(documentUrl, uiLang);
   }
   if (
-    format === "foliate" ||
-    format === "epub" ||
-    (format === "auto" && isLikelyFoliateUrl(documentUrl))
+    format === "foliate" || (format === "auto" && isLikelyFoliateUrl(documentUrl))
   ) {
     return foliateViewerUrlForFile(documentUrl);
   }
@@ -103,10 +89,6 @@ export function isLikelyFoliateUrl(url: string): boolean {
 
 export function isPdfViewerUrl(url: string): boolean {
   return url.startsWith(pdfViewerBaseUrl().href);
-}
-
-export function isEpubViewerUrl(url: string): boolean {
-  return isFoliateViewerUrl(url);
 }
 
 export function isFoliateViewerUrl(url: string): boolean {

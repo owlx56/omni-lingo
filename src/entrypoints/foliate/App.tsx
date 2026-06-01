@@ -252,10 +252,10 @@ function App(): JSX.Element {
 
   return (
     <main class="viewer-root" data-onelingo-reader-ui="">
-      <header class="epub-toolbar">
+      <header class="foliate-toolbar">
         <button
           aria-label={sidebarOpen() ? t("viewer.sidebar.close") : t("viewer.sidebar.open")}
-          class="epub-nav-button"
+          class="foliate-nav-button"
           disabled={state() !== "ready"}
           onClick={toggleSidebar}
           type="button"
@@ -263,18 +263,18 @@ function App(): JSX.Element {
           <IconSidebar size={16} />
         </button>
         <button
-          class="epub-nav-button"
+          class="foliate-nav-button"
           disabled={state() !== "ready"}
           onClick={() => void goLeft()}
           type="button"
         >
           ‹
         </button>
-        <div class="epub-toolbar-title">{docTitle()}</div>
-        <div class="epub-toolbar-location">{locationLabel()}</div>
-        <div class="epub-mode-switch" role="group" aria-label={t("viewer.mode.pages")}>
+        <div class="foliate-toolbar-title">{docTitle()}</div>
+        <div class="foliate-toolbar-location">{locationLabel()}</div>
+        <div class="foliate-mode-switch" role="group" aria-label={t("viewer.mode.pages")}>
           <button
-            classList={{ "epub-mode-button": true, "is-active": viewMode() === "pages" }}
+            classList={{ "foliate-mode-button": true, "is-active": viewMode() === "pages" }}
             disabled={state() !== "ready"}
             onClick={() => setMode("pages")}
             type="button"
@@ -283,7 +283,7 @@ function App(): JSX.Element {
             <span>{t("viewer.mode.pages")}</span>
           </button>
           <button
-            classList={{ "epub-mode-button": true, "is-active": viewMode() === "scroll" }}
+            classList={{ "foliate-mode-button": true, "is-active": viewMode() === "scroll" }}
             disabled={state() !== "ready"}
             onClick={() => setMode("scroll")}
             type="button"
@@ -293,7 +293,7 @@ function App(): JSX.Element {
           </button>
         </div>
         <button
-          class="epub-nav-button"
+          class="foliate-nav-button"
           disabled={state() !== "ready"}
           onClick={() => void goRight()}
           type="button"
@@ -302,15 +302,15 @@ function App(): JSX.Element {
         </button>
       </header>
 
-      <div classList={{ "epub-shell": true, "sidebar-open": sidebarOpen() }}>
-        <aside class="epub-sidebar">
-          <div class="epub-sidebar-head">{t("viewer.sidebar.title")}</div>
-          <div class="epub-sidebar-body">
+      <div classList={{ "foliate-shell": true, "sidebar-open": sidebarOpen() }}>
+        <aside class="foliate-sidebar">
+          <div class="foliate-sidebar-head">{t("viewer.sidebar.title")}</div>
+          <div class="foliate-sidebar-body">
             <Show
               when={toc().length > 0}
-              fallback={<div class="epub-sidebar-empty">{t("viewer.sidebar.empty")}</div>}
+              fallback={<div class="foliate-sidebar-empty">{t("viewer.sidebar.empty")}</div>}
             >
-              <nav class="epub-toc">
+              <nav class="foliate-toc">
                 <For each={toc()}>
                   {(item) => (
                     <TocNode item={item} isActive={isActiveToc} onSelect={goToToc} />
@@ -323,15 +323,15 @@ function App(): JSX.Element {
 
         <button
           aria-hidden="true"
-          class="epub-sidebar-backdrop"
+          class="foliate-sidebar-backdrop"
           onClick={() => setSidebarOpen(false)}
           tabIndex={-1}
           type="button"
         />
 
         <div
-          class="epub-render-area"
-          id="epub-render"
+          class="foliate-render-area"
+          id="foliate-render"
           ref={(el) => {
             renderHost = el;
           }}
@@ -357,16 +357,18 @@ function TocNode(props: {
   onSelect: (href: string) => Promise<void>;
 }): JSX.Element {
   return (
-    <div classList={{ "epub-toc-item": true, active: props.isActive(props.item.href) }}>
+    <div
+      classList={{ "foliate-toc-item": true, active: props.isActive(props.item.href) }}
+    >
       <button
-        class="epub-toc-link"
+        class="foliate-toc-link"
         onClick={() => void props.onSelect(props.item.href)}
         type="button"
       >
         {props.item.label}
       </button>
       <Show when={props.item.subitems.length > 0}>
-        <div class="epub-toc-children">
+        <div class="foliate-toc-children">
           <For each={props.item.subitems}>
             {(child) => (
               <TocNode item={child} isActive={props.isActive} onSelect={props.onSelect} />

@@ -86,14 +86,14 @@ const ALLOWED_TAGS = new Set([
   "ul",
 ]);
 
-export async function parseEpub(source: DocumentSource): Promise<ReaderDocument> {
+export async function parseFoliate(source: DocumentSource): Promise<ReaderDocument> {
   const files = await unzip(source.bytes);
   const containerXml = decodeFile(files, "META-INF/container.xml");
   const container = parseXml(containerXml);
   const rootfile = elementsByLocalName(container, "rootfile")[0];
   const opfPath = rootfile?.getAttribute("full-path");
   if (!opfPath) {
-    throw new Error("EPUB container does not point to a package document");
+    throw new Error("Book container does not point to a package document");
   }
 
   const opf = parseXml(decodeFile(files, opfPath));
@@ -117,7 +117,7 @@ export async function parseEpub(source: DocumentSource): Promise<ReaderDocument>
     const html = decodeFile(files, item.path);
     return {
       html: sanitizeHtml(html, item.path, files, objectUrls),
-      id: `epub-section-${index}`,
+      id: `foliate-section-${index}`,
       title: sectionTitleFromPath(item.href, index),
     };
   });

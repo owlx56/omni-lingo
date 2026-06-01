@@ -82,7 +82,7 @@ options / popup / EPUB viewer / PDF viewer 的界面文案都走 `src/lib/i18n/c
 - PDF reader 使用 `@onelingo/pdfjs-dist` 私有 Git 依赖提供官方 GitHub release `pdfjs-*-dist.zip` 的展开内容；当前锁定 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，依赖根目录是包壳，官方 release dist 在 `dist/build/`、`dist/web/`、`dist/LICENSE`。不要手改已安装依赖或 `.output/`。
 - PDF 内置 viewer 必须保持官方 PDF.js `viewer.html` / `viewer.js` / `viewer.css` 的布局和 textLayer 环境，避免自定义 `PDFViewer` 外壳导致双击选词边界和 hover 精度偏移。
 - PDF hover 默认直接复用 `src/features/hover/` 的通用逻辑。遇到 PDF hover 精度问题，先检查是否仍在顶层官方 viewer 里运行，再检查 reader UI 边界和 textLayer 命中；不要先验地恢复 PDF-specific hover 分支。
-- EPUB 主路径现已切到 `foliate-js`，reader shell 公开为 `/epub/web/viewer.html`，实现放在 `src/entrypoints/foliate/App.tsx`，内容桥接在 `src/entrypoints/foliate/bridge.ts`；hover 编排优先复用 `src/features/hover/`，bridge 只保留文档生命周期绑定和坐标转换。
+- EPUB 主路径现已切到 `foliate-js`，reader shell 公开为 `/foliate/web/viewer.html`，实现放在 `src/entrypoints/foliate/App.tsx`，内容桥接在 `src/entrypoints/foliate/bridge.ts`；hover 编排优先复用 `src/features/hover/`，bridge 只保留文档生命周期绑定和坐标转换。
 - `/viewer.html` 只作为兼容路由和 HTML shell 探测入口；不要把 EPUB UI 或 PDF 自定义 viewer 重新塞回这里。
 - reader 内 selection 行为必须复用 `src/features/selection/`。未来改 selection 功能时，普通网页、PDF reader、EPUB reader 应尽量同时生效。
 - reader UI 控件必须标记或继承 `data-onelingo-reader-ui` 边界，hover / selection 不应命中工具栏、侧栏、菜单、对话框。
@@ -141,3 +141,4 @@ background 是 MV3 service worker，随时可能被杀。持久状态必须可�
 - 不要顺手重命名、重排格式或抽取无关代码。
 - 做 review 时先列具体风险和文件行号。
 - 维护者要求回退某个决策时，按要求改。
+

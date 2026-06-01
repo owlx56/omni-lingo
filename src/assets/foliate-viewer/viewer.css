@@ -86,7 +86,7 @@ body {
     color: var(--danger);
 }
 
-.epub-toolbar {
+.foliate-toolbar {
     display: flex;
     align-items: center;
     gap: 10px;
@@ -97,7 +97,7 @@ body {
     flex-shrink: 0;
 }
 
-.epub-toolbar-title {
+.foliate-toolbar-title {
     min-width: 0;
     flex: 1 1 auto;
     font-size: 14px;
@@ -108,14 +108,14 @@ body {
     white-space: nowrap;
 }
 
-.epub-toolbar-location {
+.foliate-toolbar-location {
     font-size: 12px;
     color: var(--text-muted);
     white-space: nowrap;
 }
 
-.epub-nav-button,
-.epub-mode-button {
+.foliate-nav-button,
+.foliate-mode-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -131,14 +131,14 @@ body {
         opacity 120ms ease;
 }
 
-.epub-nav-button {
+.foliate-nav-button {
     width: 32px;
     height: 32px;
     flex: 0 0 auto;
     font-size: 20px;
 }
 
-.epub-mode-switch {
+.foliate-mode-switch {
     display: inline-flex;
     align-items: center;
     gap: 4px;
@@ -148,25 +148,25 @@ body {
     background: var(--surface-alt);
 }
 
-.epub-mode-button {
+.foliate-mode-button {
     height: 28px;
     padding: 0 10px;
     font-size: 12px;
     color: var(--text-muted);
 }
 
-.epub-mode-button.is-active {
+.foliate-mode-button.is-active {
     background: var(--surface);
     color: var(--text);
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
-.epub-nav-button:hover,
-.epub-mode-button:hover {
+.foliate-nav-button:hover,
+.foliate-mode-button:hover {
     background: var(--surface-alt);
 }
 
-.epub-shell {
+.foliate-shell {
     position: relative;
     flex: 1 1 auto;
     min-height: 0;
@@ -174,21 +174,21 @@ body {
     background: var(--surface);
 }
 
-.epub-render-area {
+.foliate-render-area {
     position: absolute;
     inset: 0;
     background: var(--surface);
 }
 
-.epub-shell > .viewer-loading,
-.epub-shell > .viewer-error {
+.foliate-shell > .viewer-loading,
+.foliate-shell > .viewer-error {
     position: absolute;
     inset: 0;
     z-index: 40;
     background: var(--surface);
 }
 
-.epub-sidebar {
+.foliate-sidebar {
     position: absolute;
     z-index: 20;
     top: 0;
@@ -205,12 +205,12 @@ body {
     pointer-events: none;
 }
 
-.epub-shell.sidebar-open .epub-sidebar {
+.foliate-shell.sidebar-open .foliate-sidebar {
     transform: translateX(0);
     pointer-events: auto;
 }
 
-.epub-sidebar-head {
+.foliate-sidebar-head {
     flex: 0 0 auto;
     padding: 14px 14px 10px;
     border-bottom: 1px solid var(--border);
@@ -221,31 +221,31 @@ body {
     color: var(--text-muted);
 }
 
-.epub-sidebar-body {
+.foliate-sidebar-body {
     min-height: 0;
     flex: 1 1 auto;
     overflow: auto;
     padding: 8px 8px 12px;
 }
 
-.epub-sidebar-empty {
+.foliate-sidebar-empty {
     padding: 12px 8px;
     color: var(--text-muted);
     font-size: 13px;
 }
 
-.epub-toc {
+.foliate-toc {
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
 
-.epub-toc-item {
+.foliate-toc-item {
     display: flex;
     flex-direction: column;
 }
 
-.epub-toc-link {
+.foliate-toc-link {
     display: block;
     width: 100%;
     padding: 8px 10px;
@@ -259,21 +259,21 @@ body {
     cursor: pointer;
 }
 
-.epub-toc-item.active > .epub-toc-link {
+.foliate-toc-item.active > .foliate-toc-link {
     background: var(--surface-alt);
 }
 
-.epub-toc-link:hover {
+.foliate-toc-link:hover {
     background: var(--surface-alt);
 }
 
-.epub-toc-children {
+.foliate-toc-children {
     padding-left: 12px;
     border-left: 1px solid var(--border);
     margin-left: 6px;
 }
 
-.epub-sidebar-backdrop {
+.foliate-sidebar-backdrop {
     position: absolute;
     inset: 0;
     z-index: 10;
@@ -285,29 +285,29 @@ body {
     pointer-events: none;
 }
 
-.epub-shell.sidebar-open .epub-sidebar-backdrop {
+.foliate-shell.sidebar-open .foliate-sidebar-backdrop {
     pointer-events: auto;
 }
 
-.epub-shell.sidebar-open .epub-render-area {
+.foliate-shell.sidebar-open .foliate-render-area {
     filter: saturate(0.98);
 }
 
 @media (max-width: 720px) {
-    .epub-toolbar {
+    .foliate-toolbar {
         gap: 8px;
         padding-inline: 8px;
     }
 
-    .epub-toolbar-location {
+    .foliate-toolbar-location {
         display: none;
     }
 
-    .epub-mode-switch {
+    .foliate-mode-switch {
         gap: 2px;
     }
 
-    .epub-mode-button {
+    .foliate-mode-button {
         padding-inline: 8px;
     }
 }

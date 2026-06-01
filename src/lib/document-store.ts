@@ -4,7 +4,7 @@ const DB_VERSION = 1;
 
 interface StoredDocument {
   data: ArrayBuffer;
-  format: "pdf" | "foliate" | "epub";
+  format: "pdf" | "foliate";
   name: string;
   timestamp: number;
 }
@@ -25,7 +25,7 @@ function openDB(): Promise<IDBDatabase> {
 
 export async function storeDocument(
   data: ArrayBuffer,
-  format: "pdf" | "foliate" | "epub",
+  format: "pdf" | "foliate",
   name: string,
 ): Promise<string> {
   const key = crypto.randomUUID();

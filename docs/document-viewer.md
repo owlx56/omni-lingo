@@ -9,12 +9,12 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 | `src/entrypoints/viewer/App.tsx` | `/viewer.html` 兼容路由壳；只负责本地 `onelingo-key`、远程 URL、旧 sniff 链接的格式解析和转跳 |
 | `src/entrypoints/pdf-viewer.ts` | 输出 `/pdf-viewer.js` 的薄入口；实际代码在 `src/entrypoints/pdf/bridge.ts` |
 | `src/entrypoints/pdf/bridge.ts` | PDF.js reader 内 hover、selection 状态桥接、主题同步和 reader UI 标记 |
-| `src/entrypoints/epub-viewer.ts` | 输出 `/epub-viewer.js` 的薄入口；挂载 Foliate Solid viewer |
+| `src/entrypoints/foliate-viewer.ts` | 输出 `/foliate-viewer.js` 的薄入口；挂载 Foliate Solid viewer |
 | `src/entrypoints/foliate/App.tsx` | Foliate reader UI；接收 `onelingo-key`、`file`、`onelingo-sniff=1` 并驱动 `foliate-view` |
 | `src/entrypoints/foliate/bridge.ts` | Foliate 内容文档内 hover / selection 桥接；绑定 `foliate-view` 的 load / relocate 生命周期 |
 | `@onelingo/pdfjs-dist` | 私有 Git 依赖仓库 `owlx56/pdfjs-dist`；根目录是 package shell，官方 `pdfjs-*-dist.zip` 展开内容放在 `dist/` |
 | `package.json` / `bun.lock` | OneLingo 只在这里锁定 `@onelingo/pdfjs-dist` 的具体 Git tag；当前为 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284` |
-| `src/assets/epub-viewer/` | OneLingo EPUB 静态 shell，构建时复制到 `/epub/web/` |
+| `src/assets/foliate-viewer/` | OneLingo EPUB 静态 shell，构建时复制到 `/foliate/web/` |
 | `src/assets/pdf-viewer/locales.generated.mjs` | 由 `scripts/generate-i18n.ts` 生成的 PDF reader 静态语言包 |
 | `src/features/document-sniffer.ts` | content script 层的页面内 PDF / EPUB 链接点击拦截 |
 | `src/entrypoints/background.ts` | 地址栏 / 主框架文件导航嗅探、右键菜单、保留原页面、独立窗口逻辑 |
@@ -24,7 +24,7 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 
 ## 打开流程
 
-PDF 最终必须进入顶层 `/pdf/web/viewer.html`，EPUB 最终进入 `/epub/web/viewer.html`。`/viewer.html` 只保留为兼容路由和 HTML shell 探测入口，不再承载 EPUB UI：
+PDF 最终必须进入顶层 `/pdf/web/viewer.html`，EPUB 最终进入 `/foliate/web/viewer.html`。`/viewer.html` 只保留为兼容路由和 HTML shell 探测入口，不再承载 EPUB UI：
 
 ```text
 options / context menu / sniffer
@@ -32,16 +32,16 @@ options / context menu / sniffer
   -> local PDF: storeDocument() IndexedDB
   -> /pdf/web/viewer.html?onelingo-key=...
   -> PDF DNR sniff: /pdf/web/viewer.html?onelingo-sniff=1
-  -> EPUB / MOBI / AZW3 / FB2 URL: /epub/web/viewer.html?file=...
+  -> EPUB / MOBI / AZW3 / FB2 URL: /foliate/web/viewer.html?file=...
   -> local EPUB: storeDocument() IndexedDB
-  -> /epub/web/viewer.html?onelingo-key=...
-  -> Foliate DNR sniff: /epub/web/viewer.html?onelingo-sniff=1
+  -> /foliate/web/viewer.html?onelingo-key=...
+  -> Foliate DNR sniff: /foliate/web/viewer.html?onelingo-sniff=1
   -> unknown URL / HTML shell: /viewer.html?url=...&format=auto
   -> discovered PDF: /pdf/web/viewer.html?file=...
-  -> discovered EPUB: /epub/web/viewer.html?file=...
+  -> discovered EPUB: /foliate/web/viewer.html?file=...
 ```
 
-本地 PDF 从 options 进入时先 `storeDocument()`，然后由顶层 PDF.js viewer 内的 `pdf/bridge.ts` 用 `onelingo-key` 读取 IndexedDB 并调用 `PDFViewerApplication.open({ data })`。远程 PDF URL 直接作为官方 viewer 的 `file` 参数打开，和 Saladict 一样。远程 EPUB / MOBI / AZW3 / FB2 URL 进入 `/epub/web/viewer.html?file=...` 后由 Foliate viewer 拉取并渲染；本地同样用 `onelingo-key` 打开。远程 URL 如果不能从扩展入口判断格式，会先进入 `/viewer.html` 做 HTML shell 发现；发现 PDF 后立即重定向到顶层官方 viewer，发现 Foliate 书籍后重定向到 Foliate viewer 的 `file` 入口。`fetchResolvableResource()` 会尝试从 iframe / embed / object / anchor / script 中发现嵌套的 PDF / Foliate 链接，最多递归 `MAX_URL_RESOLVE_DEPTH`。
+本地 PDF 从 options 进入时先 `storeDocument()`，然后由顶层 PDF.js viewer 内的 `pdf/bridge.ts` 用 `onelingo-key` 读取 IndexedDB 并调用 `PDFViewerApplication.open({ data })`。远程 PDF URL 直接作为官方 viewer 的 `file` 参数打开，和 Saladict 一样。远程 EPUB / MOBI / AZW3 / FB2 URL 进入 `/foliate/web/viewer.html?file=...` 后由 Foliate viewer 拉取并渲染；本地同样用 `onelingo-key` 打开。远程 URL 如果不能从扩展入口判断格式，会先进入 `/viewer.html` 做 HTML shell 发现；发现 PDF 后立即重定向到顶层官方 viewer，发现 Foliate 书籍后重定向到 Foliate viewer 的 `file` 入口。`fetchResolvableResource()` 会尝试从 iframe / embed / object / anchor / script 中发现嵌套的 PDF / Foliate 链接，最多递归 `MAX_URL_RESOLVE_DEPTH`。
 
 ## PDF.js 资产
 
@@ -79,7 +79,7 @@ OneLingo 不再下载或解压 PDF.js release zip。私有 `owlx56/pdfjs-dist` �
 
 文件链接嗅探有两层，缺一层都会出现行为差异：
 
-- content script：`src/features/document-sniffer.ts` 拦截普通网页中的 `<a href="...pdf|epub">` 点击。仅在不保留原页面且不独立窗口时，PDF 直接跳到 `/pdf/web/viewer.html?file=...`，EPUB 直接跳到 `/epub/web/viewer.html?file=...`，未知格式才跳到 `/viewer.html?url=...`。
+- content script：`src/features/document-sniffer.ts` 拦截普通网页中的 `<a href="...pdf|epub">` 点击。仅在不保留原页面且不独立窗口时，PDF 直接跳到 `/pdf/web/viewer.html?file=...`，EPUB 直接跳到 `/foliate/web/viewer.html?file=...`，未知格式才跳到 `/viewer.html?url=...`。
 - background：`src/entrypoints/background.ts` 用 DNR / webRequest 处理地址栏输入、主框架跳转、content-type 是 PDF / EPUB 但 URL 不带扩展名的情况，以及 `file://` 导航。
 
 相关设置在 `src/lib/storage/settings.ts`：
@@ -118,7 +118,7 @@ options、popup、EPUB reader、PDF reader 使用打包的 Inter 字体。字体
 
 - `/viewer.html` 路由壳通过 `useSettings()` / `initTheme()` 更新。
 - 顶层 PDF viewer 内部由 `/pdf-viewer.js` 调用 `initTheme()` 并监听主题变化。
-- EPUB viewer 自身由 `/epub-viewer.js` 初始化主题；EPUB 内容文档通过 `syncRenditionDocumentPrefs()` 和 `rendition.hooks.content` 注入 `onelingo-epub-theme`。
+- EPUB viewer 自身由 `/foliate-viewer.js` 初始化主题；EPUB 内容文档通过 `syncRenditionDocumentPrefs()` 和 `rendition.hooks.content` 注入 `onelingo-foliate-theme`。
 
 修主题 bug 时要检查已打开的 PDF / EPUB tab，无需刷新 tab 就应该响应主语言和主题切换。
 
@@ -143,3 +143,4 @@ bun test .\src\lib\i18n\index.test.js
 bun run compile
 bun run build
 ```
+

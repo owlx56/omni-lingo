@@ -1,7 +1,7 @@
 import type { DocumentKind, DocumentSource, ViewerFormat } from "./types";
 
 const PDF_MAGIC = "%PDF";
-const EPUB_MIME = "application/epub+zip";
+const FOLIATE_MIME = "application/epub+zip";
 const FB2_MIME = "application/x-fictionbook+xml";
 const FBZ_MIME = "application/x-zip-compressed-fb2";
 const MOBI_MAGIC = "BOOKMOBI";
@@ -32,14 +32,13 @@ export function inferDocumentKind(
   preferred: ViewerFormat,
 ): DocumentKind | null {
   if (preferred === "pdf" || preferred === "foliate") return preferred;
-  if (preferred === "epub") return "foliate";
   if (preferred !== "auto") return null;
 
   const name = source.name.toLowerCase();
   const mime = source.mimeType?.toLowerCase() ?? "";
   if (mime === "application/pdf" || name.endsWith(".pdf")) return "pdf";
   if (
-    mime === EPUB_MIME ||
+    mime === FOLIATE_MIME ||
     mime === FB2_MIME ||
     mime === FBZ_MIME ||
     name.endsWith(".epub") ||
@@ -67,14 +66,13 @@ export function inferDocumentKindFromName(
   preferred: ViewerFormat,
 ): DocumentKind | null {
   if (preferred === "pdf" || preferred === "foliate") return preferred;
-  if (preferred === "epub") return "foliate";
   if (preferred !== "auto") return null;
 
   const lowerName = name.toLowerCase();
   const lowerMime = mimeType?.toLowerCase() ?? "";
   if (lowerMime === "application/pdf" || lowerName.endsWith(".pdf")) return "pdf";
   if (
-    lowerMime === EPUB_MIME ||
+    lowerMime === FOLIATE_MIME ||
     lowerMime === FB2_MIME ||
     lowerMime === FBZ_MIME ||
     lowerName.endsWith(".epub") ||

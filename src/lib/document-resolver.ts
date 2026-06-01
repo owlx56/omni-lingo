@@ -189,7 +189,7 @@ function looksLikeDocumentOrHtmlShell(
 function looksLikeDocumentUrl(url: string, preferred: ViewerFormat): boolean {
   const lower = url.split(/[?#]/)[0]?.toLowerCase() ?? "";
   if (preferred === "pdf") return lower.endsWith(".pdf");
-  if (preferred === "foliate" || preferred === "epub") {
+  if (preferred === "foliate") {
     return (
       lower.endsWith(".epub") ||
       lower.endsWith(".mobi") ||

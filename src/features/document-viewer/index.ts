@@ -1,4 +1,4 @@
-import { parseEpub } from "./epub";
+import { parseFoliate } from "./foliate";
 import { inferDocumentKind } from "./source";
 import type {
   DocumentKind,
@@ -30,6 +30,6 @@ function parseByKind(
   kind: DocumentKind,
   source: DocumentSource,
 ): Promise<ReaderDocument> {
-  if (kind === "foliate") return parseEpub(source);
+  if (kind === "foliate") return parseFoliate(source);
   throw new Error("PDF documents are handled by the bundled PDF.js viewer");
 }
