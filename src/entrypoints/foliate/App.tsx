@@ -24,7 +24,13 @@ import {
   setSettings,
   useSettings,
 } from "@/lib/storage/settings";
-import { IconPages, IconPin, IconScroll, IconSidebar } from "@/lib/ui/icons";
+import {
+  IconPages,
+  IconPin,
+  IconPinFilled,
+  IconScroll,
+  IconSidebar,
+} from "@/lib/ui/icons";
 import { initFoliateBridge } from "./bridge";
 import type {
   FoliateRelocateDetail,
@@ -43,7 +49,7 @@ type ReaderSource = {
 
 const SIDEBAR_MIN = 0.05;
 const SIDEBAR_MAX = 0.45;
-const SIDEBAR_DEFAULT_DESKTOP = 0.15;
+const SIDEBAR_DEFAULT_DESKTOP = 0.24;
 const SIDEBAR_DEFAULT_MOBILE = 0.25;
 const MOBILE_BREAKPOINT = 720;
 
@@ -232,7 +238,12 @@ function App(): JSX.Element {
   };
 
   const loadSidebarPrefs = async (): Promise<void> => {
-    const raw = await getStoredSettings();
+    let raw: Awaited<ReturnType<typeof getStoredSettings>> = null;
+    try {
+      raw = await getStoredSettings();
+    } catch (err) {
+      console.warn("[OneLingo] failed to read foliate sidebar prefs:", err);
+    }
     const desktop = isWideViewport();
     const storedPinned = raw?.foliateSidebarPinned;
     const storedWidth = raw?.foliateSidebarWidth;
@@ -333,10 +344,14 @@ function App(): JSX.Element {
 
   const startResize = (event: PointerEvent): void => {
     if (!isDockedSidebar() || !sidebarVisible()) return;
-    const frameWidth = shellRef?.getBoundingClientRect().width ?? window.innerWidth;
+    const frameWidth =
+      shellRef?.getBoundingClientRect().width ??
+      window.innerWidth ??
+      1;
     const startX = event.clientX;
     const startWidth = parseWidthFraction(sidebarWidth());
     let nextWidth = sidebarWidth();
+    const pointerId = event.pointerId;
 
     const move = (moveEvent: PointerEvent): void => {
       const delta = moveEvent.clientX - startX;
@@ -360,6 +375,10 @@ function App(): JSX.Element {
     window.addEventListener("pointerup", stop);
     window.addEventListener("pointercancel", stop);
     dragCleanup = stop;
+    const target = event.currentTarget;
+    if (target instanceof HTMLElement) {
+      target.setPointerCapture(pointerId);
+    }
     event.preventDefault();
     event.stopPropagation();
   };
@@ -391,6 +410,7 @@ function App(): JSX.Element {
             }}
             style={{
               width: isDockedSidebar() ? sidebarWidth() : "",
+              "flex-basis": isDockedSidebar() ? sidebarWidth() : "",
             }}
           >
             <div class="foliate-sidebar-head">
@@ -412,7 +432,7 @@ function App(): JSX.Element {
                 onClick={() => void togglePinSidebar()}
                 type="button"
               >
-                <IconPin size={16} />
+                {sidebarPinned() ? <IconPinFilled size={16} /> : <IconPin size={16} />}
               </button>
             </div>
             <div class="foliate-sidebar-body">
@@ -670,6 +690,8 @@ function syncReaderLayout(width: string | null, mode: ViewMode): void {
     const available = Math.max(360, Math.round(viewport * (1 - sidebarFraction)));
     const maxInline = clamp(available * 0.62, 440, 760);
     renderer.setAttribute("max-inline-size", `${Math.round(maxInline)}px`);
+  } else {
+    renderer.removeAttribute("max-inline-size");
   }
 }
 

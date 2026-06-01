@@ -54,6 +54,7 @@ export interface FoliateViewRenderer {
     listener: EventListenerOrEventListenerObject,
     options?: boolean | EventListenerOptions,
   ): void;
+  removeAttribute(name: string): void;
   setAttribute(name: string, value: string): void;
   setStyles?(styles: string | [string, string]): void;
 }

@@ -112,7 +112,7 @@ const DEFAULTS: Settings = {
   documentLinkSniffEnabled: true,
   documentLinkSniffKeepOriginal: false,
   documentLinkSniffStandalone: false,
-  foliateSidebarWidth: "15%",
+  foliateSidebarWidth: "24%",
   foliateSidebarPinned: true,
   translationStyle: {
     underlineStyle: "none",

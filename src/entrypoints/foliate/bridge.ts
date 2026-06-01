@@ -58,10 +58,15 @@ export function initFoliateBridge(
     currentTheme = theme;
     syncCurrentContents(view, currentTheme, currentUiLang, hover);
   });
-  const stopSettingsWatch = watchSettings((settings) => {
-    currentUiLang = settings.uiLang;
-    syncCurrentContents(view, currentTheme, currentUiLang, hover);
-  });
+  let stopSettingsWatch = (): void => {};
+  try {
+    stopSettingsWatch = watchSettings((settings) => {
+      currentUiLang = settings.uiLang;
+      syncCurrentContents(view, currentTheme, currentUiLang, hover);
+    });
+  } catch (err) {
+    console.warn("[OneLingo] failed to watch foliate settings:", err);
+  }
   const stopMessages = registerMessageHandlers(hover);
   const stopHooks = registerViewHooks(
     view,
