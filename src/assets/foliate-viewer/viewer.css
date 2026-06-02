@@ -25,7 +25,7 @@
     --text-muted: #6f6e6a;
     --border: #e2dfd5;
     --danger: #b42318;
-    --sidebar-bg: rgba(255, 255, 255, 0.94);
+    --sidebar-bg: #fcfcfb;
     color-scheme: light;
 }
 
@@ -297,7 +297,7 @@ body {
     padding: 10px 10px 12px;
     margin: 0 8px 8px;
     border-radius: 8px;
-    background: color-mix(in srgb, var(--surface) 72%, transparent);
+    background: var(--sidebar-bg);
 }
 
 .foliate-book-card.has-cover {
@@ -454,6 +454,70 @@ body {
     background: var(--surface);
 }
 
+.foliate-page-turn-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    width: clamp(84px, 15vw, 220px);
+    pointer-events: auto;
+}
+
+.foliate-page-turn-zone.is-left {
+    left: 0;
+    justify-content: flex-start;
+    padding-left: 10px;
+}
+
+.foliate-page-turn-zone.is-right {
+    right: 0;
+    justify-content: flex-end;
+    padding-right: 10px;
+}
+
+.foliate-page-turn-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(4px);
+    transition:
+        color 120ms ease,
+        opacity 120ms ease,
+        transform 120ms ease;
+}
+
+.foliate-page-turn-zone:hover .foliate-page-turn-button {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.foliate-page-turn-button:hover {
+    color: var(--text);
+}
+
+.foliate-page-turn-zone.is-left .foliate-page-turn-button svg {
+    transform: rotate(90deg);
+}
+
+.foliate-page-turn-zone.is-right .foliate-page-turn-button svg {
+    transform: rotate(-90deg);
+}
+
+.foliate-viewer-frame.is-dragging .foliate-page-turn-zone {
+    display: none;
+}
+
 .viewer-loading,
 .viewer-error {
     position: absolute;
@@ -501,7 +565,7 @@ body {
     padding: 18px;
     border: 1px solid var(--border);
     border-radius: 12px;
-    background: var(--surface);
+    background: var(--sidebar-bg);
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
 }
 

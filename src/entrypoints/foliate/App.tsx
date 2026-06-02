@@ -696,6 +696,34 @@ function App(): JSX.Element {
                 renderHost = el;
               }}
             />
+            <Show when={state() === "ready" && viewMode() === "pages"}>
+              <div class="foliate-page-turn-zone is-left">
+                <button
+                  aria-label={t("pdfViewer.previousPage")}
+                  class="foliate-page-turn-button"
+                  onClick={(event) => {
+                    event.currentTarget.blur();
+                    void goLeft();
+                  }}
+                  type="button"
+                >
+                  <IconChevron size={24} />
+                </button>
+              </div>
+              <div class="foliate-page-turn-zone is-right">
+                <button
+                  aria-label={t("pdfViewer.nextPage")}
+                  class="foliate-page-turn-button"
+                  onClick={(event) => {
+                    event.currentTarget.blur();
+                    void goRight();
+                  }}
+                  type="button"
+                >
+                  <IconChevron size={24} />
+                </button>
+              </div>
+            </Show>
 
             <Show when={sidebarVisible() && !isDockedSidebar()}>
               <button
@@ -1397,7 +1425,7 @@ function syncReaderLayout(width: string | null, mode: ViewMode): void {
     const sidebarFraction = width ? parseWidthFraction(width) : 0;
     const viewport = Math.max(320, window.innerWidth);
     const available = Math.max(360, Math.round(viewport * (1 - sidebarFraction)));
-    const maxInline = clamp(available * 0.62, 440, 760);
+    const maxInline = clamp(available * 0.55, 420, 680);
     renderer.setAttribute("max-inline-size", `${Math.round(maxInline)}px`);
   } else {
     renderer.removeAttribute("max-inline-size");
