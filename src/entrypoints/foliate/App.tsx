@@ -573,15 +573,17 @@ function App(): JSX.Element {
             </div>
             <Show when={bookState()}>
               {(book) => (
-                <div class="foliate-book-card">
-                  <div class="foliate-book-cover">
-                    <Show
-                      when={book().coverUrl}
-                      fallback={<div class="foliate-book-cover-fallback" />}
-                    >
-                      <img alt={book().title} src={book().coverUrl} />
-                    </Show>
-                  </div>
+                <div
+                  class="foliate-book-card"
+                  classList={{ "has-cover": Boolean(book().coverUrl) }}
+                >
+                  <Show when={book().coverUrl}>
+                    {(coverUrl) => (
+                      <div class="foliate-book-cover">
+                        <img alt={book().title} src={coverUrl()} />
+                      </div>
+                    )}
+                  </Show>
                   <div class="foliate-book-meta">
                     <div class="foliate-book-title">{book().title}</div>
                     <div class="foliate-book-author">{book().author}</div>
@@ -724,15 +726,17 @@ function App(): JSX.Element {
                 <Show when={bookState()} fallback={<div class="foliate-details-empty" />}>
                   {(book) => (
                     <>
-                      <div class="foliate-details-hero">
-                        <div class="foliate-details-cover">
-                          <Show
-                            when={book().coverUrl}
-                            fallback={<div class="foliate-book-cover-fallback" />}
-                          >
-                            <img alt={book().title} src={book().coverUrl} />
-                          </Show>
-                        </div>
+                      <div
+                        class="foliate-details-hero"
+                        classList={{ "has-cover": Boolean(book().coverUrl) }}
+                      >
+                        <Show when={book().coverUrl}>
+                          {(coverUrl) => (
+                            <div class="foliate-details-cover">
+                              <img alt={book().title} src={coverUrl()} />
+                            </div>
+                          )}
+                        </Show>
                         <div class="foliate-details-identity">
                           <h2>{book().title}</h2>
                           <p>{book().author}</p>
