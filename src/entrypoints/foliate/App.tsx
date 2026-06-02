@@ -535,7 +535,7 @@ function App(): JSX.Element {
               <div class="foliate-sidebar-title">{t("viewer.sidebar.title")}</div>
               <button
                 aria-label={sidebarPinned() ? t("viewer.sidebar.unpin") : t("viewer.sidebar.pin")}
-                class="foliate-icon-button"
+                class="foliate-icon-button foliate-sidebar-pin-button"
                 classList={{ "is-active": sidebarPinned() }}
                 disabled={state() !== "ready" || !isDesktop()}
                 onClick={() => void togglePinSidebar()}

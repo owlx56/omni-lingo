@@ -162,6 +162,10 @@ body {
     color: var(--text);
 }
 
+.foliate-sidebar-pin-button {
+    color: var(--text);
+}
+
 .foliate-nav-button {
     width: 30px;
     height: 30px;

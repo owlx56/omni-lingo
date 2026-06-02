@@ -23,20 +23,6 @@ function svg(path: JSX.Element, size = 16): JSX.Element {
   );
 }
 
-function solidSvg(path: JSX.Element, size = 16): JSX.Element {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="currentColor"
-      height={size}
-      viewBox="0 0 24 24"
-      width={size}
-    >
-      {path}
-    </svg>
-  );
-}
-
 export function IconChevron(props: IconProps): JSX.Element {
   return svg(<path d="M6 9l6 6 6-6" />, props.size ?? 14);
 }
@@ -113,20 +99,18 @@ export function IconScroll(props: IconProps): JSX.Element {
 }
 
 export function IconPin(props: IconProps): JSX.Element {
-  return svg(
-    <>
+  return (
+    <svg aria-hidden="true" fill="currentColor" height={props.size ?? 16} viewBox="0 0 24 24" width={props.size ?? 16}>
       <path d="M14 4v5c0 1.12.37 2.16 1 3H9c.65-.86 1-1.9 1-3V4h4m3-2H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3V4h1c.55 0 1-.45 1-1s-.45-1-1-1z" />
-    </>,
-    props.size ?? 16,
+    </svg>
   );
 }
 
 export function IconPinFilled(props: IconProps): JSX.Element {
-  return solidSvg(
-    <>
+  return (
+    <svg aria-hidden="true" fill="currentColor" height={props.size ?? 16} viewBox="0 0 24 24" width={props.size ?? 16}>
       <path fill-rule="evenodd" d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z" />
-    </>,
-    props.size ?? 16,
+    </svg>
   );
 }
 
