@@ -26,6 +26,7 @@ import type {
 } from "./types";
 
 type FoliateBridgeCallbacks = {
+  onContentLoad?: (doc: Document) => void;
   onLocationChange?: (location: FoliateRelocateDetail) => void;
 };
 
@@ -48,7 +49,7 @@ export function initFoliateBridge(
   void getSettings()
     .then((settings) => {
       currentUiLang = settings.uiLang;
-      syncCurrentContents(view, currentTheme, currentUiLang, hover);
+      syncCurrentContents(view, currentTheme, currentUiLang, hover, callbacks);
     })
     .catch((err: unknown) => {
       console.warn("[OneLingo] failed to read foliate settings:", err);
@@ -56,13 +57,13 @@ export function initFoliateBridge(
 
   const stopThemeWatch = watchEffectiveTheme((theme) => {
     currentTheme = theme;
-    syncCurrentContents(view, currentTheme, currentUiLang, hover);
+    syncCurrentContents(view, currentTheme, currentUiLang, hover, callbacks);
   });
   let stopSettingsWatch = (): void => {};
   try {
     stopSettingsWatch = watchSettings((settings) => {
       currentUiLang = settings.uiLang;
-      syncCurrentContents(view, currentTheme, currentUiLang, hover);
+      syncCurrentContents(view, currentTheme, currentUiLang, hover, callbacks);
     });
   } catch (err) {
     console.warn("[OneLingo] failed to watch foliate settings:", err);
@@ -96,13 +97,14 @@ function registerViewHooks(
   const handleLoad = (event: Event): void => {
     const detail = (event as CustomEvent<FoliateLoadDetail>).detail;
     bindDoc(detail.doc, hover, theme, uiLang);
-    syncCurrentContents(view, theme, uiLang, hover);
+    callbacks.onContentLoad?.(detail.doc);
+    syncCurrentContents(view, theme, uiLang, hover, callbacks);
   };
 
   const handleRelocate = (event: Event): void => {
     const detail = (event as CustomEvent<FoliateRelocateDetail>).detail;
     callbacks.onLocationChange?.(detail);
-    syncCurrentContents(view, theme, uiLang, hover);
+    syncCurrentContents(view, theme, uiLang, hover, callbacks);
   };
 
   view.addEventListener("load", handleLoad);
@@ -110,11 +112,11 @@ function registerViewHooks(
 
   const timers = [
     window.setTimeout(
-      () => syncCurrentContents(view, theme, uiLang, hover),
+      () => syncCurrentContents(view, theme, uiLang, hover, callbacks),
       0,
     ),
     window.setTimeout(
-      () => syncCurrentContents(view, theme, uiLang, hover),
+      () => syncCurrentContents(view, theme, uiLang, hover, callbacks),
       250,
     ),
   ];
@@ -131,11 +133,13 @@ function syncCurrentContents(
   theme: EffectiveTheme,
   uiLang: UiLang,
   hover: HoverController,
+  callbacks: FoliateBridgeCallbacks,
 ): void {
   const contents = view.getContents?.();
   if (!Array.isArray(contents)) return;
   for (const item of contents) {
     bindDoc(item.doc, hover, theme, uiLang);
+    callbacks.onContentLoad?.(item.doc);
   }
 }
 

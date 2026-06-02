@@ -43,6 +43,12 @@ import type {
   FoliateTocItem,
   FoliateViewElement,
 } from "./types";
+import {
+  createQueuedWheelTurnNavigator,
+  createWheelTurnDetector,
+  shouldHandleWheelTurn,
+  type WheelTurnDirection,
+} from "./wheel-turns";
 
 type ViewState = "loading" | "ready" | "error";
 type ViewMode = "pages" | "scroll";
@@ -126,7 +132,16 @@ function App(): JSX.Element {
   let navigationLocked = false;
   let resizeCleanup: (() => void) | undefined;
   let dragCleanup: (() => void) | undefined;
+  let contentWheelCleanup: (() => void) | undefined;
+  let contentRef: HTMLDivElement | undefined;
   let shellRef: HTMLDivElement | undefined;
+  const wheelDocCleanups = new Map<Document, () => void>();
+  const wheelTurnDetector = createWheelTurnDetector();
+  const wheelTurnNavigator = createQueuedWheelTurnNavigator({
+    canNavigate: () => !navigationLocked,
+    isActive: () => state() === "ready" && viewMode() === "pages",
+    navigate: (direction) => performPageTurn(direction),
+  });
 
   createEffect(() => {
     const lang = settings().uiLang;
@@ -149,6 +164,9 @@ function App(): JSX.Element {
     };
     updateViewport();
     window.addEventListener("resize", updateViewport);
+    if (contentRef) {
+      contentWheelCleanup = bindWheelTarget(contentRef);
+    }
     resizeCleanup = () => {
       window.removeEventListener("resize", updateViewport);
     };
@@ -156,6 +174,10 @@ function App(): JSX.Element {
   });
 
   onCleanup(() => {
+    clearWheelTurns();
+    clearWheelContentDocuments();
+    contentWheelCleanup?.();
+    contentWheelCleanup = undefined;
     resizeCleanup?.();
     dragCleanup?.();
     revokeCoverObjectUrl();
@@ -262,6 +284,7 @@ function App(): JSX.Element {
     await el.open(file);
     el.renderer?.setAttribute("flow", viewFlow(viewMode()));
     stopBridge = initFoliateBridge(el, {
+      onContentLoad: bindWheelContentDocument,
       onLocationChange,
     });
 
@@ -284,6 +307,8 @@ function App(): JSX.Element {
   };
 
   const resetReaderState = (): void => {
+    clearWheelTurns();
+    clearWheelContentDocuments();
     bookStateToken += 1;
     stopBridge?.();
     stopBridge = undefined;
@@ -423,16 +448,21 @@ function App(): JSX.Element {
   };
 
   const setMode = (nextMode: ViewMode): void => {
+    if (nextMode !== "pages") clearWheelTurns();
     setViewMode(nextMode);
     view?.renderer?.setAttribute("flow", viewFlow(nextMode));
     syncReaderLayout(sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null, nextMode);
   };
 
-  const goLeft = async (): Promise<void> => {
+  const performPageTurn = async (direction: WheelTurnDirection): Promise<void> => {
     if (!view || navigationLocked) return;
     navigationLocked = true;
     try {
-      await view.goLeft();
+      if (direction === "left") {
+        await view.goLeft();
+      } else {
+        await view.goRight();
+      }
       if (!isDockedSidebar() && sidebarVisible()) {
         setSidebarVisible(false);
       }
@@ -441,21 +471,17 @@ function App(): JSX.Element {
     }
   };
 
+  const goLeft = async (): Promise<void> => {
+    await performPageTurn("left");
+  };
+
   const goRight = async (): Promise<void> => {
-    if (!view || navigationLocked) return;
-    navigationLocked = true;
-    try {
-      await view.goRight();
-      if (!isDockedSidebar() && sidebarVisible()) {
-        setSidebarVisible(false);
-      }
-    } finally {
-      navigationLocked = false;
-    }
+    await performPageTurn("right");
   };
 
   const goToToc = async (href: string): Promise<void> => {
     if (!view || navigationLocked || !href) return;
+    clearWheelTurns();
     navigationLocked = true;
     try {
       await view.goTo(href);
@@ -465,6 +491,62 @@ function App(): JSX.Element {
     } finally {
       navigationLocked = false;
     }
+  };
+
+  const clearWheelTurns = (): void => {
+    wheelTurnDetector.reset();
+    wheelTurnNavigator.clear();
+  };
+
+  const bindWheelTarget = (target: Document | HTMLElement): (() => void) => {
+    const listener = (event: WheelEvent): void => {
+      handleWheelTurn(event);
+    };
+    target.addEventListener("wheel", listener as EventListener, {
+      capture: true,
+      passive: false,
+    });
+    return () => {
+      target.removeEventListener("wheel", listener as EventListener, {
+        capture: true,
+      });
+    };
+  };
+
+  const bindWheelContentDocument = (doc: Document): void => {
+    if (wheelDocCleanups.has(doc)) return;
+    wheelDocCleanups.set(doc, bindWheelTarget(doc));
+  };
+
+  const clearWheelContentDocuments = (): void => {
+    for (const cleanup of wheelDocCleanups.values()) cleanup();
+    wheelDocCleanups.clear();
+  };
+
+  const handleWheelTurn = (event: WheelEvent): void => {
+    const active = shouldHandleWheelTurn(event, {
+      isPagesMode: viewMode() === "pages",
+      isReady: state() === "ready",
+      isReaderUi: isReaderControlWheelEvent(event),
+    });
+    if (!active) {
+      if (event.ctrlKey || event.metaKey || viewMode() !== "pages") {
+        clearWheelTurns();
+      }
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    const direction = wheelTurnDetector.feed({
+      ctrlKey: event.ctrlKey,
+      deltaMode: event.deltaMode,
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+      metaKey: event.metaKey,
+    });
+    if (!direction) return;
+    wheelTurnNavigator.enqueue(direction);
   };
 
   const startResize = (event: PointerEvent): void => {
@@ -688,7 +770,12 @@ function App(): JSX.Element {
             </button>
           </header>
 
-          <div class="foliate-content">
+          <div
+            class="foliate-content"
+            ref={(el) => {
+              contentRef = el;
+            }}
+          >
             <div
               class="foliate-render-area"
               id="foliate-render"
@@ -1430,6 +1517,22 @@ function syncReaderLayout(width: string | null, mode: ViewMode): void {
   } else {
     renderer.removeAttribute("max-inline-size");
   }
+}
+
+function isReaderControlWheelEvent(event: WheelEvent): boolean {
+  const target = event.target;
+  if (!(target instanceof Element)) return false;
+  return Boolean(
+    target.closest(
+      [
+        ".foliate-toolbar",
+        ".foliate-sidebar",
+        ".foliate-sidebar-backdrop",
+        ".foliate-details-backdrop",
+        ".foliate-details-modal",
+      ].join(", "),
+    ),
+  );
 }
 
 export default App;
