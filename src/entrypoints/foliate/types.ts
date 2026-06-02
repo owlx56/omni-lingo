@@ -42,6 +42,38 @@ export interface FoliateLoadDetail {
   index: number;
 }
 
+export type FoliateLanguageMap = string | Record<string, string>;
+
+export type FoliateContributorValue =
+  | string
+  | Record<string, string>
+  | Array<string | Record<string, string>>;
+
+export interface FoliateSeriesValue {
+  name?: FoliateLanguageMap;
+  position?: number | string;
+  [key: string]: unknown;
+}
+
+export interface FoliateBookMetadata {
+  author?: FoliateContributorValue;
+  belongsTo?: {
+    collection?: FoliateSeriesValue | FoliateSeriesValue[];
+    series?: FoliateSeriesValue | FoliateSeriesValue[];
+  };
+  description?: string | Record<string, string>;
+  identifier?: string | string[];
+  language?: string | string[];
+  modified?: string | Date;
+  published?: string | Date;
+  publisher?: FoliateContributorValue;
+  rights?: string | Record<string, string>;
+  subject?: FoliateContributorValue;
+  subtitle?: FoliateLanguageMap;
+  title?: FoliateLanguageMap;
+  [key: string]: unknown;
+}
+
 export interface FoliateViewRenderer {
   addEventListener(
     type: string,
@@ -61,11 +93,8 @@ export interface FoliateViewRenderer {
 
 export interface FoliateBookLike {
   dir?: "ltr" | "rtl";
-  metadata?: {
-    author?: string | Record<string, string> | Array<string | Record<string, string>>;
-    language?: string | string[];
-    title?: string | Record<string, string>;
-  };
+  getCover?: () => Promise<Blob | null> | Blob | null;
+  metadata?: FoliateBookMetadata;
   pageList?: unknown[];
   rendition?: {
     layout?: string;

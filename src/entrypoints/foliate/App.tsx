@@ -26,6 +26,9 @@ import {
 } from "@/lib/storage/settings";
 import {
   IconPages,
+  IconInfo,
+  IconClose,
+  IconChevron,
   IconPin,
   IconPinFilled,
   IconScroll,
@@ -33,6 +36,9 @@ import {
 } from "@/lib/ui/icons";
 import { initFoliateBridge } from "./bridge";
 import type {
+  FoliateBookLike,
+  FoliateBookMetadata,
+  FoliateSeriesValue,
   FoliateRelocateDetail,
   FoliateTocItem,
   FoliateViewElement,
@@ -47,9 +53,38 @@ type ReaderSource = {
   url?: string;
 };
 
+type SidebarBookState = {
+  author: string;
+  coverUrl: string;
+  metadata: FoliateBookMetadata | null;
+  subtitle: string;
+  title: string;
+};
+
+type MetadataSection = {
+  key: string;
+  label: string;
+  value: string;
+};
+
+type SeriesItem = {
+  key: string;
+  label: string;
+  position: string;
+};
+
+type DetailsSectionKind = "fields" | "series" | "description";
+
+type DetailsSectionProps = {
+  emptyLabel: string;
+  items: MetadataSection[] | SeriesItem[] | string[];
+  kind: DetailsSectionKind;
+  label: string;
+};
+
 const SIDEBAR_MIN = 0.05;
 const SIDEBAR_MAX = 0.45;
-const SIDEBAR_DEFAULT_DESKTOP = 0.24;
+const SIDEBAR_DEFAULT_DESKTOP = 0.28;
 const SIDEBAR_DEFAULT_MOBILE = 0.25;
 const MOBILE_BREAKPOINT = 720;
 
@@ -70,10 +105,14 @@ function App(): JSX.Element {
   const [activeHref, setActiveHref] = createSignal("");
   const [isDesktop, setIsDesktop] = createSignal(isWideViewport());
   const [isDragging, setIsDragging] = createSignal(false);
+  const [bookState, setBookState] = createSignal<SidebarBookState | null>(null);
+  const [detailsOpen, setDetailsOpen] = createSignal(false);
 
   let renderHost: HTMLDivElement | undefined;
   let view: FoliateViewElement | undefined;
   let stopBridge: (() => void) | undefined;
+  let coverObjectUrl: string | undefined;
+  let bookStateToken = 0;
   let navigationLocked = false;
   let resizeCleanup: (() => void) | undefined;
   let dragCleanup: (() => void) | undefined;
@@ -105,6 +144,7 @@ function App(): JSX.Element {
   onCleanup(() => {
     resizeCleanup?.();
     dragCleanup?.();
+    revokeCoverObjectUrl();
     stopBridge?.();
     stopBridge = undefined;
     view?.remove();
@@ -211,11 +251,16 @@ function App(): JSX.Element {
       onLocationChange,
     });
 
+    void loadBookState(el.book);
+
     const bookTitle = formatLanguageMap(el.book?.metadata?.title);
     if (bookTitle) setDocTitle(bookTitle);
     setToc(normalizeToc(el.book?.toc ?? []));
     setState("ready");
-    syncReaderLayout(sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null, viewMode());
+    syncReaderLayout(
+      sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null,
+      viewMode(),
+    );
 
     await nextFrame();
     await el.goToTextStart?.().catch(async () => {
@@ -224,17 +269,72 @@ function App(): JSX.Element {
   };
 
   const resetReaderState = (): void => {
+    bookStateToken += 1;
     stopBridge?.();
     stopBridge = undefined;
+    revokeCoverObjectUrl();
     view?.remove();
     view = undefined;
     renderHost?.replaceChildren();
     setToc([]);
     setActiveHref("");
     setLocationLabel("");
+    setBookState(null);
+    setDetailsOpen(false);
     setSidebarVisible(false);
     setIsDragging(false);
     navigationLocked = false;
+  };
+
+  const loadBookState = async (book?: FoliateBookLike): Promise<void> => {
+    revokeCoverObjectUrl();
+    const token = ++bookStateToken;
+    if (!book) {
+      setBookState(null);
+      return;
+    }
+
+    const uiLang = settings().uiLang;
+    const metadata = book.metadata ?? null;
+    const title =
+      formatLanguageMap(metadata?.title, uiLang) || docTitle() || t("viewer.metadata.untitled");
+    const subtitle = formatLanguageMap(metadata?.subtitle, uiLang);
+    const author = formatContributor(metadata?.author, uiLang) || t("viewer.metadata.unknown");
+    setBookState({
+      title,
+      subtitle,
+      author,
+      metadata,
+      coverUrl: "",
+    });
+
+    try {
+      const cover = await Promise.resolve(book.getCover?.());
+      if (token !== bookStateToken) return;
+      if (!cover) return;
+      const nextCoverUrl = URL.createObjectURL(cover);
+      if (token !== bookStateToken) {
+        URL.revokeObjectURL(nextCoverUrl);
+        return;
+      }
+      coverObjectUrl = nextCoverUrl;
+      setBookState((current) =>
+        current
+          ? {
+              ...current,
+              coverUrl: nextCoverUrl,
+            }
+          : current,
+      );
+    } catch (err) {
+      console.warn("[OneLingo] failed to load foliate cover:", err);
+    }
+  };
+
+  const revokeCoverObjectUrl = (): void => {
+    if (!coverObjectUrl) return;
+    URL.revokeObjectURL(coverObjectUrl);
+    coverObjectUrl = undefined;
   };
 
   const loadSidebarPrefs = async (): Promise<void> => {
@@ -291,10 +391,19 @@ function App(): JSX.Element {
     const nextPinned = !sidebarPinned();
     setSidebarPinned(nextPinned);
     setSidebarVisible(nextPinned);
+    syncReaderLayout(nextPinned ? sidebarWidth() : null, viewMode());
     await setSettings({
       foliateSidebarPinned: nextPinned,
       foliateSidebarWidth: sidebarWidth(),
     });
+  };
+
+  const openDetails = (): void => {
+    setDetailsOpen(true);
+  };
+
+  const closeDetails = (): void => {
+    setDetailsOpen(false);
   };
 
   const setMode = (nextMode: ViewMode): void => {
@@ -435,6 +544,33 @@ function App(): JSX.Element {
                 {sidebarPinned() ? <IconPinFilled size={16} /> : <IconPin size={16} />}
               </button>
             </div>
+            <Show when={bookState()}>
+              {(book) => (
+                <div class="foliate-book-card">
+                  <div class="foliate-book-cover">
+                    <Show
+                      when={book().coverUrl}
+                      fallback={<div class="foliate-book-cover-fallback" />}
+                    >
+                      <img alt={book().title} src={book().coverUrl} />
+                    </Show>
+                  </div>
+                  <div class="foliate-book-meta">
+                    <div class="foliate-book-title">{book().title}</div>
+                    <div class="foliate-book-author">{book().author}</div>
+                  </div>
+                  <button
+                    aria-label={t("viewer.metadata.details")}
+                    class="foliate-icon-button foliate-book-info"
+                    disabled={state() !== "ready"}
+                    onClick={openDetails}
+                    type="button"
+                  >
+                    <IconInfo size={16} />
+                  </button>
+                </div>
+              )}
+            </Show>
             <div class="foliate-sidebar-body">
               <Show
                 when={toc().length > 0}
@@ -533,6 +669,68 @@ function App(): JSX.Element {
               />
             </Show>
 
+            <Show when={detailsOpen()}>
+              <div class="foliate-details-backdrop" onClick={closeDetails} />
+              <section
+                aria-label={t("viewer.metadata.details")}
+                class="foliate-details-modal"
+                role="dialog"
+                tabIndex={-1}
+              >
+                <button
+                  aria-label={t("viewer.close")}
+                  class="foliate-details-close"
+                  onClick={closeDetails}
+                  type="button"
+                >
+                  <IconClose size={16} />
+                </button>
+                <Show when={bookState()} fallback={<div class="foliate-details-empty" />}>
+                  {(book) => (
+                    <>
+                      <div class="foliate-details-hero">
+                        <div class="foliate-details-cover">
+                          <Show
+                            when={book().coverUrl}
+                            fallback={<div class="foliate-book-cover-fallback" />}
+                          >
+                            <img alt={book().title} src={book().coverUrl} />
+                          </Show>
+                        </div>
+                        <div class="foliate-details-identity">
+                          <h2>{book().title}</h2>
+                          <p>{book().author}</p>
+                          <Show when={book().subtitle}>
+                            <span>{book().subtitle}</span>
+                          </Show>
+                        </div>
+                      </div>
+                      <div class="foliate-details-sections">
+                        <DetailsSection
+                          kind="fields"
+                          label={t("viewer.metadata.metadata")}
+                          emptyLabel={t("viewer.metadata.unknown")}
+                          items={buildMetadataSections(book().metadata, t, settings().uiLang)}
+                        />
+                        <DetailsSection
+                          kind="series"
+                          label={t("viewer.metadata.series")}
+                          emptyLabel={t("viewer.metadata.unknown")}
+                          items={buildSeriesSections(book().metadata, t, settings().uiLang)}
+                        />
+                        <DetailsSection
+                          kind="description"
+                          label={t("viewer.metadata.description")}
+                          emptyLabel={t("viewer.metadata.noDescription")}
+                          items={buildDescriptionSections(book().metadata, settings().uiLang)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </Show>
+              </section>
+            </Show>
+
             <Show when={state() === "loading"}>
               <div class="viewer-loading">{t("viewer.status.loading")}</div>
             </Show>
@@ -598,6 +796,202 @@ function normalizeTocItem(value: unknown): FoliateTocItem | null {
   return { href, label, subitems };
 }
 
+function DetailsSection({
+  kind,
+  label,
+  emptyLabel,
+  items,
+}: DetailsSectionProps): JSX.Element {
+  const [open, setOpen] = createSignal(true);
+
+  return (
+    <section class={`foliate-details-section is-${kind}`}>
+      <button
+        class="foliate-details-section-head"
+        onClick={() => setOpen((value) => !value)}
+        type="button"
+      >
+        <span>{label}</span>
+        <IconChevron size={14} />
+      </button>
+      <Show when={open()}>
+        <div class="foliate-details-section-body">
+          <Show
+            when={items.length > 0}
+            fallback={<p class="foliate-details-empty-text">{emptyLabel}</p>}
+          >
+            {kind === "description" ? (
+              <For each={items as string[]}>
+                {(item) => <p class="foliate-details-description">{item}</p>}
+              </For>
+            ) : kind === "series" ? (
+              <div class="foliate-details-series-list">
+                <For each={items as SeriesItem[]}>
+                  {(item) => (
+                    <div class="foliate-details-series-item">
+                      <strong>{item.label}</strong>
+                      <span>{item.position}</span>
+                    </div>
+                  )}
+                </For>
+              </div>
+            ) : (
+              <dl class="foliate-details-field-list">
+                <For each={items as MetadataSection[]}>
+                  {(item) => (
+                    <>
+                      <dt>{item.label}</dt>
+                      <dd>{item.value}</dd>
+                    </>
+                  )}
+                </For>
+              </dl>
+            )}
+          </Show>
+        </div>
+      </Show>
+    </section>
+  );
+}
+
+function buildMetadataSections(
+  metadata: FoliateBookMetadata | null,
+  t: (key: Parameters<ReturnType<typeof useT>>[0]) => string,
+  uiLang: UiLang,
+): MetadataSection[] {
+  if (!metadata) return [];
+  const fields: Array<[string, string]> = [
+    ["publisher", formatContributor(metadata.publisher, uiLang)],
+    ["published", formatDateValue(metadata.published, uiLang)],
+    ["modified", formatDateValue(metadata.modified, uiLang)],
+    ["language", formatLanguageValue(metadata.language, uiLang)],
+    ["subject", formatContributor(metadata.subject, uiLang)],
+    ["identifier", formatIdentifier(metadata.identifier)],
+    ["rights", formatTextValue(metadata.rights, uiLang)],
+  ];
+
+  return fields
+    .map(([key, value]) => ({
+      key,
+      label: t(`viewer.metadata.${key}` as Parameters<typeof t>[0]),
+      value: value || t("viewer.metadata.unknown"),
+    }))
+    .filter((item) => item.value !== "");
+}
+
+function buildSeriesSections(
+  metadata: FoliateBookMetadata | null,
+  t: (key: Parameters<ReturnType<typeof useT>>[0]) => string,
+  uiLang: UiLang,
+): SeriesItem[] {
+  const series = normalizeSeries(metadata?.belongsTo?.series, uiLang);
+  return series.map((item, index) => ({
+    key: `${item.label}-${item.position}-${index}`,
+    label: item.label || t("viewer.metadata.unknown"),
+    position: item.position || t("viewer.metadata.unknown"),
+  }));
+}
+
+function buildDescriptionSections(
+  metadata: FoliateBookMetadata | null,
+  uiLang: UiLang,
+): string[] {
+  const description = normalizeDescription(metadata?.description, uiLang);
+  if (!description) return [];
+  return description.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+}
+
+function normalizeSeries(
+  value?: FoliateSeriesValue | FoliateSeriesValue[] | null,
+  uiLang?: UiLang,
+): SeriesItem[] {
+  const items = Array.isArray(value) ? value : value ? [value] : [];
+  return items
+    .map((item) => {
+      return {
+        label: formatLanguageMap(item.name, uiLang),
+        position: formatPosition(item.position),
+      };
+    })
+    .filter((item): item is SeriesItem => Boolean(item));
+}
+
+function formatContributor(value: FoliateBookMetadata["author"], uiLang?: UiLang): string {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) {
+    const locale = getDisplayLocale(uiLang);
+    const items = value
+      .map((item) => formatContributor(item as FoliateBookMetadata["author"], uiLang))
+      .filter(Boolean);
+    return items.length > 0
+      ? new Intl.ListFormat(locale, { style: "long", type: "conjunction" }).format(items)
+      : "";
+  }
+  return formatLanguageMap(value.name ?? value, uiLang);
+}
+
+function formatLanguageValue(value: FoliateBookMetadata["language"], uiLang: UiLang): string {
+  if (!value) return "";
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (!raw) return "";
+  const locale = uiLang === "zh-Hans" ? "zh-Hans" : uiLang;
+  try {
+    return new Intl.DisplayNames([locale], { type: "language" }).of(raw) ?? raw;
+  } catch {
+    return raw;
+  }
+}
+
+function formatDateValue(value: string | Date | undefined, uiLang?: UiLang): string {
+  if (!value) return "";
+  try {
+    return new Intl.DateTimeFormat(getDisplayLocale(uiLang), {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(value));
+  } catch {
+    return "";
+  }
+}
+
+function formatPosition(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "string" && value.trim()) return value.trim();
+  return "";
+}
+
+function formatIdentifier(value: string | string[] | undefined): string {
+  if (!value) return "";
+  return Array.isArray(value) ? value.filter(Boolean).join(", ") : value;
+}
+
+function formatTextValue(
+  value: string | Record<string, string> | undefined,
+  uiLang?: UiLang,
+): string {
+  if (!value) return "";
+  return typeof value === "string" ? stripHtml(value) : formatLanguageMap(value, uiLang);
+}
+
+function normalizeDescription(
+  value: FoliateBookMetadata["description"],
+  uiLang?: UiLang,
+): string {
+  if (!value) return "";
+  return typeof value === "string" ? stripHtml(value) : formatLanguageMap(value, uiLang);
+}
+
+function stripHtml(text: string): string {
+  return text
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#\d+;|&[a-z]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function createReaderFile(source: ReaderSource): File {
   return new File([source.data.slice(0)], source.name || `document.${source.format}`, {
     type: mimeFromName(source.name, source.format),
@@ -622,11 +1016,34 @@ function stripDocumentName(name: string): string {
   return name.replace(/\.(pdf|epub|mobi|azw3|kf8|fb2|fb2\.zip|fbz)$/i, "") || name;
 }
 
-function formatLanguageMap(value: string | Record<string, string> | undefined): string {
+function formatLanguageMap(
+  value: string | Record<string, string> | undefined,
+  preferredLang?: UiLang,
+): string {
   if (!value) return "";
   if (typeof value === "string") return value;
+  if (preferredLang) {
+    const preferredKeys = [
+      preferredLang,
+      preferredLang.split("-")[0] ?? "",
+      preferredLang === "zh-Hans" || preferredLang === "zh-Hant" ? "zh" : "",
+    ].filter(Boolean);
+    for (const key of preferredKeys) {
+      const candidate = value[key];
+      if (typeof candidate === "string" && candidate.trim()) {
+        return candidate;
+      }
+    }
+  }
   const keys = Object.keys(value);
   return keys.length > 0 ? value[keys[0]!] ?? "" : "";
+}
+
+function getDisplayLocale(uiLang?: UiLang): string {
+  if (!uiLang) return "en";
+  if (uiLang === "zh-Hans") return "zh-Hans";
+  if (uiLang === "zh-Hant") return "zh-Hant";
+  return uiLang;
 }
 
 function applyLanguageToDocument(targetDocument: Document, uiLang: UiLang): void {

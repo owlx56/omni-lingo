@@ -111,7 +111,6 @@ body {
 }
 
 .foliate-sidebar.is-pinned {
-    border-inline-end: 1px solid var(--border);
     background: color-mix(in srgb, var(--sidebar-bg) 94%, var(--surface) 6%);
 }
 
@@ -122,6 +121,7 @@ body {
     gap: 8px;
     min-height: 48px;
     padding: 8px 10px;
+    border-bottom: 0;
 }
 
 .foliate-sidebar-title {
@@ -180,7 +180,7 @@ body {
     min-height: 0;
     flex: 1 1 auto;
     overflow: auto;
-    padding: 8px 8px 12px;
+    padding: 0 8px 12px;
 }
 
 .foliate-sidebar-empty {
@@ -221,6 +221,74 @@ body {
 .foliate-toc-children {
     padding-left: 12px;
     margin-left: 6px;
+}
+
+.foliate-book-card {
+    display: grid;
+    grid-template-columns: 54px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 10px 12px;
+    margin: 0 8px 8px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.foliate-book-cover {
+    width: 54px;
+    aspect-ratio: 28 / 41;
+    overflow: hidden;
+    border-radius: 4px;
+    background: var(--surface-alt);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+.foliate-book-cover img,
+.foliate-details-cover img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.foliate-book-cover-fallback {
+    width: 100%;
+    height: 100%;
+    background:
+        linear-gradient(135deg, rgba(0, 0, 0, 0.12), rgba(255, 255, 255, 0.08)),
+        var(--surface-alt);
+}
+
+.foliate-book-meta {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.foliate-book-title {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.foliate-book-author {
+    font-size: 12px;
+    line-height: 1.3;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.foliate-book-info {
+    color: var(--text-muted);
+    margin-inline-start: auto;
 }
 
 .foliate-sidebar-resize {
@@ -349,6 +417,160 @@ body {
     background: rgba(0, 0, 0, 0.04);
 }
 
+.foliate-details-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 45;
+    background: rgba(0, 0, 0, 0.24);
+}
+
+.foliate-details-modal {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    z-index: 50;
+    width: min(680px, calc(100% - 24px));
+    max-height: min(84vh, 760px);
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    overflow: hidden;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
+}
+
+.foliate-details-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+}
+
+.foliate-details-hero {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+    padding-right: 36px;
+}
+
+.foliate-details-cover {
+    width: 88px;
+    aspect-ratio: 28 / 41;
+    overflow: hidden;
+    border-radius: 6px;
+    background: var(--surface-alt);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+}
+
+.foliate-details-identity {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.foliate-details-identity h2 {
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.2;
+    color: var(--text);
+}
+
+.foliate-details-identity p,
+.foliate-details-identity span {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.45;
+}
+
+.foliate-details-sections {
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 2px;
+}
+
+.foliate-details-section {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--surface) 92%, var(--surface-alt) 8%);
+}
+
+.foliate-details-section-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+}
+
+.foliate-details-section-body {
+    padding: 0 12px 12px;
+}
+
+.foliate-details-field-list {
+    display: grid;
+    grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
+    gap: 6px 12px;
+    margin: 0;
+}
+
+.foliate-details-field-list dt {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.foliate-details-field-list dd {
+    margin: 0;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.foliate-details-series-list,
+.foliate-details-description {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.foliate-details-series-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.foliate-details-empty-text {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+}
+
 @media (max-width: 720px) {
     .foliate-sidebar {
         min-width: 0;
@@ -375,5 +597,23 @@ body {
 
     .foliate-mode-button {
         padding-inline: 8px;
+    }
+
+    .foliate-details-modal {
+        width: calc(100% - 16px);
+        max-height: calc(100vh - 16px);
+        padding: 14px;
+    }
+
+    .foliate-details-hero {
+        grid-template-columns: 72px minmax(0, 1fr);
+    }
+
+    .foliate-details-cover {
+        width: 72px;
+    }
+
+    .foliate-details-identity h2 {
+        font-size: 18px;
     }
 }
