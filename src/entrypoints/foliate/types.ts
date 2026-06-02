@@ -1,8 +1,15 @@
 export type FoliateFlow = "paginated" | "scrolled";
 
 export interface FoliateTocItem {
+  id?: number | string;
   href: string;
   label: string;
+  index?: number;
+  location?: {
+    current?: number;
+    next?: number;
+    total?: number;
+  };
   subitems: FoliateTocItem[];
 }
 
@@ -33,6 +40,12 @@ export interface FoliateRelocateDetail {
   tocItem?: {
     href?: string;
     label?: string;
+    index?: number;
+    location?: {
+      current?: number;
+      next?: number;
+      total?: number;
+    };
     subitems?: FoliateTocItem[];
   };
 }
@@ -103,20 +116,31 @@ export interface FoliateBookLike {
     anchor: (doc: Document) => Element | Range | null;
     index: number;
   };
-  resolveHref?: (href: string) => {
-    anchor: (doc: Document) => Element | Range | null;
-    index: number;
-  };
+  resolveHref?: (href: string) =>
+    | {
+        anchor?: (doc: Document) => Element | Range | null;
+        index: number;
+      }
+    | null
+    | undefined
+    | Promise<
+        | {
+            anchor?: (doc: Document) => Element | Range | null;
+            index: number;
+          }
+        | null
+        | undefined
+      >;
   sections: Array<{
+    createDocument?: () => Promise<Document> | Document;
     id?: unknown;
     linear?: string;
     load?: () => Promise<string> | string;
     size?: number;
     unload?: () => void;
   }>;
-  splitTOCHref?: (
-    href: string,
-  ) => Promise<[unknown, unknown]> | [unknown, unknown];
+  getTOCFragment?: (doc: Document, id: unknown) => Node | Range | null | undefined;
+  splitTOCHref?: (href: string) => Promise<unknown[]> | unknown[];
   toc?: unknown[];
   transformTarget?: EventTarget;
 }
