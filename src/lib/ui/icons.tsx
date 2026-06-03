@@ -98,6 +98,34 @@ export function IconScroll(props: IconProps): JSX.Element {
   );
 }
 
+export function IconArrowLeftDouble(props: IconProps): JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="currentColor"
+      height={props.size ?? 16}
+      viewBox="0 0 24 24"
+      width={props.size ?? 16}
+    >
+      <path d="M8.37 12l4.95 4.95-1.42 1.41L5.54 12l6.36-6.36 1.42 1.41L8.37 12zm6 0 4.95 4.95-1.42 1.41L11.54 12l6.36-6.36 1.42 1.41L14.37 12z" />
+    </svg>
+  );
+}
+
+export function IconArrowRightDouble(props: IconProps): JSX.Element {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="currentColor"
+      height={props.size ?? 16}
+      viewBox="0 0 24 24"
+      width={props.size ?? 16}
+    >
+      <path d="M15.63 12l-4.95-4.95 1.42-1.41L18.46 12l-6.36 6.36-1.42-1.41L15.63 12zm-6 0L4.68 7.05 6.1 5.64 12.46 12 6.1 18.36l-1.42-1.41L9.63 12z" />
+    </svg>
+  );
+}
+
 export function IconPin(props: IconProps): JSX.Element {
   return (
     <svg aria-hidden="true" fill="currentColor" height={props.size ?? 16} viewBox="0 0 24 24" width={props.size ?? 16}>

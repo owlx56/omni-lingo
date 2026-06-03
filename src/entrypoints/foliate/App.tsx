@@ -25,6 +25,8 @@ import {
   useSettings,
 } from "@/lib/storage/settings";
 import {
+  IconArrowLeftDouble,
+  IconArrowRightDouble,
   IconPages,
   IconInfo,
   IconClose,
@@ -35,6 +37,11 @@ import {
   IconSidebar,
 } from "@/lib/ui/icons";
 import { initFoliateBridge } from "./bridge";
+import {
+  getReaderChromeLayout,
+  getReaderChromeState,
+  type ReaderChromeZone,
+} from "./reader-chrome";
 import type {
   FoliateBookLike,
   FoliateBookMetadata,
@@ -52,6 +59,7 @@ import {
 
 type ViewState = "loading" | "ready" | "error";
 type ViewMode = "pages" | "scroll";
+type SectionTurnDirection = "previous" | "next";
 type ReaderSource = {
   data: ArrayBuffer;
   format: ViewerFormat;
@@ -123,6 +131,7 @@ function App(): JSX.Element {
   const [isDragging, setIsDragging] = createSignal(false);
   const [bookState, setBookState] = createSignal<SidebarBookState | null>(null);
   const [detailsOpen, setDetailsOpen] = createSignal(false);
+  const [readerChromeZone, setReaderChromeZone] = createSignal<ReaderChromeZone>(null);
 
   let renderHost: HTMLDivElement | undefined;
   let view: FoliateViewElement | undefined;
@@ -447,6 +456,29 @@ function App(): JSX.Element {
     setDetailsOpen(false);
   };
 
+  const readerChapterLabel = (): string => locationLabel() || docTitle();
+
+  const readerBookTitle = (): string => docTitle() || t("viewer.title");
+
+  const readerChromeState = () => getReaderChromeState(readerChromeZone());
+
+  const readerChromeLayout = () => getReaderChromeLayout(viewMode());
+
+  const showReaderChrome = (zone: Exclude<ReaderChromeZone, null>): void => {
+    if (state() !== "ready") return;
+    setReaderChromeZone(zone);
+  };
+
+  const resetReaderChrome = (): void => {
+    if (readerChromeZone() !== null) {
+      setReaderChromeZone(null);
+    }
+  };
+
+  const hideReaderChrome = (zone: Exclude<ReaderChromeZone, null>): void => {
+    setReaderChromeZone((current) => (current === zone ? null : current));
+  };
+
   const setMode = (nextMode: ViewMode): void => {
     if (nextMode !== "pages") clearWheelTurns();
     setViewMode(nextMode);
@@ -477,6 +509,31 @@ function App(): JSX.Element {
 
   const goRight = async (): Promise<void> => {
     await performPageTurn("right");
+  };
+
+  const performSectionTurn = async (direction: SectionTurnDirection): Promise<void> => {
+    if (!view || navigationLocked) return;
+    const renderer = view.renderer;
+    const action = direction === "previous" ? renderer?.prevSection : renderer?.nextSection;
+    if (!renderer || !action) return;
+    clearWheelTurns();
+    navigationLocked = true;
+    try {
+      await action.call(renderer);
+      if (!isDockedSidebar() && sidebarVisible()) {
+        setSidebarVisible(false);
+      }
+    } finally {
+      navigationLocked = false;
+    }
+  };
+
+  const goPreviousSection = async (): Promise<void> => {
+    await performSectionTurn("previous");
+  };
+
+  const goNextSection = async (): Promise<void> => {
+    await performSectionTurn("next");
   };
 
   const goToToc = async (href: string): Promise<void> => {
@@ -515,12 +572,32 @@ function App(): JSX.Element {
 
   const bindWheelContentDocument = (doc: Document): void => {
     if (wheelDocCleanups.has(doc)) return;
-    wheelDocCleanups.set(doc, bindWheelTarget(doc));
+    const cleanupWheel = bindWheelTarget(doc);
+    const cleanupChrome = bindReaderChromeContentDocument(doc);
+    wheelDocCleanups.set(doc, () => {
+      cleanupWheel();
+      cleanupChrome();
+    });
   };
 
   const clearWheelContentDocuments = (): void => {
     for (const cleanup of wheelDocCleanups.values()) cleanup();
     wheelDocCleanups.clear();
+  };
+
+  const bindReaderChromeContentDocument = (doc: Document): (() => void) => {
+    const listener = (): void => {
+      resetReaderChrome();
+    };
+    doc.addEventListener("mousemove", listener, {
+      capture: true,
+      passive: true,
+    });
+    return () => {
+      doc.removeEventListener("mousemove", listener, {
+        capture: true,
+      });
+    };
   };
 
   const handleWheelTurn = (event: WheelEvent): void => {
@@ -716,62 +793,27 @@ function App(): JSX.Element {
         </Show>
 
         <div class="foliate-main">
-          <header class="foliate-toolbar">
-            <Show when={!sidebarVisible()}>
-              <button
-                aria-label={t("viewer.sidebar.open")}
-                class="foliate-nav-button"
-                disabled={state() !== "ready"}
-                onClick={toggleSidebar}
-                type="button"
-              >
-                <IconSidebar size={16} />
-              </button>
-            </Show>
-            <button
-              class="foliate-nav-button"
-              disabled={state() !== "ready"}
-              onClick={() => void goLeft()}
-              type="button"
-            >
-              ‹
-            </button>
-            <div class="foliate-toolbar-title">{docTitle()}</div>
-            <div class="foliate-toolbar-location">{locationLabel()}</div>
-            <div class="foliate-mode-switch" role="group" aria-label={t("viewer.mode.pages")}>
-              <button
-                aria-label={t("viewer.mode.pages")}
-                classList={{ "foliate-mode-button": true, "is-active": viewMode() === "pages" }}
-                disabled={state() !== "ready"}
-                onClick={() => setMode("pages")}
-                title={t("viewer.mode.pages")}
-                type="button"
-              >
-                <IconPages size={15} />
-              </button>
-              <button
-                aria-label={t("viewer.mode.scroll")}
-                classList={{ "foliate-mode-button": true, "is-active": viewMode() === "scroll" }}
-                disabled={state() !== "ready"}
-                onClick={() => setMode("scroll")}
-                title={t("viewer.mode.scroll")}
-                type="button"
-              >
-                <IconScroll size={15} />
-              </button>
-            </div>
-            <button
-              class="foliate-nav-button"
-              disabled={state() !== "ready"}
-              onClick={() => void goRight()}
-              type="button"
-            >
-              ›
-            </button>
-          </header>
-
           <div
-            class="foliate-content"
+            classList={{
+              "foliate-content": true,
+              "has-scroll-chrome-space": readerChromeLayout().reserveChromeSpace,
+            }}
+            onMouseMove={(event) => {
+              const target = event.target;
+              if (!(target instanceof Element)) return;
+              if (
+                target.closest(
+                  [
+                    ".foliate-reader-topbar",
+                    ".foliate-reader-bottom-hover-zone",
+                    ".foliate-page-turn-zone",
+                  ].join(", "),
+                )
+              ) {
+                return;
+              }
+              resetReaderChrome();
+            }}
             ref={(el) => {
               contentRef = el;
             }}
@@ -783,6 +825,106 @@ function App(): JSX.Element {
                 renderHost = el;
               }}
             />
+            <Show when={state() === "ready"}>
+              <header
+                classList={{
+                  "foliate-reader-topbar": true,
+                  "is-expanded": readerChromeState().showModeSwitch,
+                }}
+                onMouseEnter={() => showReaderChrome("top")}
+                onMouseLeave={() => hideReaderChrome("top")}
+              >
+                <div class="foliate-reader-topbar-start">
+                  <Show when={!sidebarVisible()}>
+                    <button
+                      aria-label={t("viewer.sidebar.open")}
+                      class="foliate-nav-button foliate-reader-sidebar-toggle"
+                      disabled={state() !== "ready"}
+                      onClick={toggleSidebar}
+                      type="button"
+                    >
+                      <IconSidebar size={16} />
+                    </button>
+                  </Show>
+                  <div
+                    classList={{
+                      "foliate-reader-section-info": true,
+                      "is-hidden": !readerChromeState().showChapterTitle,
+                    }}
+                    title={readerChapterLabel()}
+                  >
+                    {readerChapterLabel()}
+                  </div>
+                </div>
+                <div class="foliate-reader-book-title" title={readerBookTitle()}>
+                  {readerBookTitle()}
+                </div>
+                <div class="foliate-reader-topbar-end">
+                  <div class="foliate-mode-switch" role="group" aria-label={t("viewer.mode.pages")}>
+                    <button
+                      aria-label={t("viewer.mode.pages")}
+                      classList={{ "foliate-mode-button": true, "is-active": viewMode() === "pages" }}
+                      disabled={state() !== "ready"}
+                      onClick={() => setMode("pages")}
+                      title={t("viewer.mode.pages")}
+                      type="button"
+                    >
+                      <IconPages size={15} />
+                    </button>
+                    <button
+                      aria-label={t("viewer.mode.scroll")}
+                      classList={{ "foliate-mode-button": true, "is-active": viewMode() === "scroll" }}
+                      disabled={state() !== "ready"}
+                      onClick={() => setMode("scroll")}
+                      title={t("viewer.mode.scroll")}
+                      type="button"
+                    >
+                      <IconScroll size={15} />
+                    </button>
+                  </div>
+                </div>
+              </header>
+              <div
+                class="foliate-reader-bottom-hover-zone"
+                onMouseEnter={() => showReaderChrome("bottom")}
+                onMouseLeave={() => hideReaderChrome("bottom")}
+              >
+                <nav
+                  aria-label={t("viewer.sectionNavigation")}
+                  classList={{
+                    "foliate-reader-bottombar": true,
+                    "is-visible": readerChromeState().showSectionNavigation,
+                  }}
+                >
+                  <button
+                    aria-label={t("viewer.previousSection")}
+                    class="foliate-section-button"
+                    disabled={state() !== "ready"}
+                    onClick={(event) => {
+                      event.currentTarget.blur();
+                      void goPreviousSection();
+                    }}
+                    title={t("viewer.previousSection")}
+                    type="button"
+                  >
+                    <IconArrowLeftDouble size={24} />
+                  </button>
+                  <button
+                    aria-label={t("viewer.nextSection")}
+                    class="foliate-section-button"
+                    disabled={state() !== "ready"}
+                    onClick={(event) => {
+                      event.currentTarget.blur();
+                      void goNextSection();
+                    }}
+                    title={t("viewer.nextSection")}
+                    type="button"
+                  >
+                    <IconArrowRightDouble size={24} />
+                  </button>
+                </nav>
+              </div>
+            </Show>
             <Show when={state() === "ready" && viewMode() === "pages"}>
               <div class="foliate-page-turn-zone is-left">
                 <button
@@ -1525,7 +1667,9 @@ function isReaderControlWheelEvent(event: WheelEvent): boolean {
   return Boolean(
     target.closest(
       [
-        ".foliate-toolbar",
+        ".foliate-reader-topbar",
+        ".foliate-reader-bottombar",
+        ".foliate-reader-bottom-hover-zone",
         ".foliate-sidebar",
         ".foliate-sidebar-backdrop",
         ".foliate-details-backdrop",

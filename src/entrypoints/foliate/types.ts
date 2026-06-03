@@ -101,6 +101,8 @@ export interface FoliateViewRenderer {
   ): void;
   removeAttribute(name: string): void;
   setAttribute(name: string, value: string): void;
+  nextSection?(): Promise<void> | void;
+  prevSection?(): Promise<void> | void;
   setStyles?(styles: string | [string, string]): void;
 }
 
