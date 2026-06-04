@@ -21,6 +21,7 @@
     --bg: #f8f8f6;
     --surface: #ffffff;
     --surface-alt: #ece9e1;
+    --reader-bg: #ffffff;
     --text: #1f1e1d;
     --text-muted: #6f6e6a;
     --border: #e2dfd5;
@@ -33,6 +34,7 @@
     --bg: #1f1f1e;
     --surface: #232323;
     --surface-alt: #2c2c2b;
+    --reader-bg: #1f1f1e;
     --text: #ebe8df;
     --text-muted: #a3a09a;
     --border: #2f2f2e;
@@ -678,6 +680,92 @@ body {
     inset: 0;
     z-index: 45;
     background: rgba(0, 0, 0, 0.24);
+}
+
+.foliate-footnote-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 36;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+}
+
+.foliate-footnote-popup {
+    position: absolute;
+    z-index: 42;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--reader-bg);
+    color: var(--text);
+    box-shadow: none;
+}
+
+.foliate-footnote-popup::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--border);
+    background: var(--reader-bg);
+    transform: translateX(-50%) rotate(45deg);
+}
+
+.foliate-footnote-popup.is-down::before {
+    top: -6px;
+    border-right: 0;
+    border-bottom: 0;
+}
+
+.foliate-footnote-popup.is-up::before {
+    bottom: -6px;
+    border-left: 0;
+    border-top: 0;
+}
+
+.foliate-footnote-content {
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: auto;
+}
+
+.foliate-footnote-content foliate-view {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.foliate-footnote-back {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--sidebar-bg) 88%, var(--surface-alt) 12%);
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.foliate-footnote-back:hover {
+    background: var(--surface-alt);
+    color: var(--text);
+}
+
+.foliate-footnote-back svg {
+    transform: rotate(90deg);
 }
 
 .foliate-details-modal {

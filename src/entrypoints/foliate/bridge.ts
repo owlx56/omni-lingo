@@ -24,6 +24,7 @@ import type {
   FoliateRelocateDetail,
   FoliateViewElement,
 } from "./types";
+import { createFoliateContentCss } from "./reader-content-style";
 
 type FoliateBridgeCallbacks = {
   onContentLoad?: (doc: Document) => void;
@@ -186,23 +187,8 @@ function applyDocPrefs(doc: Document, theme: EffectiveTheme, uiLang: UiLang): vo
   const styleId = "onelingo-foliate-theme";
   const style = doc.getElementById(styleId) ?? doc.createElement("style");
   style.id = styleId;
-  style.textContent = foliateThemeCss(theme);
+  style.textContent = createFoliateContentCss(theme);
   if (!style.parentNode) (doc.head ?? doc.documentElement).appendChild(style);
-}
-
-function foliateThemeCss(theme: EffectiveTheme): string {
-  const isDark = theme === "dark";
-  const bg = isDark ? "#1f1f1e" : "#ffffff";
-  const text = isDark ? "#ebe8df" : "#1f1e1d";
-  const selection = isDark
-    ? "rgba(91, 141, 214, 0.42)"
-    : "rgba(44, 117, 224, 0.28)";
-  const link = isDark ? "#8ab4f8" : "#1f5fbf";
-  return [
-    `html,body{background:${bg}!important;color:${text}!important;color-scheme:${theme}!important;}`,
-    `::selection{background:${selection}!important;}`,
-    `a,a:visited{color:${link}!important;}`,
-  ].join("\n");
 }
 
 function htmlLang(uiLang: UiLang): string {

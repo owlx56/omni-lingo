@@ -10,6 +10,7 @@ const sample = (overrides) => ({
   deltaMode: 0,
   deltaX: 0,
   deltaY: 0,
+  timeStamp: 0,
   ...overrides,
 });
 
@@ -17,32 +18,42 @@ describe("createWheelTurnDetector", () => {
   test("maps vertical wheel direction to previous and next page turns", () => {
     const detector = createWheelTurnDetector({ threshold: 30 });
 
-    expect(detector.feed(sample({ deltaY: 40 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: -40 }))).toBe("left");
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 0 }))).toBe("right");
+    detector.reset();
+    expect(detector.feed(sample({ deltaY: -40, timeStamp: 0 }))).toBe("left");
   });
 
   test("maps horizontal wheel direction to previous and next page turns", () => {
     const detector = createWheelTurnDetector({ threshold: 30 });
 
-    expect(detector.feed(sample({ deltaX: 40 }))).toBe("right");
-    expect(detector.feed(sample({ deltaX: -40 }))).toBe("left");
+    expect(detector.feed(sample({ deltaX: 40, timeStamp: 0 }))).toBe("right");
+    detector.reset();
+    expect(detector.feed(sample({ deltaX: -40, timeStamp: 0 }))).toBe("left");
   });
 
-  test("accumulates touchpad deltas into repeated effective steps", () => {
-    const detector = createWheelTurnDetector({ threshold: 30 });
+  test("flips only once during one continuous touchpad gesture", () => {
+    const detector = createWheelTurnDetector({ idleResetMs: 200, threshold: 30 });
 
-    expect(detector.feed(sample({ deltaY: 12 }))).toBeNull();
-    expect(detector.feed(sample({ deltaY: 12 }))).toBeNull();
-    expect(detector.feed(sample({ deltaY: 12 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: 12 }))).toBeNull();
-    expect(detector.feed(sample({ deltaY: 18 }))).toBe("right");
+    expect(detector.feed(sample({ deltaY: 12, timeStamp: 0 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: 12, timeStamp: 16 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: 12, timeStamp: 32 }))).toBe("right");
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 48 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 64 }))).toBeNull();
+  });
+
+  test("allows another page turn after the wheel stream goes idle", () => {
+    const detector = createWheelTurnDetector({ idleResetMs: 200, threshold: 30 });
+
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 0 }))).toBe("right");
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 80 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: -40, timeStamp: 281 }))).toBe("left");
   });
 
   test("counts a single oversized wheel event as one effective step", () => {
-    const detector = createWheelTurnDetector({ threshold: 30 });
+    const detector = createWheelTurnDetector({ idleResetMs: 200, threshold: 30 });
 
-    expect(detector.feed(sample({ deltaY: 600 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: 0 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: 600, timeStamp: 0 }))).toBe("right");
+    expect(detector.feed(sample({ deltaY: 600, timeStamp: 16 }))).toBeNull();
   });
 
   test("normalizes line and page delta modes", () => {
@@ -52,8 +63,8 @@ describe("createWheelTurnDetector", () => {
       threshold: 30,
     });
 
-    expect(detector.feed(sample({ deltaMode: 1, deltaY: 1 }))).toBe("right");
-    expect(detector.feed(sample({ deltaMode: 2, deltaY: -1 }))).toBe("left");
+    expect(detector.feed(sample({ deltaMode: 1, deltaY: 1, timeStamp: 0 }))).toBe("right");
+    expect(detector.feed(sample({ deltaMode: 2, deltaY: -1, timeStamp: 201 }))).toBe("left");
   });
 
   test("ignores ctrl or meta wheel and resets accumulated movement", () => {
@@ -68,7 +79,7 @@ describe("createWheelTurnDetector", () => {
 });
 
 describe("createQueuedWheelTurnNavigator", () => {
-  test("runs continuous wheel turns in enqueue order", async () => {
+  test("runs queued wheel turns in enqueue order", async () => {
     const turns = [];
     const navigator = createQueuedWheelTurnNavigator({
       navigate: (direction) => {

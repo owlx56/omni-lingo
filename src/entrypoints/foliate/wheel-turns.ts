@@ -6,9 +6,11 @@ export type WheelTurnSample = {
   deltaX: number;
   deltaY: number;
   metaKey?: boolean;
+  timeStamp: number;
 };
 
 export type WheelTurnDetectorOptions = {
+  idleResetMs?: number;
   lineHeight?: number;
   pageHeight?: number;
   threshold?: number;
@@ -28,6 +30,7 @@ export type WheelTurnHandleOptions = {
 };
 
 const DEFAULT_THRESHOLD = 30;
+const DEFAULT_IDLE_RESET_MS = 200;
 const DEFAULT_LINE_HEIGHT = 40;
 const DEFAULT_PAGE_HEIGHT = 800;
 
@@ -38,10 +41,13 @@ export function createWheelTurnDetector(
   reset: () => void;
 } {
   const threshold = options.threshold ?? DEFAULT_THRESHOLD;
+  const idleResetMs = options.idleResetMs ?? DEFAULT_IDLE_RESET_MS;
   const lineHeight = options.lineHeight ?? DEFAULT_LINE_HEIGHT;
   const pageHeight = options.pageHeight ?? DEFAULT_PAGE_HEIGHT;
   let accumX = 0;
   let accumY = 0;
+  let lastTime = -Infinity;
+  let flipped = false;
 
   const normalize = (delta: number, mode: number): number => {
     if (mode === 1) return delta * lineHeight;
@@ -52,6 +58,8 @@ export function createWheelTurnDetector(
   const reset = (): void => {
     accumX = 0;
     accumY = 0;
+    lastTime = -Infinity;
+    flipped = false;
   };
 
   const feed = (sample: WheelTurnSample): WheelTurnDirection | null => {
@@ -59,6 +67,15 @@ export function createWheelTurnDetector(
       reset();
       return null;
     }
+
+    if (sample.timeStamp - lastTime > idleResetMs) {
+      accumX = 0;
+      accumY = 0;
+      flipped = false;
+    }
+    lastTime = sample.timeStamp;
+
+    if (flipped) return null;
 
     accumX += normalize(sample.deltaX, sample.deltaMode);
     accumY += normalize(sample.deltaY, sample.deltaMode);
@@ -68,7 +85,9 @@ export function createWheelTurnDetector(
     }
 
     const direction = dominantDirection(accumX, accumY);
-    reset();
+    accumX = 0;
+    accumY = 0;
+    flipped = true;
     return direction;
   };
 

@@ -55,6 +55,15 @@ export interface FoliateLoadDetail {
   index: number;
 }
 
+export interface FoliateLinkDetail {
+  a: HTMLAnchorElement;
+  href: string;
+  check?: boolean;
+  follow?: boolean;
+}
+
+export type FoliateLinkEvent = CustomEvent<FoliateLinkDetail>;
+
 export type FoliateLanguageMap = string | Record<string, string>;
 
 export type FoliateContributorValue =
@@ -88,6 +97,7 @@ export interface FoliateBookMetadata {
 }
 
 export interface FoliateViewRenderer {
+  viewSize?: number;
   addEventListener(
     type: string,
     listener: EventListenerOrEventListenerObject,
@@ -149,6 +159,7 @@ export interface FoliateBookLike {
 
 export interface FoliateViewElement extends HTMLElement {
   book?: FoliateBookLike;
+  close?(): void;
   flow?: FoliateFlow;
   getContents(): FoliateContent[];
   goLeft(): Promise<void>;

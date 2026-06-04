@@ -7,6 +7,7 @@ import {
   onMount,
   type JSX,
 } from "solid-js";
+import { FootnoteHandler } from "foliate-js/footnotes.js";
 import { loadDocument } from "@/lib/document-store";
 import { fetchDocumentFromUrl } from "@/lib/document-resolver";
 import {
@@ -24,6 +25,7 @@ import {
   setSettings,
   useSettings,
 } from "@/lib/storage/settings";
+import { getEffectiveTheme } from "@/lib/theme";
 import {
   IconArrowLeftDouble,
   IconArrowRightDouble,
@@ -42,9 +44,23 @@ import {
   getReaderChromeState,
   type ReaderChromeZone,
 } from "./reader-chrome";
+import {
+  FOLIATE_FOOTNOTE_POPUP_PADDING,
+  configureFootnotePopupRenderer,
+  createFoliateFootnoteContentCss,
+  getFootnoteAnchorPosition,
+  getFootnotePopupSize,
+  getFootnotePopupPosition,
+  shouldPromoteFootnoteDetection,
+  shouldCheckAsFootnote,
+  type FootnotePopupPosition,
+  type FootnotePopupSize,
+} from "./footnote-popup";
 import type {
   FoliateBookLike,
   FoliateBookMetadata,
+  FoliateLinkDetail,
+  FoliateLinkEvent,
   FoliateSeriesValue,
   FoliateRelocateDetail,
   FoliateTocItem,
@@ -89,6 +105,11 @@ type SeriesItem = {
 
 type DetailsSectionKind = "fields" | "series" | "description";
 
+type FootnotePopupState = {
+  position: FootnotePopupPosition;
+  size: FootnotePopupSize;
+};
+
 type DetailsSectionProps = {
   emptyLabel: string;
   items: MetadataSection[] | SeriesItem[] | string[];
@@ -132,10 +153,14 @@ function App(): JSX.Element {
   const [bookState, setBookState] = createSignal<SidebarBookState | null>(null);
   const [detailsOpen, setDetailsOpen] = createSignal(false);
   const [readerChromeZone, setReaderChromeZone] = createSignal<ReaderChromeZone>(null);
+  const [footnotePopup, setFootnotePopup] = createSignal<FootnotePopupState | null>(null);
+  const [footnoteCanGoBack, setFootnoteCanGoBack] = createSignal(false);
 
   let renderHost: HTMLDivElement | undefined;
   let view: FoliateViewElement | undefined;
   let stopBridge: (() => void) | undefined;
+  let stopFootnoteMainLink: (() => void) | undefined;
+  let stopFootnoteHandler: (() => void) | undefined;
   let coverObjectUrl: string | undefined;
   let bookStateToken = 0;
   let navigationLocked = false;
@@ -143,7 +168,13 @@ function App(): JSX.Element {
   let dragCleanup: (() => void) | undefined;
   let contentWheelCleanup: (() => void) | undefined;
   let contentRef: HTMLDivElement | undefined;
+  let footnoteContentRef: HTMLDivElement | undefined;
+  let footnoteView: FoliateViewElement | undefined;
+  let footnoteAnchorPosition: FootnotePopupPosition | null = null;
+  let footnoteHistory: FoliateLinkDetail[] = [];
+  let footnoteHistoryIndex = -1;
   let shellRef: HTMLDivElement | undefined;
+  const footnoteHandler = new FootnoteHandler();
   const wheelDocCleanups = new Map<Document, () => void>();
   const wheelTurnDetector = createWheelTurnDetector();
   const wheelTurnNavigator = createQueuedWheelTurnNavigator({
@@ -170,14 +201,21 @@ function App(): JSX.Element {
   onMount(() => {
     const updateViewport = (): void => {
       setIsDesktop(isWideViewport());
+      closeFootnotePopup();
+    };
+    const onWindowKeydown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") closeFootnotePopup();
     };
     updateViewport();
     window.addEventListener("resize", updateViewport);
+    window.addEventListener("keydown", onWindowKeydown);
+    stopFootnoteHandler = bindFootnoteHandler();
     if (contentRef) {
       contentWheelCleanup = bindWheelTarget(contentRef);
     }
     resizeCleanup = () => {
       window.removeEventListener("resize", updateViewport);
+      window.removeEventListener("keydown", onWindowKeydown);
     };
     void init();
   });
@@ -189,6 +227,11 @@ function App(): JSX.Element {
     contentWheelCleanup = undefined;
     resizeCleanup?.();
     dragCleanup?.();
+    closeFootnotePopup();
+    stopFootnoteMainLink?.();
+    stopFootnoteMainLink = undefined;
+    stopFootnoteHandler?.();
+    stopFootnoteHandler = undefined;
     revokeCoverObjectUrl();
     stopBridge?.();
     stopBridge = undefined;
@@ -289,6 +332,8 @@ function App(): JSX.Element {
 
     await customElements.whenDefined("foliate-view");
     const el = ensureViewElement();
+    stopFootnoteMainLink?.();
+    stopFootnoteMainLink = bindFootnoteMainLink(el);
     const file = createReaderFile(source);
     await el.open(file);
     el.renderer?.setAttribute("flow", viewFlow(viewMode()));
@@ -318,6 +363,9 @@ function App(): JSX.Element {
   const resetReaderState = (): void => {
     clearWheelTurns();
     clearWheelContentDocuments();
+    closeFootnotePopup();
+    stopFootnoteMainLink?.();
+    stopFootnoteMainLink = undefined;
     bookStateToken += 1;
     stopBridge?.();
     stopBridge = undefined;
@@ -425,7 +473,223 @@ function App(): JSX.Element {
     return el;
   };
 
+  const bindFootnoteMainLink = (targetView: FoliateViewElement): (() => void) => {
+    const listener = (event: Event): void => {
+      void handleMainFootnoteLink(event as FoliateLinkEvent);
+    };
+    targetView.addEventListener("link", listener);
+    return () => {
+      targetView.removeEventListener("link", listener);
+    };
+  };
+
+  const bindFootnoteHandler = (): (() => void) => {
+    const handleBeforeRender = (event: Event): void => {
+      const popupView = (event as CustomEvent<{ view: FoliateViewElement }>).detail.view;
+      mountFootnoteView(popupView);
+    };
+    const handleRender = (): void => {
+      showFootnoteView();
+    };
+    footnoteHandler.addEventListener("before-render", handleBeforeRender);
+    footnoteHandler.addEventListener("render", handleRender);
+    return () => {
+      footnoteHandler.removeEventListener("before-render", handleBeforeRender);
+      footnoteHandler.removeEventListener("render", handleRender);
+    };
+  };
+
+  const handleMainFootnoteLink = async (event: FoliateLinkEvent): Promise<void> => {
+    if (!view?.book || !contentRef) return;
+    const detail = event.detail;
+    if (!isFoliateLinkDetail(detail) || !shouldCheckAsFootnote(detail.a)) return;
+    footnoteAnchorPosition = getFootnoteAnchorPosition(
+      detail.a,
+      contentRef.getBoundingClientRect(),
+      FOLIATE_FOOTNOTE_POPUP_PADDING,
+    );
+    const result = handleFootnoteEvent(view.book, event);
+    if (!event.defaultPrevented) {
+      footnoteAnchorPosition = null;
+      return;
+    }
+    showFootnoteShell();
+    footnoteHistory = [cloneFootnoteLinkDetail(detail)];
+    footnoteHistoryIndex = 0;
+    setFootnoteCanGoBack(false);
+    try {
+      await Promise.resolve(result);
+    } catch (err) {
+      console.warn("[OneLingo] failed to render foliate footnote popup:", err);
+      closeFootnotePopup();
+      await view.goTo(detail.href);
+    }
+  };
+
+  const handlePopupFootnoteLink = async (event: FoliateLinkEvent): Promise<void> => {
+    const detail = event.detail;
+    event.preventDefault();
+    if (!view?.book || !isFoliateLinkDetail(detail)) return;
+    const syntheticEvent = new CustomEvent<FoliateLinkDetail>("link", {
+      cancelable: true,
+      detail: cloneFootnoteLinkDetail(detail),
+    });
+    const result = handleFootnoteEvent(view.book, syntheticEvent);
+    if (!syntheticEvent.defaultPrevented) {
+      closeFootnotePopup();
+      await view.goTo(detail.href);
+      return;
+    }
+    showFootnoteShell();
+    const nextHistory = [
+      ...footnoteHistory.slice(0, footnoteHistoryIndex + 1),
+      cloneFootnoteLinkDetail(detail),
+    ];
+    footnoteHistory = nextHistory;
+    footnoteHistoryIndex = nextHistory.length - 1;
+    setFootnoteCanGoBack(footnoteHistoryIndex > 0);
+    try {
+      await Promise.resolve(result);
+    } catch (err) {
+      console.warn("[OneLingo] failed to follow foliate footnote link:", err);
+      closeFootnotePopup();
+      await view.goTo(detail.href);
+    }
+  };
+
+  const handleFootnoteBack = async (): Promise<void> => {
+    if (!view?.book || footnoteHistoryIndex <= 0) return;
+    const nextIndex = footnoteHistoryIndex - 1;
+    const detail = footnoteHistory[nextIndex];
+    if (!detail) return;
+    footnoteHistoryIndex = nextIndex;
+    setFootnoteCanGoBack(nextIndex > 0);
+    const syntheticEvent = new CustomEvent<FoliateLinkDetail>("link", {
+      cancelable: true,
+      detail: cloneFootnoteLinkDetail(detail),
+    });
+    showFootnoteShell();
+    try {
+      await Promise.resolve(handleFootnoteEvent(view.book, syntheticEvent));
+    } catch (err) {
+      console.warn("[OneLingo] failed to go back in foliate footnote popup:", err);
+    }
+  };
+
+  const handleFootnoteEvent = (
+    book: FoliateBookLike,
+    event: FoliateLinkEvent,
+  ): Promise<void> | void => {
+    const { a, href } = event.detail;
+    event.detail.check = shouldCheckAsFootnote(a);
+    if (!event.detail.check) return undefined;
+    const restoreRole = shouldPromoteFootnoteDetection(a, href)
+      ? promoteAnchorForFootnoteDetection(a)
+      : undefined;
+    try {
+      return footnoteHandler.handle(book, event);
+    } finally {
+      restoreRole?.();
+    }
+  };
+
+  const mountFootnoteView = (popupView: FoliateViewElement): void => {
+    removeFootnoteView();
+    footnoteView = popupView;
+    popupView.setAttribute("data-onelingo-reader-ui", "");
+    popupView.style.display = "block";
+    popupView.style.width = "100%";
+    popupView.style.height = "100%";
+    popupView.addEventListener("link", onPopupFootnoteLink);
+    popupView.addEventListener("relocate", onFootnoteRelocate);
+    configureFootnotePopupRenderer(
+      popupView.renderer,
+      createFoliateFootnoteContentCss(getEffectiveTheme()),
+    );
+    footnoteContentRef?.replaceChildren(popupView);
+  };
+
+  const onPopupFootnoteLink = (event: Event): void => {
+    void handlePopupFootnoteLink(event as FoliateLinkEvent);
+  };
+
+  const onFootnoteRelocate = (): void => {
+    if (footnoteView) showFootnoteView();
+  };
+
+  const showFootnoteView = (): void => {
+    if (!contentRef) return;
+    const bounds = contentRef.getBoundingClientRect();
+    const size = getFootnotePopupSize(
+      bounds,
+      FOLIATE_FOOTNOTE_POPUP_PADDING,
+      footnoteView?.renderer?.viewSize,
+    );
+    const anchorPosition =
+      footnoteAnchorPosition ??
+      ({
+        dir: "down",
+        point: {
+          x: bounds.width / 2,
+          y: bounds.height / 2,
+        },
+      } satisfies FootnotePopupPosition);
+    const position = getFootnotePopupPosition(
+      anchorPosition,
+      size,
+      bounds,
+      FOLIATE_FOOTNOTE_POPUP_PADDING,
+    );
+    setFootnotePopup({ position, size });
+  };
+
+  const showFootnoteShell = (): void => {
+    if (!contentRef) return;
+    const bounds = contentRef.getBoundingClientRect();
+    const size = getFootnotePopupSize(bounds);
+    const anchorPosition =
+      footnoteAnchorPosition ??
+      ({
+        dir: "down",
+        point: {
+          x: bounds.width / 2,
+          y: bounds.height / 2,
+        },
+      } satisfies FootnotePopupPosition);
+    setFootnotePopup({
+      position: getFootnotePopupPosition(
+        anchorPosition,
+        size,
+        bounds,
+        FOLIATE_FOOTNOTE_POPUP_PADDING,
+      ),
+      size,
+    });
+  };
+
+  const closeFootnotePopup = (): void => {
+    removeFootnoteView();
+    footnoteAnchorPosition = null;
+    footnoteHistory = [];
+    footnoteHistoryIndex = -1;
+    setFootnoteCanGoBack(false);
+    setFootnotePopup(null);
+  };
+
+  const removeFootnoteView = (): void => {
+    if (!footnoteView) return;
+    footnoteView.removeEventListener("link", onPopupFootnoteLink);
+    footnoteView.removeEventListener("relocate", onFootnoteRelocate);
+    footnoteView.close?.();
+    footnoteView.remove();
+    footnoteView = undefined;
+    footnoteContentRef?.replaceChildren();
+  };
+
   const onLocationChange = (detail: FoliateRelocateDetail): void => {
+    if (footnotePopup() && isReaderMovementRelocate(detail.reason)) {
+      closeFootnotePopup();
+    }
     if (detail.tocItem?.href) {
       setActiveHref(detail.tocItem.href);
     }
@@ -481,6 +745,7 @@ function App(): JSX.Element {
 
   const setMode = (nextMode: ViewMode): void => {
     if (nextMode !== "pages") clearWheelTurns();
+    closeFootnotePopup();
     setViewMode(nextMode);
     view?.renderer?.setAttribute("flow", viewFlow(nextMode));
     syncReaderLayout(sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null, nextMode);
@@ -488,6 +753,7 @@ function App(): JSX.Element {
 
   const performPageTurn = async (direction: WheelTurnDirection): Promise<void> => {
     if (!view || navigationLocked) return;
+    closeFootnotePopup();
     navigationLocked = true;
     try {
       if (direction === "left") {
@@ -517,6 +783,7 @@ function App(): JSX.Element {
     const action = direction === "previous" ? renderer?.prevSection : renderer?.nextSection;
     if (!renderer || !action) return;
     clearWheelTurns();
+    closeFootnotePopup();
     navigationLocked = true;
     try {
       await action.call(renderer);
@@ -539,6 +806,7 @@ function App(): JSX.Element {
   const goToToc = async (href: string): Promise<void> => {
     if (!view || navigationLocked || !href) return;
     clearWheelTurns();
+    closeFootnotePopup();
     navigationLocked = true;
     try {
       await view.goTo(href);
@@ -621,6 +889,7 @@ function App(): JSX.Element {
       deltaX: event.deltaX,
       deltaY: event.deltaY,
       metaKey: event.metaKey,
+      timeStamp: event.timeStamp,
     });
     if (!direction) return;
     wheelTurnNavigator.enqueue(direction);
@@ -962,6 +1231,56 @@ function App(): JSX.Element {
                 tabIndex={-1}
                 type="button"
               />
+            </Show>
+
+            <Show when={footnotePopup()}>
+              {(popup) => (
+                <>
+                  <button
+                    aria-hidden="true"
+                    class="foliate-footnote-backdrop"
+                    data-onelingo-reader-ui=""
+                    onClick={closeFootnotePopup}
+                    tabIndex={-1}
+                    type="button"
+                  />
+                  <section
+                    aria-label="Footnote"
+                    classList={{
+                      "foliate-footnote-popup": true,
+                      "is-down": popup().position.dir === "down",
+                      "is-up": popup().position.dir === "up",
+                    }}
+                    data-onelingo-reader-ui=""
+                    role="dialog"
+                    style={{
+                      height: `${popup().size.height}px`,
+                      left: `${popup().position.point.x}px`,
+                      top: `${popup().position.point.y}px`,
+                      width: `${popup().size.width}px`,
+                    }}
+                    tabIndex={-1}
+                  >
+                    <Show when={footnoteCanGoBack()}>
+                      <button
+                        aria-label="Back"
+                        class="foliate-footnote-back"
+                        onClick={() => void handleFootnoteBack()}
+                        type="button"
+                      >
+                        <IconChevron size={16} />
+                      </button>
+                    </Show>
+                    <div
+                      class="foliate-footnote-content"
+                      ref={(el) => {
+                        footnoteContentRef = el;
+                        if (footnoteView) el.replaceChildren(footnoteView);
+                      }}
+                    />
+                  </section>
+                </>
+              )}
             </Show>
 
             <Show when={detailsOpen()}>
@@ -1661,6 +1980,39 @@ function syncReaderLayout(width: string | null, mode: ViewMode): void {
   }
 }
 
+function isFoliateLinkDetail(value: unknown): value is FoliateLinkDetail {
+  if (!value || typeof value !== "object") return false;
+  const detail = value as Partial<FoliateLinkDetail>;
+  return isAnchorElement(detail.a) && typeof detail.href === "string";
+}
+
+function isAnchorElement(value: unknown): value is HTMLAnchorElement {
+  if (!value || typeof value !== "object" || !("tagName" in value)) return false;
+  const tagName = (value as { tagName?: unknown }).tagName;
+  return typeof tagName === "string" && tagName.toLowerCase() === "a";
+}
+
+function cloneFootnoteLinkDetail(detail: FoliateLinkDetail): FoliateLinkDetail {
+  return {
+    a: detail.a,
+    check: detail.check,
+    follow: detail.follow,
+    href: detail.href,
+  };
+}
+
+function promoteAnchorForFootnoteDetection(anchor: HTMLAnchorElement): () => void {
+  const previousVerticalAlign = anchor.style.verticalAlign;
+  anchor.style.verticalAlign = "super";
+  return () => {
+    anchor.style.verticalAlign = previousVerticalAlign;
+  };
+}
+
+function isReaderMovementRelocate(reason: string | undefined): boolean {
+  return reason === "page" || reason === "snap" || reason === "scroll";
+}
+
 function isReaderControlWheelEvent(event: WheelEvent): boolean {
   const target = event.target;
   if (!(target instanceof Element)) return false;
@@ -1674,6 +2026,8 @@ function isReaderControlWheelEvent(event: WheelEvent): boolean {
         ".foliate-sidebar-backdrop",
         ".foliate-details-backdrop",
         ".foliate-details-modal",
+        ".foliate-footnote-backdrop",
+        ".foliate-footnote-popup",
       ].join(", "),
     ),
   );
