@@ -45,6 +45,14 @@ import {
   type ReaderChromeZone,
 } from "./reader-chrome";
 import {
+  HIDDEN_OVERLAY_SCROLLBAR,
+  createOverlayScrollbarController,
+  getFoliateScrollContainer,
+  installOverlayScrollbarNativeStyle,
+  type OverlayScrollbarDrag,
+  type OverlayScrollbarSnapshot,
+} from "./reader-scrollbar";
+import {
   FOLIATE_FOOTNOTE_POPUP_PADDING,
   configureFootnotePopupRenderer,
   createFoliateFootnoteContentCss,
@@ -155,6 +163,8 @@ function App(): JSX.Element {
   const [readerChromeZone, setReaderChromeZone] = createSignal<ReaderChromeZone>(null);
   const [footnotePopup, setFootnotePopup] = createSignal<FootnotePopupState | null>(null);
   const [footnoteCanGoBack, setFootnoteCanGoBack] = createSignal(false);
+  const [scrollbarSnapshot, setScrollbarSnapshot] =
+    createSignal<OverlayScrollbarSnapshot>(HIDDEN_OVERLAY_SCROLLBAR);
 
   let renderHost: HTMLDivElement | undefined;
   let view: FoliateViewElement | undefined;
@@ -174,6 +184,8 @@ function App(): JSX.Element {
   let footnoteHistory: FoliateLinkDetail[] = [];
   let footnoteHistoryIndex = -1;
   let shellRef: HTMLDivElement | undefined;
+  let scrollbarTrackRef: HTMLDivElement | undefined;
+  let scrollbarDrag: OverlayScrollbarDrag | undefined;
   const footnoteHandler = new FootnoteHandler();
   const wheelDocCleanups = new Map<Document, () => void>();
   const wheelTurnDetector = createWheelTurnDetector();
@@ -181,6 +193,11 @@ function App(): JSX.Element {
     canNavigate: () => !navigationLocked,
     isActive: () => state() === "ready" && viewMode() === "pages",
     navigate: (direction) => performPageTurn(direction),
+  });
+  const overlayScrollbarController = createOverlayScrollbarController({
+    getTrackHeight: () => scrollbarTrackRef?.getBoundingClientRect().height ?? 0,
+    isActive: () => state() === "ready" && viewMode() === "scroll",
+    onChange: (snapshot) => setScrollbarSnapshot(snapshot),
   });
 
   createEffect(() => {
@@ -192,6 +209,7 @@ function App(): JSX.Element {
   createEffect(() => {
     const width = sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null;
     syncReaderLayout(width, viewMode());
+    syncOverlayScrollbarContainer();
   });
 
   createEffect(() => {
@@ -223,6 +241,7 @@ function App(): JSX.Element {
   onCleanup(() => {
     clearWheelTurns();
     clearWheelContentDocuments();
+    overlayScrollbarController.destroy();
     contentWheelCleanup?.();
     contentWheelCleanup = undefined;
     resizeCleanup?.();
@@ -336,9 +355,10 @@ function App(): JSX.Element {
     stopFootnoteMainLink = bindFootnoteMainLink(el);
     const file = createReaderFile(source);
     await el.open(file);
-    el.renderer?.setAttribute("flow", viewFlow(viewMode()));
+    syncViewMode(el, viewMode());
+    syncOverlayScrollbarContainer();
     stopBridge = initFoliateBridge(el, {
-      onContentLoad: bindWheelContentDocument,
+      onContentLoad: onFoliateContentLoad,
       onLocationChange,
     });
 
@@ -353,6 +373,7 @@ function App(): JSX.Element {
       sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null,
       viewMode(),
     );
+    syncOverlayScrollbarContainer();
 
     await nextFrame();
     await el.goToTextStart?.().catch(async () => {
@@ -363,6 +384,7 @@ function App(): JSX.Element {
   const resetReaderState = (): void => {
     clearWheelTurns();
     clearWheelContentDocuments();
+    overlayScrollbarController.setContainer(null);
     closeFootnotePopup();
     stopFootnoteMainLink?.();
     stopFootnoteMainLink = undefined;
@@ -468,6 +490,7 @@ function App(): JSX.Element {
     el.style.display = "block";
     el.style.width = "100%";
     el.style.height = "100%";
+    el.dataset.viewMode = viewMode();
     renderHost.replaceChildren(el);
     view = el;
     return el;
@@ -690,6 +713,7 @@ function App(): JSX.Element {
     if (footnotePopup() && isReaderMovementRelocate(detail.reason)) {
       closeFootnotePopup();
     }
+    if (detail.reason === "scroll") overlayScrollbarController.refresh();
     if (detail.tocItem?.href) {
       setActiveHref(detail.tocItem.href);
     }
@@ -747,8 +771,9 @@ function App(): JSX.Element {
     if (nextMode !== "pages") clearWheelTurns();
     closeFootnotePopup();
     setViewMode(nextMode);
-    view?.renderer?.setAttribute("flow", viewFlow(nextMode));
+    if (view) syncViewMode(view, nextMode);
     syncReaderLayout(sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null, nextMode);
+    syncOverlayScrollbarContainer(nextMode);
   };
 
   const performPageTurn = async (direction: WheelTurnDirection): Promise<void> => {
@@ -838,6 +863,12 @@ function App(): JSX.Element {
     };
   };
 
+  const onFoliateContentLoad = (doc: Document): void => {
+    bindWheelContentDocument(doc);
+    syncOverlayScrollbarContainer();
+    overlayScrollbarController.refresh();
+  };
+
   const bindWheelContentDocument = (doc: Document): void => {
     if (wheelDocCleanups.has(doc)) return;
     const cleanupWheel = bindWheelTarget(doc);
@@ -851,6 +882,15 @@ function App(): JSX.Element {
   const clearWheelContentDocuments = (): void => {
     for (const cleanup of wheelDocCleanups.values()) cleanup();
     wheelDocCleanups.clear();
+  };
+
+  const syncOverlayScrollbarContainer = (mode = viewMode()): void => {
+    if (!view || mode !== "scroll") {
+      overlayScrollbarController.setContainer(null);
+      return;
+    }
+    installOverlayScrollbarNativeStyle(view);
+    overlayScrollbarController.setContainer(getFoliateScrollContainer(view));
   };
 
   const bindReaderChromeContentDocument = (doc: Document): (() => void) => {
@@ -1094,6 +1134,101 @@ function App(): JSX.Element {
                 renderHost = el;
               }}
             />
+            <Show when={state() === "ready" && viewMode() === "scroll"}>
+              <div
+                aria-hidden="true"
+                classList={{
+                  "foliate-scrollbar": true,
+                  "is-expanded": scrollbarSnapshot().state === "expanded",
+                  "is-visible":
+                    scrollbarSnapshot().state === "visible" ||
+                    scrollbarSnapshot().state === "expanded",
+                }}
+                data-onelingo-reader-ui=""
+                onMouseEnter={() => overlayScrollbarController.expand()}
+                onMouseLeave={() => overlayScrollbarController.collapse()}
+                onWheel={(event) => {
+                  const handled = overlayScrollbarController.scrollByWheel({
+                    deltaMode: event.deltaMode,
+                    deltaX: event.deltaX,
+                    deltaY: event.deltaY,
+                  });
+                  if (!handled) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+              >
+                <button
+                  class="foliate-scrollbar-button is-up"
+                  onClick={() => overlayScrollbarController.scrollByStep("up")}
+                  tabIndex={-1}
+                  type="button"
+                >
+                  <span
+                    aria-hidden="true"
+                    class="foliate-scrollbar-button-triangle"
+                  />
+                </button>
+                <div
+                  class="foliate-scrollbar-track"
+                  onClick={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    overlayScrollbarController.scrollByPageAt(
+                      event.clientY,
+                      event.currentTarget.getBoundingClientRect().top,
+                    );
+                  }}
+                  ref={(el) => {
+                    scrollbarTrackRef = el;
+                    overlayScrollbarController.refresh();
+                  }}
+                >
+                  <button
+                    class="foliate-scrollbar-thumb"
+                    onClick={(event) => event.stopPropagation()}
+                    onPointerDown={(event) => {
+                      scrollbarDrag?.stop();
+                      scrollbarDrag = overlayScrollbarController.startThumbDrag(event.clientY);
+                      const pointerId = event.pointerId;
+                      const target = event.currentTarget;
+                      target.setPointerCapture(pointerId);
+                      const onMove = (moveEvent: PointerEvent): void => {
+                        scrollbarDrag?.move(moveEvent.clientY);
+                      };
+                      const onStop = (): void => {
+                        target.removeEventListener("pointermove", onMove);
+                        target.removeEventListener("pointerup", onStop);
+                        target.removeEventListener("pointercancel", onStop);
+                        scrollbarDrag?.stop();
+                        scrollbarDrag = undefined;
+                      };
+                      target.addEventListener("pointermove", onMove);
+                      target.addEventListener("pointerup", onStop);
+                      target.addEventListener("pointercancel", onStop);
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    style={{
+                      height: `${scrollbarSnapshot().thumbHeight}px`,
+                      transform: `translateY(${scrollbarSnapshot().thumbTop}px)`,
+                    }}
+                    tabIndex={-1}
+                    type="button"
+                  />
+                </div>
+                <button
+                  class="foliate-scrollbar-button is-down"
+                  onClick={() => overlayScrollbarController.scrollByStep("down")}
+                  tabIndex={-1}
+                  type="button"
+                >
+                  <span
+                    aria-hidden="true"
+                    class="foliate-scrollbar-button-triangle"
+                  />
+                </button>
+              </div>
+            </Show>
             <Show when={state() === "ready"}>
               <header
                 classList={{
@@ -1929,6 +2064,11 @@ function htmlLang(uiLang: UiLang): string {
 
 function viewFlow(mode: ViewMode): "paginated" | "scrolled" {
   return mode === "scroll" ? "scrolled" : "paginated";
+}
+
+function syncViewMode(targetView: FoliateViewElement, mode: ViewMode): void {
+  targetView.dataset.viewMode = mode;
+  targetView.renderer?.setAttribute("flow", viewFlow(mode));
 }
 
 function nextFrame(): Promise<void> {

@@ -5,7 +5,7 @@
     "": {
       "name": "wxt-solid-starter",
       "dependencies": {
-        "foliate-js": "github:johnfactotum/foliate-js#78914aef4466eb960965702401634c2cb348e9b1",
+        "foliate-js": "github:readest/foliate-js#1fc763b8e6afe10971043a6818dcb9e2d8c54f4a",
         "solid-js": "^1.9.11",
       },
       "devDependencies": {
@@ -321,6 +321,8 @@
 
     "console-control-strings": ["console-control-strings@1.1.0", "", {}, "sha512-ty/fTekppD2fIwRvnZAVdeOiGd1c7YXEixbgJTNzqcxJWKQnjJ/V1bNEEE6hygpM3WjwHFUVK6HTjWSzV4a8sQ=="],
 
+    "construct-style-sheets-polyfill": ["construct-style-sheets-polyfill@3.1.0", "", {}, "sha512-HBLKP0chz8BAY6rBdzda11c3wAZeCZ+kIG4weVC2NM3AXzxx09nhe8t0SQNdloAvg5GLuHwq/0SPOOSPvtCcKw=="],
+
     "convert-source-map": ["convert-source-map@2.0.0", "", {}, "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="],
 
     "core-util-is": ["core-util-is@1.0.3", "", {}, "sha512-ZQBvi1DcpJ4GDqanjucZ2Hj3wEO5pZDS89BWbkcrvdxksJorwUDDZamX9ldFkp9aw2lmBDLgkObEA4DWNJ9FYQ=="],
@@ -409,7 +411,7 @@
 
     "firefox-profile": ["firefox-profile@4.7.0", "", { "dependencies": { "adm-zip": "~0.5.x", "fs-extra": "^11.2.0", "ini": "^4.1.3", "minimist": "^1.2.8", "xml2js": "^0.6.2" }, "bin": { "firefox-profile": "lib/cli.js" } }, "sha512-aGApEu5bfCNbA4PGUZiRJAIU6jKmghV2UVdklXAofnNtiDjqYw0czLS46W7IfFqVKgKhFB8Ao2YoNGHY4BoIMQ=="],
 
-    "foliate-js": ["foliate-js@github:johnfactotum/foliate-js#78914ae", {}, "johnfactotum-foliate-js-78914ae", "sha512-SrsmoMV2WpMXgoD+CAXtRfYZ8b1XGfOiP8YvdqNh/XCVuRAiuFIp1oGF7gddpYEUKPzvFG+w2c0JnwdxTqi2kQ=="],
+    "foliate-js": ["foliate-js@github:readest/foliate-js#1fc763b", { "dependencies": { "construct-style-sheets-polyfill": "^3.1.0" } }, "readest-foliate-js-1fc763b", "sha512-Ea/jtFupTI27wD2Ch0m5n26J9sXI9RPBbVvGicQT6Zc09oazve9b8KWDM0mIOjiL7H1l9IDRBoPTWdVCk66s2Q=="],
 
     "form-data-encoder": ["form-data-encoder@4.1.0", "", {}, "sha512-G6NsmEW15s0Uw9XnCg+33H3ViYRyiM0hMrMhhqQOR8NFc5GhYrI+6I3u7OTw7b91J2g8rtvMBZJDbcGb2YUniw=="],
 

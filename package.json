@@ -16,7 +16,7 @@
     "postinstall": "bun --bun node_modules/wxt/bin/wxt.mjs prepare"
   },
   "dependencies": {
-    "foliate-js": "github:johnfactotum/foliate-js#78914aef4466eb960965702401634c2cb348e9b1",
+    "foliate-js": "github:readest/foliate-js#1fc763b8e6afe10971043a6818dcb9e2d8c54f4a",
     "solid-js": "^1.9.11"
   },
   "devDependencies": {

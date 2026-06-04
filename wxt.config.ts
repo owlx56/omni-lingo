@@ -4,6 +4,11 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import "./scripts/generate-i18n";
+import {
+  patchFoliateFixedLayoutScript,
+  patchFoliatePdfScript,
+  patchFoliatePaginatorScript,
+} from "./scripts/foliate-runtime-patches";
 
 const PDFJS_PACKAGE_NAME = "@onelingo/pdfjs-dist";
 
@@ -28,6 +33,12 @@ const PDFJS_DIST_PACKAGE = resolvePdfJsDistPackage();
 const PDFJS_DIST_PACKAGE_DIR = PDFJS_DIST_PACKAGE.packageDir;
 const PDFJS_DIST_DIR = PDFJS_DIST_PACKAGE.distDir;
 const FOLIATE_JS_PACKAGE_DIR = join(ROOT_DIR, "node_modules", "foliate-js");
+const FOLIATE_JS_REQUIRE = createRequire(
+  join(FOLIATE_JS_PACKAGE_DIR, "package.json"),
+);
+const CONSTRUCT_STYLE_SHEETS_POLYFILL_PATH = FOLIATE_JS_REQUIRE.resolve(
+  "construct-style-sheets-polyfill/dist/adoptedStyleSheets.js",
+);
 const PDFJS_RELEASE_LOCK_PATH = join(
   PDFJS_DIST_PACKAGE_DIR,
   "pdfjs-release.lock.json",
@@ -223,83 +234,6 @@ function patchPdfViewerScript(contents: string, filename: string): string {
     }
   }
 
-  return next;
-}
-
-function patchFoliatePaginatorScript(contents: string): string {
-  let next = contents;
-
-  const goToNeedle =
-    "    async #goTo({ index, anchor, select}) {\n" +
-    "        if (index === this.#index) await this.#display({ index, anchor, select })\n";
-  if (next.includes(goToNeedle)) {
-    next = next.replace(
-      goToNeedle,
-      "    async #goTo({ index, anchor, select}) {\n" +
-        "        if (index == null || !this.sections[index]) return\n" +
-        "        if (index === this.#index) await this.#display({ index, anchor, select })\n",
-    );
-  }
-
-  const publicGoToNeedle =
-    "    async goTo(target) {\n" +
-    "        if (this.#locked) return\n" +
-    "        const resolved = await target\n" +
-    "        if (this.#canGoToIndex(resolved.index)) return this.#goTo(resolved)\n" +
-    "    }";
-  if (next.includes(publicGoToNeedle)) {
-    next = next.replace(
-      publicGoToNeedle,
-      "    async goTo(target) {\n" +
-        "        if (this.#locked) return\n" +
-        "        const resolved = await target\n" +
-        "        if (!resolved || !this.#canGoToIndex(resolved.index)) return\n" +
-        "        return this.#goTo(resolved)\n" +
-        "    }",
-    );
-  }
-
-  const turnPageNeedle =
-    "    async #turnPage(dir, distance) {\n" +
-    "        if (this.#locked) return\n" +
-    "        this.#locked = true\n" +
-    "        const prev = dir === -1\n" +
-    "        const shouldGo = await (prev ? this.#scrollPrev(distance) : this.#scrollNext(distance))\n" +
-    "        if (shouldGo) await this.#goTo({\n" +
-    "            index: this.#adjacentIndex(dir),\n" +
-    "            anchor: prev ? () => 1 : () => 0,\n" +
-    "        })\n" +
-    "        if (shouldGo || !this.hasAttribute('animated')) await wait(100)\n" +
-    "        this.#locked = false\n" +
-    "    }";
-  if (next.includes(turnPageNeedle)) {
-    next = next.replace(
-      turnPageNeedle,
-      "    async #turnPage(dir, distance) {\n" +
-        "        if (this.#locked) return\n" +
-        "        this.#locked = true\n" +
-        "        try {\n" +
-        "            const prev = dir === -1\n" +
-        "            const shouldGo = await (prev ? this.#scrollPrev(distance) : this.#scrollNext(distance))\n" +
-        "            if (shouldGo) {\n" +
-        "                const index = this.#adjacentIndex(dir)\n" +
-        "                if (index == null) return\n" +
-        "                await this.#goTo({\n" +
-        "                    index,\n" +
-        "                    anchor: prev ? () => 1 : () => 0,\n" +
-        "                })\n" +
-        "            }\n" +
-        "            if (shouldGo || !this.hasAttribute('animated')) await wait(100)\n" +
-        "        } finally {\n" +
-        "            this.#locked = false\n" +
-        "        }\n" +
-        "    }",
-    );
-  }
-
-  if (!next.includes("if (index == null || !this.sections[index]) return")) {
-    throw new Error("Unable to patch Foliate paginator navigation guards.");
-  }
   return next;
 }
 
@@ -599,7 +533,17 @@ async function addFoliateJsPublicAssets(files: PublicAssetFile[]): Promise<void>
     if (sourcePath === "fixed-layout.js") {
       addTextAsset(
         files,
-        patchFoliateIframeSandbox(await readFile(absoluteSrc, "utf8")),
+        patchFoliateIframeSandbox(
+          patchFoliateFixedLayoutScript(await readFile(absoluteSrc, "utf8")),
+        ),
+        join(FOLIATE_JS_PUBLIC_DIR, publicPath),
+      );
+      continue;
+    }
+    if (sourcePath === "pdf.js") {
+      addTextAsset(
+        files,
+        patchFoliatePdfScript(await readFile(absoluteSrc, "utf8")),
         join(FOLIATE_JS_PUBLIC_DIR, publicPath),
       );
       continue;
@@ -626,6 +570,11 @@ async function addFoliateJsPublicAssets(files: PublicAssetFile[]): Promise<void>
       join(FOLIATE_JS_PUBLIC_DIR, publicPath),
     );
   }
+  addFileAsset(
+    files,
+    CONSTRUCT_STYLE_SHEETS_POLYFILL_PATH,
+    join(FOLIATE_JS_PUBLIC_DIR, "vendor", "construct-style-sheets-polyfill.js"),
+  );
   await addDirectoryAssets(
     files,
     join(FOLIATE_JS_PACKAGE_DIR, "vendor", "pdfjs", "cmaps"),

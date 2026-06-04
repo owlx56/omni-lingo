@@ -97,6 +97,8 @@ export interface FoliateBookMetadata {
 }
 
 export interface FoliateViewRenderer {
+  primaryIndex?: number;
+  shadowRoot?: ShadowRoot | null;
   viewSize?: number;
   addEventListener(
     type: string,
