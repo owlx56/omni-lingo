@@ -727,7 +727,7 @@ foliate-view[data-view-mode="scroll"]::part(container)::-webkit-scrollbar {
     display: flex;
     align-items: center;
     width: clamp(84px, 15vw, 220px);
-    pointer-events: auto;
+    pointer-events: none;
 }
 
 .foliate-page-turn-zone.is-left {
@@ -761,7 +761,7 @@ foliate-view[data-view-mode="scroll"]::part(container)::-webkit-scrollbar {
         transform 120ms ease;
 }
 
-.foliate-page-turn-zone:hover .foliate-page-turn-button {
+.foliate-page-turn-zone.is-visible .foliate-page-turn-button {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0);

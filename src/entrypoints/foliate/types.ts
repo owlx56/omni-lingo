@@ -162,6 +162,7 @@ export interface FoliateBookLike {
 export interface FoliateViewElement extends HTMLElement {
   book?: FoliateBookLike;
   close?(): void;
+  deselect?(): void;
   flow?: FoliateFlow;
   getContents(): FoliateContent[];
   goLeft(): Promise<void>;

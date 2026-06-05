@@ -20,6 +20,7 @@ import {
 import { useT } from "@/lib/i18n";
 import type { UiLang } from "@/lib/languages";
 import { sendMessage } from "@/lib/messaging";
+import { hideSelectionUi } from "@/features/selection";
 import {
   getStoredSettings,
   setSettings,
@@ -52,6 +53,14 @@ import {
   type OverlayScrollbarDrag,
   type OverlayScrollbarSnapshot,
 } from "./reader-scrollbar";
+import {
+  clearReaderSelections,
+  shouldDismissReaderSelectionPointer,
+} from "./reader-selection";
+import {
+  getPageTurnHoverSide,
+  type PageTurnSide,
+} from "./reader-page-turn";
 import {
   FOLIATE_FOOTNOTE_POPUP_PADDING,
   configureFootnotePopupRenderer,
@@ -161,6 +170,8 @@ function App(): JSX.Element {
   const [bookState, setBookState] = createSignal<SidebarBookState | null>(null);
   const [detailsOpen, setDetailsOpen] = createSignal(false);
   const [readerChromeZone, setReaderChromeZone] = createSignal<ReaderChromeZone>(null);
+  const [pageTurnHoverSide, setPageTurnHoverSide] =
+    createSignal<PageTurnSide | null>(null);
   const [footnotePopup, setFootnotePopup] = createSignal<FootnotePopupState | null>(null);
   const [footnoteCanGoBack, setFootnoteCanGoBack] = createSignal(false);
   const [scrollbarSnapshot, setScrollbarSnapshot] =
@@ -767,8 +778,31 @@ function App(): JSX.Element {
     setReaderChromeZone((current) => (current === zone ? null : current));
   };
 
+  const resetPageTurnHover = (): void => {
+    if (pageTurnHoverSide() !== null) {
+      setPageTurnHoverSide(null);
+    }
+  };
+
+  const updatePageTurnHoverFromClientX = (clientX: number): void => {
+    if (state() !== "ready" || viewMode() !== "pages" || !contentRef) {
+      resetPageTurnHover();
+      return;
+    }
+    const bounds = contentRef.getBoundingClientRect();
+    setPageTurnHoverSide(
+      getPageTurnHoverSide({
+        clientX,
+        containerLeft: bounds.left,
+        containerWidth: bounds.width,
+        viewportWidth: window.innerWidth,
+      }),
+    );
+  };
+
   const setMode = (nextMode: ViewMode): void => {
     if (nextMode !== "pages") clearWheelTurns();
+    if (nextMode !== "pages") resetPageTurnHover();
     closeFootnotePopup();
     setViewMode(nextMode);
     if (view) syncViewMode(view, nextMode);
@@ -894,17 +928,23 @@ function App(): JSX.Element {
   };
 
   const bindReaderChromeContentDocument = (doc: Document): (() => void) => {
-    const listener = (): void => {
+    const onMouseMove = (event: MouseEvent): void => {
       resetReaderChrome();
+      updatePageTurnHoverFromClientX(toParentClientX(doc, event.clientX));
     };
-    doc.addEventListener("mousemove", listener, {
+    const onMouseLeave = (): void => {
+      resetPageTurnHover();
+    };
+    doc.addEventListener("mousemove", onMouseMove, {
       capture: true,
       passive: true,
     });
+    doc.addEventListener("mouseleave", onMouseLeave);
     return () => {
-      doc.removeEventListener("mousemove", listener, {
+      doc.removeEventListener("mousemove", onMouseMove, {
         capture: true,
       });
+      doc.removeEventListener("mouseleave", onMouseLeave);
     };
   };
 
@@ -978,6 +1018,16 @@ function App(): JSX.Element {
 
   const closeSidebar = (): void => {
     setSidebarVisible(false);
+  };
+
+  const dismissReaderSelection = (): void => {
+    hideSelectionUi();
+    clearReaderSelections(view);
+  };
+
+  const handleReaderSurfacePointerDown = (event: PointerEvent): void => {
+    if (!shouldDismissReaderSelectionPointer(event.target)) return;
+    dismissReaderSelection();
   };
 
   const isActiveToc = (href: string): boolean => activeHref() === href;
@@ -1109,6 +1159,7 @@ function App(): JSX.Element {
             }}
             onMouseMove={(event) => {
               const target = event.target;
+              updatePageTurnHoverFromClientX(event.clientX);
               if (!(target instanceof Element)) return;
               if (
                 target.closest(
@@ -1123,6 +1174,8 @@ function App(): JSX.Element {
               }
               resetReaderChrome();
             }}
+            onMouseLeave={resetPageTurnHover}
+            onPointerDown={handleReaderSurfacePointerDown}
             ref={(el) => {
               contentRef = el;
             }}
@@ -1330,7 +1383,13 @@ function App(): JSX.Element {
               </div>
             </Show>
             <Show when={state() === "ready" && viewMode() === "pages"}>
-              <div class="foliate-page-turn-zone is-left">
+              <div
+                classList={{
+                  "foliate-page-turn-zone": true,
+                  "is-left": true,
+                  "is-visible": pageTurnHoverSide() === "left",
+                }}
+              >
                 <button
                   aria-label={t("pdfViewer.previousPage")}
                   class="foliate-page-turn-button"
@@ -1343,7 +1402,13 @@ function App(): JSX.Element {
                   <IconChevron size={24} />
                 </button>
               </div>
-              <div class="foliate-page-turn-zone is-right">
+              <div
+                classList={{
+                  "foliate-page-turn-zone": true,
+                  "is-right": true,
+                  "is-visible": pageTurnHoverSide() === "right",
+                }}
+              >
                 <button
                   aria-label={t("pdfViewer.nextPage")}
                   class="foliate-page-turn-button"
@@ -2151,6 +2216,26 @@ function promoteAnchorForFootnoteDetection(anchor: HTMLAnchorElement): () => voi
 
 function isReaderMovementRelocate(reason: string | undefined): boolean {
   return reason === "page" || reason === "snap" || reason === "scroll";
+}
+
+function toParentClientX(doc: Document, clientX: number): number {
+  const frame = frameElementForDoc(doc);
+  if (!frame) return clientX;
+  return frame.getBoundingClientRect().left + clientX;
+}
+
+function frameElementForDoc(doc: Document): HTMLElement | null {
+  const frame = doc.defaultView?.frameElement;
+  if (frame instanceof HTMLElement) return frame;
+
+  for (const iframe of document.querySelectorAll("iframe")) {
+    try {
+      if (iframe.contentDocument === doc) return iframe;
+    } catch {
+      // Ignore inaccessible frames.
+    }
+  }
+  return null;
 }
 
 function isReaderControlWheelEvent(event: WheelEvent): boolean {

@@ -18,6 +18,7 @@ import {
   type EffectiveTheme,
 } from "@/lib/theme";
 import { getSettings, watchSettings, type UiLang } from "@/lib/storage/settings";
+import { clearReaderSelections } from "./reader-selection";
 import type {
   FoliateContent,
   FoliateLoadDetail,
@@ -81,6 +82,7 @@ export function initFoliateBridge(
   return () => {
     hover.dismiss();
     hideSelectionUi();
+    clearReaderSelections(view);
     stopHooks();
     stopMessages();
     stopSettingsWatch();
@@ -97,7 +99,7 @@ function registerViewHooks(
 ): () => void {
   const handleLoad = (event: Event): void => {
     const detail = (event as CustomEvent<FoliateLoadDetail>).detail;
-    bindDoc(detail.doc, hover, theme, uiLang);
+    bindDoc(view, detail.doc, hover, theme, uiLang);
     callbacks.onContentLoad?.(detail.doc);
     syncCurrentContents(view, theme, uiLang, hover, callbacks);
   };
@@ -139,12 +141,13 @@ function syncCurrentContents(
   const contents = view.getContents?.();
   if (!Array.isArray(contents)) return;
   for (const item of contents) {
-    bindDoc(item.doc, hover, theme, uiLang);
+    bindDoc(view, item.doc, hover, theme, uiLang);
     callbacks.onContentLoad?.(item.doc);
   }
 }
 
 function bindDoc(
+  view: FoliateViewElement,
   doc: Document,
   hover: HoverController,
   theme: EffectiveTheme,
@@ -158,23 +161,28 @@ function bindDoc(
   doc.addEventListener("mouseup", (event) => {
     window.setTimeout(() => onDocMouseUp(event, doc), 0);
   });
-  doc.addEventListener("mousedown", () => hideSelectionUi(), {
+  doc.addEventListener("mousedown", () => dismissReaderSelection(view), {
     capture: true,
   });
   doc.addEventListener(
     "scroll",
     () => {
       hover.dismiss();
-      hideSelectionUi();
+      dismissReaderSelection(view);
     },
     { passive: true },
   );
   doc.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       hover.dismiss();
-      hideSelectionUi();
+      dismissReaderSelection(view);
     }
   });
+}
+
+function dismissReaderSelection(view: FoliateViewElement): void {
+  hideSelectionUi();
+  clearReaderSelections(view);
 }
 
 function applyDocPrefs(doc: Document, theme: EffectiveTheme, uiLang: UiLang): void {
