@@ -391,7 +391,7 @@ body {
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    background: var(--surface);
+    background: var(--reader-bg);
 }
 
 .foliate-reader-topbar {
@@ -814,7 +814,7 @@ body {
     min-height: 0;
     flex: 1 1 auto;
     overflow: hidden;
-    background: var(--surface);
+    background: var(--reader-bg);
 }
 
 .foliate-render-area {
@@ -822,7 +822,7 @@ body {
     inset: 0;
     min-width: 0;
     min-height: 0;
-    background: var(--surface);
+    background: var(--reader-bg);
 }
 
 .foliate-content.has-reader-chrome-space .foliate-render-area {

@@ -14,6 +14,18 @@ describe("Foliate reader chrome layout styling", () => {
     );
   });
 
+  test("uses the reader background for chrome safe areas", () => {
+    expect(css).toMatch(
+      /\.foliate-main\s*\{[^}]*background:\s*var\(--reader-bg\);/,
+    );
+    expect(css).toMatch(
+      /\.foliate-content\s*\{[^}]*background:\s*var\(--reader-bg\);/,
+    );
+    expect(css).toMatch(
+      /\.foliate-render-area\s*\{[^}]*background:\s*var\(--reader-bg\);/,
+    );
+  });
+
   test("provides an in-reader appearance settings popover", () => {
     expect(css).toContain(".foliate-appearance-button");
     expect(css).toContain(".foliate-appearance-panel");
