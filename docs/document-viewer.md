@@ -12,6 +12,10 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 | `src/entrypoints/foliate-viewer.ts` | 输出 `/foliate-viewer.js` 的薄入口；挂载 Foliate Solid viewer |
 | `src/entrypoints/foliate/App.tsx` | Foliate reader UI；接收 `onelingo-key`、`file`、`onelingo-sniff=1` 并驱动 `foliate-view` |
 | `src/entrypoints/foliate/bridge.ts` | Foliate 内容文档内 hover / selection 桥接；绑定 `foliate-view` 的 load / relocate 生命周期 |
+| `src/entrypoints/foliate/reader-content-style.ts` | Foliate 内容 CSS 注入、书内 CSS/HTML transform、Readest 默认字号和主题变量 |
+| `src/entrypoints/foliate/reader-*.ts` | Foliate sidebar / chrome / layout / page-turn / scrollbar / settings 等 reader-local helper |
+| `src/entrypoints/foliate/footnote-popup.ts` | Readest 式脚注 / 尾注弹窗 |
+| `src/lib/foliate-reader-settings.ts` | EPUB reader 外观设置的默认值、范围、锁定和存储转换 |
 | `@onelingo/pdfjs-dist` | 私有 Git 依赖仓库 `owlx56/pdfjs-dist`；根目录是 package shell，官方 `pdfjs-*-dist.zip` 展开内容放在 `dist/` |
 | `package.json` / `bun.lock` | OneLingo 只在这里锁定 `@onelingo/pdfjs-dist` 的具体 Git tag；当前为 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284` |
 | `src/assets/foliate-viewer/` | OneLingo EPUB 静态 shell，构建时复制到 `/foliate/web/` |
@@ -20,7 +24,7 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 | `src/entrypoints/background.ts` | 地址栏 / 主框架文件导航嗅探、右键菜单、保留原页面、独立窗口逻辑 |
 | `src/lib/document-store.ts` | reader 页面 IndexedDB 文档暂存，避免把大文件塞进 URL |
 
-`src/features/document-viewer/` 仍保留早期解析型 reader 的类型和 EPUB 解析 helper。当前 PDF 不在这里解析，PDF 由打包的 PDF.js viewer 处理；当前 EPUB / MOBI / AZW3 / FB2 主路径由 Foliate reader 在 `src/entrypoints/foliate/App.tsx` 渲染。
+`src/features/document-viewer/` 仍保留早期解析型 reader 的类型和 EPUB 解析 helper。当前 PDF 不在这里解析，PDF 由打包的 PDF.js viewer 处理；当前 EPUB / MOBI / AZW3 / FB2 主路径由 Readest fork `foliate-js` 和 Foliate reader 在 `src/entrypoints/foliate/App.tsx` 渲染。
 
 ## 打开流程
 
@@ -61,7 +65,42 @@ OneLingo 不再下载或解压 PDF.js release zip。私有 `owlx56/pdfjs-dist` �
 
 旧版 PDF.js 使用 `@onelingo/pdfjs-dist/dist/web/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。新版 PDF.js 使用 Fluent `viewer.ftl` / `locale.json` 时直接复制官方 locale 目录。
 
-`prepare:publicPaths` 会把 `pdf/web/viewer.html` 和 `epub/web/viewer.html` 加入 public path。`wxt.config.ts` 会通过 Node 模块解析定位已安装的 `@onelingo/pdfjs-dist`，只接受包壳里的 `dist/build/pdf.mjs` / `dist/build/pdf.js` 布局，并用 `dist/PDFJS_RELEASE.json` 和 `pdfjs-release.lock.json` 做一致性校验。`wxt.config.ts` 会在复制时注入 `/pdf-viewer.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
+`prepare:publicPaths` 会把 `pdf/web/viewer.html`、`foliate/web/viewer.html` 和 `foliate/web/foliate-js/view.js` 加入 public path。`wxt.config.ts` 会通过 Node 模块解析定位已安装的 `@onelingo/pdfjs-dist`，只接受包壳里的 `dist/build/pdf.mjs` / `dist/build/pdf.js` 布局，并用 `dist/PDFJS_RELEASE.json` 和 `pdfjs-release.lock.json` 做一致性校验。`wxt.config.ts` 会在复制时注入 `/pdf-viewer.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
+
+## Foliate / EPUB reader
+
+EPUB / MOBI / AZW3 / FB2 reader 使用 Readest fork `foliate-js`，依赖锁定在 `github:readest/foliate-js#1fc763b8e6afe10971043a6818dcb9e2d8c54f4a`。不要把 `foliate-js` 改回上游，也不要在 OneLingo 外层手写章节拼接；跨章节滚动依赖 fork 的连续 `flow="scrolled"` renderer。
+
+`wxt.config.ts` 会复制 `node_modules/foliate-js` 运行时文件到 `/foliate/web/foliate-js/`，并通过 `scripts/foliate-runtime-patches.ts` 做构建期 patch，包括 iframe sandbox 兼容、Readest fork paginator 兼容和 pages 双页章节首页对齐等。改 Foliate runtime 行为时，改 patch 管线和 `scripts/foliate-runtime-patches.test.js`，不要改 `node_modules/foliate-js` 或 `.output/`。
+
+当前 Foliate reader UI 行为：
+
+- sidebar 支持 overlay / pinned(docked) 两种状态。桌面 pinned 时侧栏成为布局左列，正文和 hover chrome 在右列；sidebar 宽度可拖拽并持久化，visible 不持久化。窄屏保持 overlay 抽屉，不提供横向拖拽。
+- sidebar 顶部保留 toggle 和 pin/unpin；下面显示书籍封面、标题、作者和详情按钮。无封面时不显示封面区域；详情 modal 只读展示 Metadata / Series / Description。
+- TOC 支持卷折叠和起始页码。overlay 模式下导航可自动收起；pinned 模式保持打开。
+- 固定顶栏已改成 Readest 式正文 hover chrome：常态顶部显示当前章节名、底部空白；鼠标进入顶部区域时显示书名和 pages / scroll 模式切换、reader 外观按钮；鼠标进入底部区域时显示上一章节 / 下一章节按钮。
+- pages 模式左右空白区有 hover 翻页按钮；滚轮翻页只在 pages 模式启用，`scroll` 模式交给 Foliate 原生连续滚动。
+- scroll 模式隐藏 Foliate 原生滚动条，并使用 reader-local overlay scrollbar。滚动后只显示滑块，滑块可见时 hover 右侧展开完整滚动条和上下按钮；pages 模式不启用 overlay scrollbar。
+- 脚注 / 尾注点击由 `foliate-js/footnotes.js` 的 `FootnoteHandler` 和本地启发式接管，优先在当前位置弹出只读 popup，识别失败才回退到原链接跳转。
+
+Foliate reader 外观设置只包含：
+
+- 字号：默认 16px，范围和规范化在 `src/lib/foliate-reader-settings.ts`；
+- 行距：默认 1.4；
+- 首行缩进：开启时使用 2em；
+- Use Book Layout：保留书内段落版式，只锁行距和首行缩进，字号仍可调整。
+
+不提供 reader 字体选择，也不要恢复已移除的 `foliateReaderFontFamily`。Options 的 File Plus 和 Foliate viewer 顶栏设置共用同一组存储字段。Foliate viewer 内修改设置时需要通过 `reader-content-style.ts` 的 `renderer.setStyles()` 和已加载文档 CSS 注入即时生效，不应要求刷新 tab。
+
+`reader-content-style.ts` 负责：
+
+- 生成当前主题和外观设置对应的 reader CSS；
+- 给 Foliate paginator 提供 `--theme-bg-color`、`--theme-fg-color` 和 `--override-color:true`，避免主题切换后 pages gutter 继续使用旧章节背景缓存；
+- 在 `book.transformTarget` 上预处理书内 CSS / HTML，移除 `res:///` / `file:///` 本地字体，转换硬编码字号，替换 viewport units，撤销 `user-select:none`；
+- 限制 pages 模式封面 / 全页图片高度，避免和 reader chrome 重叠；
+- 已打开内容 iframe 通过 `applyFoliateContentCss()` 同步样式，新加载章节通过 `bridge.ts` load / relocate 继续绑定。
+
+Reader UI 控件、sidebar、详情 modal、脚注 popup、overlay scrollbar 等都必须标记或继承 `data-onelingo-reader-ui` 边界。hover、selection、滚轮翻页和正文点击取消选中都要避开这些 UI 区域。
 
 ## Reader 翻译
 
@@ -118,9 +157,9 @@ options、popup、EPUB reader、PDF reader 使用打包的 Inter 字体。字体
 
 - `/viewer.html` 路由壳通过 `useSettings()` / `initTheme()` 更新。
 - 顶层 PDF viewer 内部由 `/pdf-viewer.js` 调用 `initTheme()` 并监听主题变化。
-- EPUB viewer 自身由 `/foliate-viewer.js` 初始化主题；EPUB 内容文档通过 `syncRenditionDocumentPrefs()` 和 `rendition.hooks.content` 注入 `onelingo-foliate-theme`。
+- EPUB viewer 自身由 `/foliate-viewer.js` 初始化主题；EPUB 内容文档通过 `src/entrypoints/foliate/bridge.ts` 监听主题 / 设置变化，并用 `reader-content-style.ts` 注入 `onelingo-foliate-theme`。
 
-修主题 bug 时要检查已打开的 PDF / EPUB tab，无需刷新 tab 就应该响应主语言和主题切换。
+修主题 bug 时要检查已打开的 PDF / EPUB tab，无需刷新 tab 就应该响应主语言和主题切换。Foliate pages 模式还有 paginator `#background` 段；如果正文和 UI 已变色但左右 gutter 没变，优先检查 `foliate-view.renderer.shadowRoot.querySelector("#background")` 的子节点背景，以及内容 CSS 是否仍包含 `--override-color:true`。
 
 ## 验证建议
 
@@ -133,6 +172,10 @@ options、popup、EPUB reader、PDF reader 使用打包的 Inter 字体。字体
 - 地址栏输入 PDF URL，分别测试只嗅探、保留原页面、独立窗口；
 - PDF reader 内 hover / selection；
 - Foliate reader 内 hover / selection；
+- Foliate pages / scroll 模式切换、滚轮翻页、左右页边翻页、overlay scrollbar；
+- Foliate sidebar overlay / pinned / 拖宽、TOC 折叠页码、书籍详情 modal；
+- Foliate 脚注 / 尾注 popup；
+- Foliate reader 外观设置：字号、行距、首行缩进、Use Book Layout，在已打开 tab 内即时生效；
 - 已打开 reader tab 时切换主题和主语言。
 
 常规命令：
@@ -140,6 +183,11 @@ options、popup、EPUB reader、PDF reader 使用打包的 Inter 字体。字体
 ```powershell
 bun run i18n:generate
 bun test .\src\lib\i18n\index.test.js
+bun test .\src\entrypoints\foliate\reader-content-style.test.js
+bun test .\src\entrypoints\foliate\reader-settings.test.js
+bun test .\src\entrypoints\foliate\wheel-turns.test.js
+bun test .\src\entrypoints\foliate\footnote-popup.test.js
+bun test .\src\entrypoints\foliate\reader-scrollbar.test.js
 bun run compile
 bun run build
 ```

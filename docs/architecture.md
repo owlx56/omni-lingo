@@ -10,7 +10,7 @@
 - Solid：只用于交互 UI。
 - Vanilla TypeScript：用于热路径和宿主页面 DOM 操作。
 - PDF.js release dist：PDF 渲染和官方 viewer 基础能力，由 `@onelingo/pdfjs-dist` 私有 Git 依赖提供；该自建仓库同步 Mozilla GitHub release 的 `pdfjs-*-dist.zip` 展开内容，OneLingo 通过 Bun/Git 依赖锁定到具体 tag，构建时复制到扩展 public assets。当前依赖是 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，安装后包根目录是 package shell，官方 release dist 在 `dist/`。
-- foliate-js：EPUB / MOBI / AZW3 / FB2 渲染。
+- foliate-js：EPUB / MOBI / AZW3 / FB2 渲染，当前使用 Readest fork `github:readest/foliate-js#1fc763b8e6afe10971043a6818dcb9e2d8c54f4a`，以获得连续 scrolled renderer 和 Readest paginator 行为。
 
 ## 顶层流向
 
@@ -39,6 +39,7 @@ src/lib/
   cache/         -> 翻译缓存基础设施
   i18n/          -> options / popup / EPUB / PDF viewer 多语言文案源与生成入口
   ui/            -> options / popup 共享控件原语
+  foliate-reader-settings.ts -> EPUB reader 字号、行距、首行缩进、Use Book Layout 规范化和锁定规则
   document-store.ts -> viewer 页面 IndexedDB 文档暂存
   languages.ts   -> UI 语言 / 目标语言常量和类型
   translation-style.ts -> 全文译文样式解析和默认值
@@ -109,6 +110,8 @@ options 和 popup 的通用控件放在 `src/lib/ui/controls.tsx`，样式放在
 
 改下拉菜单、开关、色板、分段按钮时优先改共享控件，避免 options 和 popup 样式漂移。Select 的触发按钮保持无边框的扁平样式，下拉菜单负责边框、阴影、圆角和滚动条；选项文本需要足够 line-height，避免 `g`、`y`、`p` 等下伸字母被裁切。
 
+共享图标放在 `src/lib/ui/icons.tsx`，options 侧栏、popup、主题 Sun/Moon/System、Foliate 顶栏 / 侧栏按钮都从这里引用。新增图标时优先保持 Lucide / Claude 式 `currentColor` 线性风格；不要在单个 entrypoint 内复制 SVG。
+
 ## PDF / EPUB Reader
 
 阅读器详细边界见 [document-viewer.md](document-viewer.md)。当前实现分为三个公开入口：
@@ -133,6 +136,23 @@ EPUB 打开路径：
   -> foliate-view open(file)
   -> src/entrypoints/foliate/bridge.ts 绑定内容文档
 ```
+
+Foliate reader 当前由一个 Solid shell 和多个 reader-local helper 组成：
+
+| 文件 | 负责 |
+| --- | --- |
+| `src/entrypoints/foliate/App.tsx` | reader shell、文件打开、sidebar / chrome / settings UI 编排 |
+| `src/entrypoints/foliate/bridge.ts` | `foliate-view` load / relocate 生命周期、hover / selection 文档绑定、主题和 reader CSS 同步 |
+| `src/entrypoints/foliate/reader-content-style.ts` | `renderer.setStyles()`、已加载 iframe CSS 注入、书内 CSS/HTML transform、主题背景变量 |
+| `src/entrypoints/foliate/reader-settings.ts` | 从 `src/lib/foliate-reader-settings.ts` 复用 reader 外观设置规范 |
+| `src/entrypoints/foliate/reader-chrome.ts` | Readest 式顶部 / 底部 hover chrome 状态 |
+| `src/entrypoints/foliate/reader-layout.ts` | pages / scroll 模式下 renderer 纵向留白和 chrome 空间 |
+| `src/entrypoints/foliate/reader-page-turn.ts` | pages 模式左右页边 hover 翻页区域 |
+| `src/entrypoints/foliate/wheel-turns.ts` | pages 模式滚轮翻页步进和导航队列 |
+| `src/entrypoints/foliate/reader-scrollbar.ts` | scroll 模式自绘 overlay scrollbar 状态机 |
+| `src/entrypoints/foliate/footnote-popup.ts` | Readest 式脚注 / 尾注弹窗和 footnote renderer 配置 |
+
+Foliate runtime asset 由 `wxt.config.ts` 从 `node_modules/foliate-js` 复制到 `/foliate/web/foliate-js/`。涉及 paginator、iframe sandbox、连续滚动或 public asset 的改动，走 `scripts/foliate-runtime-patches.ts` 和 `scripts/foliate-runtime-patches.test.js`；不要直接编辑安装依赖或 `.output/`。
 
 文件链接嗅探：
 

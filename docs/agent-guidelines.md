@@ -53,6 +53,8 @@ background / content / options / popup 的消息全部走 `src/lib/messaging/`�
 
 options 和 popup 使用 Solid，但通用控件必须优先复用 `src/lib/ui/controls.tsx` 和 `src/lib/ui/controls.css`。不要在 entrypoint 内各自复制 Select、Switch、Segment、Row 等样式。
 
+options、popup、viewer 共用的图标必须放在 `src/lib/ui/icons.tsx`。新增按钮图标、侧栏图标、主题图标、reader 图标时，先扩展这里，再从 entrypoint 引用；不要在 options / popup / Foliate JSX 里临时塞一份 inline SVG。当前图标风格以 Lucide / Claude 式细线、圆角、`currentColor` 为基准。
+
 下拉菜单遵守当前 Claude/Gemini 风格约定：
 
 - 触发按钮扁平、无边框；
@@ -82,7 +84,11 @@ options / popup / EPUB viewer / PDF viewer 的界面文案都走 `src/lib/i18n/c
 - PDF reader 使用 `@onelingo/pdfjs-dist` 私有 Git 依赖提供官方 GitHub release `pdfjs-*-dist.zip` 的展开内容；当前锁定 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，依赖根目录是包壳，官方 release dist 在 `dist/build/`、`dist/web/`、`dist/LICENSE`。不要手改已安装依赖或 `.output/`。
 - PDF 内置 viewer 必须保持官方 PDF.js `viewer.html` / `viewer.js` / `viewer.css` 的布局和 textLayer 环境，避免自定义 `PDFViewer` 外壳导致双击选词边界和 hover 精度偏移。
 - PDF hover 默认直接复用 `src/features/hover/` 的通用逻辑。遇到 PDF hover 精度问题，先检查是否仍在顶层官方 viewer 里运行，再检查 reader UI 边界和 textLayer 命中；不要先验地恢复 PDF-specific hover 分支。
-- EPUB 主路径现已切到 `foliate-js`，reader shell 公开为 `/foliate/web/viewer.html`，实现放在 `src/entrypoints/foliate/App.tsx`，内容桥接在 `src/entrypoints/foliate/bridge.ts`；hover 编排优先复用 `src/features/hover/`，bridge 只保留文档生命周期绑定和坐标转换。
+- EPUB 主路径现已切到 Readest fork `foliate-js`，reader shell 公开为 `/foliate/web/viewer.html`，实现放在 `src/entrypoints/foliate/App.tsx`，内容桥接在 `src/entrypoints/foliate/bridge.ts`；hover 编排优先复用 `src/features/hover/`，bridge 只保留文档生命周期绑定和坐标转换。连续滚动依赖 fork 的 scrolled renderer，不在 OneLingo 外层手写章节拼接。
+- Foliate runtime 从 `node_modules/foliate-js` 复制到扩展 public assets，并由 `scripts/foliate-runtime-patches.ts` 做构建期 patch。改 paginator / iframe sandbox / runtime asset 行为时改 patch 管线和测试，不要手改 `node_modules/` 或 `.output/`。
+- Foliate reader 的阅读外观设置只包含字号、行距、首行缩进、Use Book Layout。默认字号按 Readest 16px；Use Book Layout 保留书籍段落版式，只锁行距和首行缩进，不锁字号；不提供 reader 字体选择。
+- Foliate 内容样式集中在 `src/entrypoints/foliate/reader-content-style.ts`。这里负责 `renderer.setStyles()`、已加载 iframe CSS 同步、书内 CSS/HTML transform、去掉本地字体 URL、把硬编码字号转成可随 reader 字号缩放的单位，以及给 paginator 提供主题背景变量。主题 / 字号 / 行距 / 首行缩进修改应在已打开 reader tab 内即时生效。
+- Foliate reader 的 sidebar、hover chrome、页边翻页、滚轮翻页、overlay scrollbar、footnote popup 都有本地 helper 和测试；改对应行为时优先补 / 更新 `src/entrypoints/foliate/*test.js`，不要把新逻辑堆回 `App.tsx`。
 - `/viewer.html` 只作为兼容路由和 HTML shell 探测入口；不要把 EPUB UI 或 PDF 自定义 viewer 重新塞回这里。
 - reader 内 selection 行为必须复用 `src/features/selection/`。未来改 selection 功能时，普通网页、PDF reader、EPUB reader 应尽量同时生效。
 - reader UI 控件必须标记或继承 `data-onelingo-reader-ui` 边界，hover / selection 不应命中工具栏、侧栏、菜单、对话框。

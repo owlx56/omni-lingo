@@ -29,9 +29,12 @@ OneLingo（一译）是跨 Chrome / Firefox / Safari 的浏览器翻译拓展。
 - `uiLang` 是 options / popup 的界面语言；hover / selection / immersive 目标语言默认与它一致，用户修改某个功能目标语言后该功能独立保存。
 - UI 文案源在 `src/lib/i18n/catalog.ts`，options / popup / EPUB / PDF reader 都从这里派生；`messages.ts`、`locales/*.ts` 和 `src/assets/pdf-viewer/locales.generated.mjs` 是类型/兼容/静态 viewer 产物。
 - 通用控件放在 `src/lib/ui/controls.tsx` 和 `src/lib/ui/controls.css`；改 options / popup 下拉菜单、开关、色板时优先复用这里。
+- 共享图标放在 `src/lib/ui/icons.tsx`；options、popup、viewer 的按钮/侧栏/主题图标都从这里取，不要在 entrypoint 里复制 inline SVG。
 - PDF reader 使用 `@onelingo/pdfjs-dist` 私有 Git 依赖提供官方 GitHub release `pdfjs-*-dist.zip` 的展开内容；当前锁定 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，依赖根目录是包壳，官方 release dist 在 `dist/build/`、`dist/web/`、`dist/LICENSE`。不要手改已安装依赖或 `.output/`。
 - PDF hover 直接复用 `src/features/hover/` 的通用逻辑；不要再维护一套 PDF-specific hover hit test / token split / overlay underline。
-- Foliate reader 在 `src/entrypoints/foliate/` 使用 `foliate-js` 渲染，`bridge.ts` 负责把 hover / selection 行为接进阅读 iframe。
+- Foliate reader 在 `src/entrypoints/foliate/` 使用 Readest fork `foliate-js` 渲染；当前依赖锁定 `github:readest/foliate-js#1fc763b8e6afe10971043a6818dcb9e2d8c54f4a`，构建时由 `wxt.config.ts` 复制并通过 `scripts/foliate-runtime-patches.ts` 做 runtime patch。不要手改 `node_modules/foliate-js` 或 `.output/`。
+- Foliate 内容桥接在 `src/entrypoints/foliate/bridge.ts`；reader CSS / 书内 CSS transform 在 `reader-content-style.ts`，侧栏 / chrome / 翻页 / overlay scrollbar / footnote popup 等逻辑拆在 `src/entrypoints/foliate/reader-*.ts` 和 `footnote-popup.ts`。
+- EPUB 阅读外观设置在 `src/lib/foliate-reader-settings.ts` 和 `src/lib/storage/settings.ts`：字号、行距、首行缩进、Use Book Layout。Use Book Layout 只锁行距和首行缩进，字号仍可调；不要重新加入 reader 字体选择。
 - 文件链接嗅探分两层：`src/features/document-sniffer.ts` 处理页面内普通链接点击；`src/entrypoints/background.ts` 用 DNR / webRequest 处理地址栏和主框架 PDF / EPUB 导航。
 - 全文翻译在 `src/features/immersive/`。
 - `index.ts` 负责会话编排和翻译执行。
@@ -58,6 +61,15 @@ bun run build
 
 ```powershell
 bun test .\src\lib\i18n\index.test.js
+```
+
+Foliate reader 相关单测按改动范围跑：
+
+```powershell
+bun test .\src\entrypoints\foliate\reader-content-style.test.js
+bun test .\src\entrypoints\foliate\reader-settings.test.js
+bun test .\src\entrypoints\foliate\wheel-turns.test.js
+bun test .\src\entrypoints\foliate\footnote-popup.test.js
 ```
 
 i18n 生成：
