@@ -30,7 +30,7 @@ export type WheelTurnHandleOptions = {
 };
 
 const DEFAULT_THRESHOLD = 30;
-const DEFAULT_IDLE_RESET_MS = 200;
+const DEFAULT_IDLE_RESET_MS = 120;
 const DEFAULT_LINE_HEIGHT = 40;
 const DEFAULT_PAGE_HEIGHT = 800;
 
@@ -47,6 +47,7 @@ export function createWheelTurnDetector(
   let accumX = 0;
   let accumY = 0;
   let lastTime = -Infinity;
+  let flipped = false;
 
   const normalize = (delta: number, mode: number): number => {
     if (mode === 1) return delta * lineHeight;
@@ -58,6 +59,7 @@ export function createWheelTurnDetector(
     accumX = 0;
     accumY = 0;
     lastTime = -Infinity;
+    flipped = false;
   };
 
   const feed = (sample: WheelTurnSample): WheelTurnDirection | null => {
@@ -69,8 +71,11 @@ export function createWheelTurnDetector(
     if (sample.timeStamp - lastTime > idleResetMs) {
       accumX = 0;
       accumY = 0;
+      flipped = false;
     }
     lastTime = sample.timeStamp;
+
+    if (flipped) return null;
 
     accumX += normalize(sample.deltaX, sample.deltaMode);
     accumY += normalize(sample.deltaY, sample.deltaMode);
@@ -80,6 +85,7 @@ export function createWheelTurnDetector(
     }
 
     const direction = dominantDirection(accumX, accumY);
+    flipped = true;
     accumX = 0;
     accumY = 0;
     return direction;

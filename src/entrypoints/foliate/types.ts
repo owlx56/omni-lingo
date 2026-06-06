@@ -169,6 +169,7 @@ export interface FoliateViewElement extends HTMLElement {
   goLeft(): Promise<void>;
   goRight(): Promise<void>;
   goTo(target: unknown): Promise<void>;
+  goToFraction?(fraction: number): Promise<void> | void;
   goToTextStart?(): Promise<void>;
   next(distance?: number): Promise<void>;
   open(input: File | Blob | string | FoliateBookLike): Promise<void>;

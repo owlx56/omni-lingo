@@ -31,29 +31,29 @@ describe("createWheelTurnDetector", () => {
     expect(detector.feed(sample({ deltaX: -40, timeStamp: 0 }))).toBe("left");
   });
 
-  test("flips each time a continuous touchpad gesture crosses the threshold", () => {
-    const detector = createWheelTurnDetector({ idleResetMs: 200, threshold: 30 });
+  test("flips only once during a continuous touchpad gesture", () => {
+    const detector = createWheelTurnDetector({ idleResetMs: 120, threshold: 30 });
 
     expect(detector.feed(sample({ deltaY: 12, timeStamp: 0 }))).toBeNull();
     expect(detector.feed(sample({ deltaY: 12, timeStamp: 16 }))).toBeNull();
     expect(detector.feed(sample({ deltaY: 12, timeStamp: 32 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: 40, timeStamp: 48 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: 40, timeStamp: 64 }))).toBe("right");
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 48 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 64 }))).toBeNull();
   });
 
-  test("keeps flipping during one stream and still resets after idle", () => {
-    const detector = createWheelTurnDetector({ idleResetMs: 200, threshold: 30 });
+  test("starts a new wheel gesture after OneLingo's shorter idle gap", () => {
+    const detector = createWheelTurnDetector({ threshold: 30 });
 
     expect(detector.feed(sample({ deltaY: 40, timeStamp: 0 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: 40, timeStamp: 80 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: -40, timeStamp: 281 }))).toBe("left");
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 80 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: -40, timeStamp: 201 }))).toBe("left");
   });
 
   test("counts a single oversized wheel event as one effective step", () => {
-    const detector = createWheelTurnDetector({ idleResetMs: 200, threshold: 30 });
+    const detector = createWheelTurnDetector({ idleResetMs: 120, threshold: 30 });
 
     expect(detector.feed(sample({ deltaY: 600, timeStamp: 0 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: 600, timeStamp: 16 }))).toBe("right");
+    expect(detector.feed(sample({ deltaY: 600, timeStamp: 16 }))).toBeNull();
   });
 
   test("normalizes line and page delta modes", () => {

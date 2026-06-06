@@ -68,6 +68,14 @@ import {
   type PageTurnSide,
 } from "./reader-page-turn";
 import {
+  READER_PROGRESS_RANGE_MAX,
+  formatReaderProgressPercent,
+  progressFractionFromRangeValue,
+  rangeValueFromReaderProgress,
+  readerProgressFromRelocate,
+  type ReaderProgress,
+} from "./reader-progress";
+import {
   FOLIATE_FOOTNOTE_POPUP_PADDING,
   configureFootnotePopupRenderer,
   createFoliateFootnoteContentCss,
@@ -214,6 +222,7 @@ function App(): JSX.Element {
   const [error, setError] = createSignal("");
   const [docTitle, setDocTitle] = createSignal("");
   const [locationLabel, setLocationLabel] = createSignal("");
+  const [readerProgress, setReaderProgress] = createSignal<ReaderProgress | null>(null);
   const [sidebarVisible, setSidebarVisible] = createSignal(false);
   const [sidebarPinned, setSidebarPinned] = createSignal(false);
   const [sidebarWidth, setSidebarWidth] = createSignal(
@@ -258,6 +267,7 @@ function App(): JSX.Element {
   let footnoteAnchorPosition: FootnotePopupPosition | null = null;
   let footnoteHistory: FoliateLinkDetail[] = [];
   let footnoteHistoryIndex = -1;
+  let progressSeekTimer: number | undefined;
   let appliedReaderStyleSettings = initialReaderStyleSettings;
   let pendingReaderStyleSettings: FoliateReaderStyleSettings | null = null;
   let readerAppearanceSave: Promise<void> = Promise.resolve();
@@ -337,6 +347,7 @@ function App(): JSX.Element {
     clearWheelTurns();
     clearWheelContentDocuments();
     overlayScrollbarController.destroy();
+    clearProgressSeekTimer();
     contentWheelCleanup?.();
     contentWheelCleanup = undefined;
     resizeCleanup?.();
@@ -512,11 +523,13 @@ function App(): JSX.Element {
     setTocExpandedKeys(new Set<string>());
     setActiveHref("");
     setLocationLabel("");
+    setReaderProgress(null);
     setBookState(null);
     setDetailsOpen(false);
     setAppearanceOpen(false);
     setSidebarVisible(false);
     setIsDragging(false);
+    clearProgressSeekTimer();
     navigationLocked = false;
   };
 
@@ -831,6 +844,8 @@ function App(): JSX.Element {
       closeFootnotePopup();
     }
     if (detail.reason === "scroll") overlayScrollbarController.refresh();
+    const progress = readerProgressFromRelocate(detail);
+    if (progress) setReaderProgress(progress);
     if (detail.tocItem?.href) {
       setActiveHref(detail.tocItem.href);
     }
@@ -982,6 +997,41 @@ function App(): JSX.Element {
   const readerChapterLabel = (): string => locationLabel() || docTitle();
 
   const readerBookTitle = (): string => docTitle() || t("viewer.title");
+
+  const readerProgressTitle = (): string => {
+    const progress = readerProgress();
+    if (!progress) return t("viewer.readingProgress");
+    const percent = formatReaderProgressPercent(progress);
+    if (
+      typeof progress.locationCurrent === "number" &&
+      typeof progress.locationTotal === "number"
+    ) {
+      return `${t("viewer.readingProgress")}: ${progress.locationCurrent + 1} / ${progress.locationTotal} (${percent})`;
+    }
+    return `${t("viewer.readingProgress")}: ${percent}`;
+  };
+
+  const seekReaderProgress = (value: number): void => {
+    const fraction = progressFractionFromRangeValue(value);
+    const current = readerProgress();
+    setReaderProgress({
+      fraction,
+      locationCurrent: current?.locationCurrent,
+      locationTotal: current?.locationTotal,
+    });
+    clearProgressSeekTimer();
+    progressSeekTimer = window.setTimeout(() => {
+      progressSeekTimer = undefined;
+      const currentView = view ?? getCurrentFoliateView();
+      void currentView?.goToFraction?.(fraction);
+    }, 80);
+  };
+
+  function clearProgressSeekTimer(): void {
+    if (progressSeekTimer === undefined) return;
+    window.clearTimeout(progressSeekTimer);
+    progressSeekTimer = undefined;
+  }
 
   const readerChromeState = () => getReaderChromeState(readerChromeZone());
 
@@ -1659,6 +1709,37 @@ function App(): JSX.Element {
                   >
                     <IconArrowLeftDouble size={24} />
                   </button>
+                  <Show when={readerProgress()}>
+                    {(progress) => (
+                      <div
+                        class="foliate-reader-progress"
+                        title={readerProgressTitle()}
+                      >
+                        <span class="foliate-reader-progress-label">
+                          {formatReaderProgressPercent(progress())}
+                        </span>
+                        <input
+                          aria-label={t("viewer.jumpToLocation")}
+                          class="foliate-reader-progress-range"
+                          max={READER_PROGRESS_RANGE_MAX}
+                          min={0}
+                          onClick={(event) => event.stopPropagation()}
+                          onInput={(event) => {
+                            event.stopPropagation();
+                            seekReaderProgress(Number(event.currentTarget.value));
+                          }}
+                          onPointerDown={(event) => event.stopPropagation()}
+                          step={1}
+                          style={{
+                            "--reader-progress": `${rangeValueFromReaderProgress(progress()) / 10}%`,
+                          }}
+                          title={readerProgressTitle()}
+                          type="range"
+                          value={rangeValueFromReaderProgress(progress())}
+                        />
+                      </div>
+                    )}
+                  </Show>
                   <button
                     aria-label={t("viewer.nextSection")}
                     class="foliate-section-button"

@@ -32,6 +32,15 @@ describe("Foliate reader chrome layout styling", () => {
     expect(css).toContain(".foliate-appearance-row");
   });
 
+  test("styles the reader progress scrubber in the bottom chrome", () => {
+    expect(css).toContain(".foliate-reader-progress");
+    expect(css).toContain(".foliate-reader-progress-label");
+    expect(css).toContain(".foliate-reader-progress-range");
+    expect(css).toMatch(
+      /\.foliate-reader-progress-range::-webkit-slider-thumb\s*\{[\s\S]*border-radius:\s*999px;/,
+    );
+  });
+
   test("matches options number stepper proportions in the appearance panel", () => {
     expect(css).toMatch(
       /\.foliate-appearance-stepper\s*\{[\s\S]*gap:\s*10px;[\s\S]*\}/,
