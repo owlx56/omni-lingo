@@ -49,16 +49,17 @@ import {
 import { broadcastFoliateReaderAppearance } from "@/lib/foliate-reader-live-settings";
 import { useT, type MessageKey, type TFn } from "@/lib/i18n";
 import {
+  IconFile,
   IconHover,
   IconImmersive,
   IconInfo,
+  IconLogo,
   IconMoon,
   IconSelection,
+  IconSettings,
   IconSun,
   IconSystem,
-  IconFile,
-} from "./icons";
-import { IconLogo, IconSettings } from "@/lib/ui/icons";
+} from "@/lib/ui/icons";
 import {
   FullRow,
   IconSegment,

@@ -167,8 +167,21 @@ body {
 }
 
 .foliate-sidebar-pin-button {
+    background: transparent;
+    box-shadow: none;
     color: var(--text);
     margin-left: auto;
+}
+
+.foliate-sidebar-pin-button.is-active {
+    background: transparent;
+    box-shadow: none;
+}
+
+.foliate-sidebar-pin-button:hover,
+.foliate-sidebar-pin-button.is-active:hover {
+    background: var(--surface-alt);
+    box-shadow: none;
 }
 
 .foliate-nav-button {
@@ -489,11 +502,13 @@ body {
 .foliate-mode-switch {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px;
+    gap: 2px;
+    height: 28px;
+    padding: 2px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--surface-alt);
+    box-sizing: border-box;
 }
 
 .foliate-mode-button {
@@ -518,6 +533,17 @@ body {
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
 }
 
+.foliate-mode-switch .foliate-mode-button {
+    width: 24px;
+    height: 24px;
+    border: 0;
+    background: transparent;
+}
+
+.foliate-mode-switch .foliate-mode-button.is-active {
+    background: var(--surface);
+}
+
 .foliate-appearance-anchor {
     position: relative;
     display: inline-flex;
@@ -525,12 +551,21 @@ body {
 }
 
 .foliate-appearance-button {
-    border: 1px solid var(--border);
-    background: var(--surface-alt);
+    border: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 .foliate-appearance-button.is-active {
-    background: var(--surface);
+    background: transparent;
+    box-shadow: none;
+    color: var(--text);
+}
+
+.foliate-appearance-button:hover,
+.foliate-appearance-button.is-active:hover {
+    background: var(--surface-alt);
+    box-shadow: none;
 }
 
 .foliate-appearance-panel {
@@ -594,11 +629,9 @@ body {
 .foliate-appearance-stepper {
     display: inline-flex;
     align-items: center;
-    min-height: 30px;
-    border: 1px solid var(--border);
-    border-radius: 7px;
-    background: var(--surface);
-    overflow: hidden;
+    gap: 10px;
+    min-height: 32px;
+    color: var(--text);
 }
 
 .foliate-appearance-stepper.is-disabled {
@@ -610,12 +643,20 @@ body {
     align-items: center;
     justify-content: center;
     width: 28px;
-    height: 30px;
+    height: 28px;
     padding: 0;
-    border: 0;
+    border: none;
+    border-radius: 8px;
     background: transparent;
-    color: var(--text-muted);
+    color: var(--text);
     cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition:
+        background-color 120ms ease,
+        border-color 120ms ease,
+        color 120ms ease,
+        transform 120ms ease;
 }
 
 .foliate-appearance-stepper button:hover {
@@ -625,33 +666,54 @@ body {
 
 .foliate-appearance-stepper button:disabled {
     cursor: default;
+    transform: none;
 }
 
 .foliate-appearance-stepper button:disabled:hover {
     background: transparent;
-    color: var(--text-muted);
+}
+
+.foliate-appearance-stepper button:active {
+    transform: scale(0.94);
 }
 
 .foliate-appearance-stepper input {
-    width: 46px;
-    height: 30px;
-    padding: 0;
-    border: 0;
-    background: transparent;
+    width: 78px;
+    min-width: 0;
+    height: 32px;
+    padding: 0 27px 0 18px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
     color: var(--text);
-    font: inherit;
-    font-size: 12px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.015);
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    line-height: 32px;
     text-align: center;
+    transition:
+        border-color 120ms ease,
+        box-shadow 120ms ease;
 }
 
 .foliate-appearance-stepper input:focus {
+    border-color: #2c75e0;
     outline: none;
+    box-shadow: 0 0 0 1px #2c75e0;
+}
+
+.foliate-appearance-stepper input:disabled {
+    cursor: default;
 }
 
 .foliate-appearance-stepper span {
-    min-width: 18px;
+    display: inline-flex;
+    align-items: center;
+    margin-left: -36px;
+    min-width: 24px;
     color: var(--text-muted);
-    font-size: 11px;
+    font-size: 13px;
+    pointer-events: none;
 }
 
 .foliate-appearance-switch {
@@ -680,11 +742,12 @@ body {
 }
 
 .foliate-appearance-switch.is-on {
-    background: var(--text);
+    border-color: #2c75e0;
+    background: #2c75e0;
 }
 
 .foliate-appearance-switch.is-on span {
-    background: var(--surface);
+    background: #ffffff;
     transform: translateX(16px);
 }
 

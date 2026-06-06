@@ -2218,7 +2218,7 @@ function DetailsSection({
 function ReaderAppearancePanel(props: ReaderAppearancePanelProps): JSX.Element {
   return (
     <section
-      aria-label={props.t("fileplus.section.readerAppearance")}
+      aria-label={props.t("viewer.appearance.title")}
       class="foliate-appearance-panel"
       data-onelingo-reader-ui=""
       onClick={(event) => event.stopPropagation()}
@@ -2227,12 +2227,12 @@ function ReaderAppearancePanel(props: ReaderAppearancePanelProps): JSX.Element {
       role="dialog"
     >
       <div class="foliate-appearance-panel-head">
-        <span>{props.t("fileplus.section.readerAppearance")}</span>
+        <span>{props.t("viewer.appearance.title")}</span>
       </div>
       <div class="foliate-appearance-row">
-        <span>{props.t("fileplus.reader.fontSize")}</span>
+        <span>{props.t("viewer.appearance.fontSize")}</span>
         <ReaderNumberStepper
-          ariaLabel={props.t("fileplus.reader.fontSize.aria")}
+          ariaLabel={props.t("viewer.appearance.fontSize.aria")}
           max={FOLIATE_READER_FONT_SIZE_MAX}
           min={FOLIATE_READER_FONT_SIZE_MIN}
           onChange={props.onFontSizeChange}
@@ -2243,26 +2243,26 @@ function ReaderAppearancePanel(props: ReaderAppearancePanelProps): JSX.Element {
         />
       </div>
       <div class="foliate-appearance-row">
-        <span>{props.t("fileplus.reader.useBookLayout")}</span>
+        <span>{props.t("viewer.appearance.useBookLayout")}</span>
         <ReaderSwitch
           checked={props.useBookLayout}
-          label={props.t("fileplus.reader.useBookLayout")}
+          label={props.t("viewer.appearance.useBookLayout")}
           onChange={props.onUseBookLayoutChange}
         />
       </div>
       <div class="foliate-appearance-row">
-        <span>{props.t("fileplus.reader.textIndent")}</span>
+        <span>{props.t("viewer.appearance.textIndent")}</span>
         <ReaderSwitch
           checked={props.textIndent}
           disabled={props.locked.textIndent}
-          label={props.t("fileplus.reader.textIndent")}
+          label={props.t("viewer.appearance.textIndent")}
           onChange={props.onTextIndentChange}
         />
       </div>
       <div class="foliate-appearance-row">
-        <span>{props.t("fileplus.reader.lineHeight")}</span>
+        <span>{props.t("viewer.appearance.lineHeight")}</span>
         <ReaderNumberStepper
-          ariaLabel={props.t("fileplus.reader.lineHeight.aria")}
+          ariaLabel={props.t("viewer.appearance.lineHeight.aria")}
           disabled={props.locked.lineHeight}
           max={FOLIATE_READER_LINE_HEIGHT_MAX}
           min={FOLIATE_READER_LINE_HEIGHT_MIN}

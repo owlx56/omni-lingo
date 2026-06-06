@@ -19,4 +19,16 @@ describe("Foliate reader chrome layout styling", () => {
     expect(css).toContain(".foliate-appearance-panel");
     expect(css).toContain(".foliate-appearance-row");
   });
+
+  test("matches options number stepper proportions in the appearance panel", () => {
+    expect(css).toMatch(
+      /\.foliate-appearance-stepper\s*\{[\s\S]*gap:\s*10px;[\s\S]*\}/,
+    );
+    expect(css).toMatch(
+      /\.foliate-appearance-stepper input\s*\{[\s\S]*width:\s*78px;[\s\S]*border:\s*1px solid var\(--border\);/,
+    );
+    expect(css).toMatch(
+      /\.foliate-appearance-stepper button\s*\{[\s\S]*width:\s*28px;[\s\S]*height:\s*28px;[\s\S]*border-radius:\s*8px;/,
+    );
+  });
 });

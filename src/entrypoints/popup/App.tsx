@@ -28,7 +28,14 @@ import {
   type FullPageMode,
 } from "@/lib/storage/settings";
 import { useT } from "@/lib/i18n";
-import { IconChevron, IconLogo, IconSettings } from "@/lib/ui/icons";
+import {
+  IconArrowRight,
+  IconBilingualMode,
+  IconChevron,
+  IconLogo,
+  IconReplaceMode,
+  IconSettings,
+} from "@/lib/ui/icons";
 import {
   Row,
   Select,
@@ -60,71 +67,6 @@ const DEFAULT_PAGE_FEATURE_STATUS: PageFeatureStatus = {
   hasHoverEnabledPref: false,
   hasSelectionEnabledPref: false,
 };
-
-function IconArrowRight(): JSX.Element {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height="24"
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="1.7"
-      viewBox="0 0 24 24"
-      width="24"
-    >
-      <path d="M5 12h14" />
-      <path d="M13 6l6 6-6 6" />
-    </svg>
-  );
-}
-
-function IconReplaceMode(): JSX.Element {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height="30"
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="2"
-      viewBox="0 0 32 32"
-      width="30"
-    >
-      <path d="M8 7H5v18h3" />
-      <path d="M24 7h3v18h-3" />
-      <path d="M12 21l4-11 4 11" />
-      <path d="M13.4 17h5.2" />
-    </svg>
-  );
-}
-
-function IconBilingualMode(): JSX.Element {
-  return (
-    <svg
-      aria-hidden="true"
-      fill="none"
-      height="30"
-      stroke="currentColor"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      stroke-width="1.8"
-      viewBox="0 0 32 32"
-      width="30"
-    >
-      <rect height="15" rx="2" width="15" x="5" y="5" />
-      <rect height="15" rx="2" width="15" x="12" y="12" />
-      <path d="M9 16l3.2-7 3.2 7" />
-      <path d="M10.2 13.4h4" />
-      <path d="M16.5 19h7" />
-      <path d="M20 16.5v8" />
-      <path d="M17.5 23c2.9-1 4.9-3.1 5.4-6" />
-      <path d="M23.5 23c-2.6-.9-4.2-2.6-5-5" />
-    </svg>
-  );
-}
 
 function EngineMark(props: { engine: FullPageEngineId }): JSX.Element {
   if (props.engine === "microsoft") {
