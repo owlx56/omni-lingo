@@ -51,6 +51,12 @@ describe("createFoliateContentCss", () => {
     expect(css).toContain("--theme-fg-color:#1f1e1d");
   });
 
+  test("marks theme colors as overrides for Foliate paginator backgrounds", () => {
+    const css = createFoliateContentCss("light");
+
+    expect(css).toContain("--override-color:true");
+  });
+
   test("adds Readest-compatible legacy font-size overrides", () => {
     const css = createFoliateContentCss("light", {
       fontSize: 18,

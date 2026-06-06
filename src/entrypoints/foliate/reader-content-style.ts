@@ -115,6 +115,7 @@ export function createFoliateContentCss(
       "--monospace:monospace;",
       `--theme-bg-color:${bg};`,
       `--theme-fg-color:${text};`,
+      "--override-color:true;",
       "}",
     ].join(""),
     [
