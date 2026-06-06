@@ -7,33 +7,48 @@ import {
 } from "./foliate-runtime-patches.ts";
 
 describe("patchFoliatePaginatorScript", () => {
-  test("leaves Readest-style multi-view paginator source intact", () => {
+  test("aligns Readest-style multi-view section widths to whole spreads", () => {
     const source = [
-      "class Paginator {",
-      "    #views = new Map()",
-      "    #primaryIndex = -1",
-      "    async #goTo({ index, anchor, select }) {",
-      "        if (this.#views.has(index)) {",
-      "            await this.scrollToAnchor(anchor, select)",
-      "        }",
-      "    }",
-      "    async #turnPage(dir, distance) {",
-      "        if (this.#locked) return",
-      "        this.#locked = true",
-      "        try {",
-      "            const shouldGo = await (dir === -1 ? this.#scrollPrev(distance) : this.#scrollNext(distance))",
-      "            if (shouldGo) {",
-      "                await this.#goTo({ index: this.#adjacentIndex(dir), anchor: dir === -1 ? () => 1 : () => 0 })",
+      "class View {",
+      "    expand() {",
+      "        if (this.#column) {",
+      "            const columnSize = this.#size / this.#columnCount",
+      "            const pageCount = Math.ceil(contentSize / columnSize)",
+      "            this.#contentPages = pageCount",
+      "            const expandedSize = pageCount * columnSize",
+      "            this.#element.style.padding = '0'",
+      "            this.#iframe.style[side] = `${expandedSize}px`",
+      "            this.#element.style[side] = `${expandedSize}px`",
+      "            this.#iframe.style[otherSide] = '100%'",
+      "            this.#element.style[otherSide] = '100%'",
+      "            documentElement.style[side] = `${columnSize}px`",
+      "            if (this.#overlayer) {",
+      "                this.#overlayer.element.style.margin = '0'",
+      "                this.#overlayer.element.style.left = '0'",
+      "                this.#overlayer.element.style.top = '0'",
+      "                this.#overlayer.element.style[side] = `${expandedSize}px`",
+      "                this.#overlayer.redraw()",
       "            }",
-      "        } finally {",
-      "            this.#locked = false",
       "        }",
       "    }",
       "}",
       "",
     ].join("\n");
 
-    expect(patchFoliatePaginatorScript(source)).toBe(source);
+    const patched = patchFoliatePaginatorScript(source);
+
+    expect(patched).toContain("this.#contentPages = pageCount");
+    expect(patched).toContain(
+      "const spreadSize = this.#columnCount > 1 ? this.#size : columnSize",
+    );
+    expect(patched).toContain(
+      "const alignedSize = spreadSize > 0 ? Math.ceil(expandedSize / spreadSize) * spreadSize : expandedSize",
+    );
+    expect(patched).toContain("this.#iframe.style[side] = `${alignedSize}px`");
+    expect(patched).toContain("this.#element.style[side] = `${alignedSize}px`");
+    expect(patched).toContain(
+      "this.#overlayer.element.style[side] = `${alignedSize}px`",
+    );
   });
 
   test("patches legacy upstream paginator guards when present", () => {

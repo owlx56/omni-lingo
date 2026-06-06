@@ -1,6 +1,35 @@
 export function patchFoliatePaginatorScript(contents: string): string {
   let next = contents;
 
+  const spreadAlignmentNeedle =
+    "            const expandedSize = pageCount * columnSize\n" +
+    "            this.#element.style.padding = '0'\n" +
+    "            this.#iframe.style[side] = `${expandedSize}px`\n" +
+    "            this.#element.style[side] = `${expandedSize}px`\n" +
+    "            this.#iframe.style[otherSide] = '100%'\n" +
+    "            this.#element.style[otherSide] = '100%'";
+  const spreadAlignmentReplacement =
+    "            const expandedSize = pageCount * columnSize\n" +
+    "            const spreadSize = this.#columnCount > 1 ? this.#size : columnSize\n" +
+    "            const alignedSize = spreadSize > 0 ? Math.ceil(expandedSize / spreadSize) * spreadSize : expandedSize\n" +
+    "            this.#element.style.padding = '0'\n" +
+    "            this.#iframe.style[side] = `${alignedSize}px`\n" +
+    "            this.#element.style[side] = `${alignedSize}px`\n" +
+    "            this.#iframe.style[otherSide] = '100%'\n" +
+    "            this.#element.style[otherSide] = '100%'";
+  if (
+    next.includes(spreadAlignmentNeedle) &&
+    !next.includes(
+      "const spreadSize = this.#columnCount > 1 ? this.#size : columnSize",
+    )
+  ) {
+    next = next.replace(spreadAlignmentNeedle, spreadAlignmentReplacement);
+    next = next.replace(
+      "                this.#overlayer.element.style[side] = `${expandedSize}px`",
+      "                this.#overlayer.element.style[side] = `${alignedSize}px`",
+    );
+  }
+
   const goToNeedle =
     "    async #goTo({ index, anchor, select}) {\n" +
     "        if (index === this.#index) await this.#display({ index, anchor, select })\n";
