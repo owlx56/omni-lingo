@@ -31,21 +31,21 @@ describe("createWheelTurnDetector", () => {
     expect(detector.feed(sample({ deltaX: -40, timeStamp: 0 }))).toBe("left");
   });
 
-  test("flips only once during one continuous touchpad gesture", () => {
+  test("flips each time a continuous touchpad gesture crosses the threshold", () => {
     const detector = createWheelTurnDetector({ idleResetMs: 200, threshold: 30 });
 
     expect(detector.feed(sample({ deltaY: 12, timeStamp: 0 }))).toBeNull();
     expect(detector.feed(sample({ deltaY: 12, timeStamp: 16 }))).toBeNull();
     expect(detector.feed(sample({ deltaY: 12, timeStamp: 32 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: 40, timeStamp: 48 }))).toBeNull();
-    expect(detector.feed(sample({ deltaY: 40, timeStamp: 64 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 48 }))).toBe("right");
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 64 }))).toBe("right");
   });
 
-  test("allows another page turn after the wheel stream goes idle", () => {
+  test("keeps flipping during one stream and still resets after idle", () => {
     const detector = createWheelTurnDetector({ idleResetMs: 200, threshold: 30 });
 
     expect(detector.feed(sample({ deltaY: 40, timeStamp: 0 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: 40, timeStamp: 80 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: 40, timeStamp: 80 }))).toBe("right");
     expect(detector.feed(sample({ deltaY: -40, timeStamp: 281 }))).toBe("left");
   });
 
@@ -53,7 +53,7 @@ describe("createWheelTurnDetector", () => {
     const detector = createWheelTurnDetector({ idleResetMs: 200, threshold: 30 });
 
     expect(detector.feed(sample({ deltaY: 600, timeStamp: 0 }))).toBe("right");
-    expect(detector.feed(sample({ deltaY: 600, timeStamp: 16 }))).toBeNull();
+    expect(detector.feed(sample({ deltaY: 600, timeStamp: 16 }))).toBe("right");
   });
 
   test("normalizes line and page delta modes", () => {

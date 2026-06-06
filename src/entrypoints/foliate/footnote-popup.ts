@@ -1,5 +1,6 @@
 import type { EffectiveTheme } from "@/lib/theme";
 import { createFoliateContentCss } from "./reader-content-style";
+import type { FoliateReaderStyleSettings } from "./reader-settings";
 import type { FoliateViewRenderer } from "./types";
 
 export type FootnotePopupDirection = "up" | "down" | "left" | "right";
@@ -192,9 +193,12 @@ export function configureFootnotePopupRenderer(
   renderer.setStyles?.(styles);
 }
 
-export function createFoliateFootnoteContentCss(theme: EffectiveTheme): string {
+export function createFoliateFootnoteContentCss(
+  theme: EffectiveTheme,
+  settings?: Partial<FoliateReaderStyleSettings> | null,
+): string {
   return [
-    createFoliateContentCss(theme),
+    createFoliateContentCss(theme, settings),
     [
       ".duokan-footnote-content,.duokan-footnote-item{display:block!important;}",
       "html{margin:0!important;padding:0!important;min-height:0!important;height:auto!important;}",

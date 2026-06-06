@@ -32,6 +32,21 @@ import {
   type TranslationUnderlineStyle,
   type UiLang,
 } from "@/lib/storage/settings";
+import {
+  FOLIATE_READER_FONT_SIZE_MAX,
+  FOLIATE_READER_FONT_SIZE_MIN,
+  FOLIATE_READER_LINE_HEIGHT_MAX,
+  FOLIATE_READER_LINE_HEIGHT_MIN,
+  foliateReaderStyleSettingsToStoragePatch,
+  getLockedFoliateReaderSettings,
+  mergeFoliateReaderStyleSettings,
+  normalizeFoliateReaderFontSize,
+  normalizeFoliateReaderLineHeight,
+  normalizeFoliateReaderSettings,
+  type FoliateReaderStylePatch,
+  type FoliateReaderStyleSettings,
+} from "@/lib/foliate-reader-settings";
+import { broadcastFoliateReaderAppearance } from "@/lib/foliate-reader-live-settings";
 import { useT, type MessageKey, type TFn } from "@/lib/i18n";
 import {
   IconHover,
@@ -69,6 +84,8 @@ type OptionIcon = (props: { size?: number }) => JSX.Element;
 
 const VERSION = "0.0.0";
 const HOVER_FONT_SIZE_STEP = 0.5;
+const FOLIATE_READER_FONT_SIZE_STEP = 1;
+const FOLIATE_READER_LINE_HEIGHT_STEP = 0.1;
 
 const TABS: { id: TabId; labelKey: MessageKey; icon: OptionIcon }[] = [
   { id: "account", labelKey: "sidebar.account", icon: IconSettings },
@@ -253,6 +270,77 @@ function ColorRowControl(props: {
   );
 }
 
+function NumberStepper(props: {
+  ariaLabel: string;
+  disabled?: boolean;
+  max: number;
+  min: number;
+  onCommit: () => void;
+  onInput: (value: string) => void;
+  onStep: (delta: number) => void;
+  step: number;
+  unit?: string;
+  value: string;
+}) {
+  return (
+    <div
+      class="number-stepper"
+      classList={{ "is-disabled": props.disabled }}
+    >
+      <button
+        aria-label={`${props.ariaLabel} -${props.step}`}
+        class="number-stepper-button"
+        disabled={props.disabled}
+        onClick={() => props.onStep(-props.step)}
+        type="button"
+      >
+        -
+      </button>
+      <input
+        aria-label={props.ariaLabel}
+        class="number-stepper-input"
+        disabled={props.disabled}
+        inputMode="decimal"
+        max={props.max}
+        min={props.min}
+        onBlur={props.onCommit}
+        onInput={(event) => props.onInput(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (props.disabled) return;
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+            return;
+          }
+          if (event.key === "ArrowUp") {
+            event.preventDefault();
+            props.onStep(props.step);
+            return;
+          }
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            props.onStep(-props.step);
+          }
+        }}
+        step="any"
+        type="text"
+        value={props.value}
+      />
+      <Show when={props.unit}>
+        <span aria-hidden="true" class="number-stepper-unit">{props.unit}</span>
+      </Show>
+      <button
+        aria-label={`${props.ariaLabel} +${props.step}`}
+        class="number-stepper-button"
+        disabled={props.disabled}
+        onClick={() => props.onStep(props.step)}
+        type="button"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 function formatPx(value: number): string {
   return Number.isInteger(value) ? String(value) : String(value);
 }
@@ -265,7 +353,7 @@ function cleanFontSizeValue(value: number): number {
   return Number(value.toFixed(3));
 }
 
-function parseFontSizeDraft(value: string): number | null {
+function parseNumberDraft(value: string): number | null {
   const trimmed = value.trim();
   if (!/^\d+(?:\.\d+)?$/.test(trimmed)) return null;
   const parsed = Number(trimmed);
@@ -282,6 +370,8 @@ function App() {
   const [hoverFontSizeDraft, setHoverFontSizeDraft] = createSignal(
     formatPx(HOVER_FONT_SIZE_MIN),
   );
+  const [readerFontSizeDraft, setReaderFontSizeDraft] = createSignal("16");
+  const [readerLineHeightDraft, setReaderLineHeightDraft] = createSignal("1.4");
 
   const [fpUrl, setFpUrl] = createSignal("");
   const [fpBusy, setFpBusy] = createSignal(false);
@@ -290,6 +380,8 @@ function App() {
 
   createEffect(() => {
     setHoverFontSizeDraft(formatPx(settings().hoverFontSize));
+    setReaderFontSizeDraft(formatPx(settings().foliateReaderFontSize));
+    setReaderLineHeightDraft(formatPx(settings().foliateReaderLineHeight));
   });
 
   const setTranslationStyle = (
@@ -310,13 +402,69 @@ function App() {
   };
 
   const commitHoverFontSizeDraft = (): void => {
-    commitHoverFontSize(parseFontSizeDraft(hoverFontSizeDraft()) ?? HOVER_FONT_SIZE_MIN);
+    commitHoverFontSize(parseNumberDraft(hoverFontSizeDraft()) ?? HOVER_FONT_SIZE_MIN);
   };
 
   const stepHoverFontSize = (delta: number): void => {
-    const draftValue = parseFontSizeDraft(hoverFontSizeDraft());
+    const draftValue = parseNumberDraft(hoverFontSizeDraft());
     const base = draftValue ?? settings().hoverFontSize;
     commitHoverFontSize(base + delta);
+  };
+
+  const commitReaderFontSize = (value: number): void => {
+    const next = normalizeFoliateReaderFontSize(value);
+    setReaderFontSizeDraft(formatPx(next));
+    updateReaderAppearanceSettings({ fontSize: next });
+  };
+
+  const commitReaderFontSizeDraft = (): void => {
+    commitReaderFontSize(
+      parseNumberDraft(readerFontSizeDraft()) ??
+        settings().foliateReaderFontSize,
+    );
+  };
+
+  const stepReaderFontSize = (delta: number): void => {
+    const draftValue = parseNumberDraft(readerFontSizeDraft());
+    const base = draftValue ?? settings().foliateReaderFontSize;
+    commitReaderFontSize(base + delta);
+  };
+
+  const commitReaderLineHeight = (value: number): void => {
+    const next = normalizeFoliateReaderLineHeight(value);
+    setReaderLineHeightDraft(formatPx(next));
+    updateReaderAppearanceSettings({ lineHeight: next });
+  };
+
+  const commitReaderLineHeightDraft = (): void => {
+    commitReaderLineHeight(
+      parseNumberDraft(readerLineHeightDraft()) ??
+        settings().foliateReaderLineHeight,
+    );
+  };
+
+  const stepReaderLineHeight = (delta: number): void => {
+    const draftValue = parseNumberDraft(readerLineHeightDraft());
+    const base = draftValue ?? settings().foliateReaderLineHeight;
+    commitReaderLineHeight(base + delta);
+  };
+
+  const saveReaderAppearanceSettings = (
+    next: FoliateReaderStyleSettings,
+  ): void => {
+    void broadcastFoliateReaderAppearance(next);
+    void setSettings(foliateReaderStyleSettingsToStoragePatch(next));
+  };
+
+  const updateReaderAppearanceSettings = (
+    patch: FoliateReaderStylePatch,
+  ): FoliateReaderStyleSettings => {
+    const next = mergeFoliateReaderStyleSettings(
+      normalizeFoliateReaderSettings(settings()),
+      patch,
+    );
+    saveReaderAppearanceSettings(next);
+    return next;
   };
 
   const renderAccount = (): JSX.Element => (
@@ -417,52 +565,17 @@ function App() {
           description={t("desc.fontSize")}
           label={t("fontSize.label")}
         >
-          <div class="number-stepper hover-font-size-control">
-            <button
-              aria-label={`${t("slider.fontSize.aria")} -${HOVER_FONT_SIZE_STEP}`}
-              class="number-stepper-button"
-              onClick={() => stepHoverFontSize(-HOVER_FONT_SIZE_STEP)}
-              type="button"
-            >
-              -
-            </button>
-            <input
-              aria-label={t("slider.fontSize.aria")}
-              class="number-stepper-input"
-              inputMode="decimal"
-              max={HOVER_FONT_SIZE_MAX}
-              min={HOVER_FONT_SIZE_MIN}
-              onBlur={commitHoverFontSizeDraft}
-              onInput={(event) => setHoverFontSizeDraft(event.currentTarget.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.currentTarget.blur();
-                  return;
-                }
-                if (event.key === "ArrowUp") {
-                  event.preventDefault();
-                  stepHoverFontSize(HOVER_FONT_SIZE_STEP);
-                  return;
-                }
-                if (event.key === "ArrowDown") {
-                  event.preventDefault();
-                  stepHoverFontSize(-HOVER_FONT_SIZE_STEP);
-                }
-              }}
-              step="any"
-              type="text"
-              value={hoverFontSizeDraft()}
-            />
-            <span aria-hidden="true" class="number-stepper-unit">px</span>
-            <button
-              aria-label={`${t("slider.fontSize.aria")} +${HOVER_FONT_SIZE_STEP}`}
-              class="number-stepper-button"
-              onClick={() => stepHoverFontSize(HOVER_FONT_SIZE_STEP)}
-              type="button"
-            >
-              +
-            </button>
-          </div>
+          <NumberStepper
+            ariaLabel={t("slider.fontSize.aria")}
+            max={HOVER_FONT_SIZE_MAX}
+            min={HOVER_FONT_SIZE_MIN}
+            onCommit={commitHoverFontSizeDraft}
+            onInput={setHoverFontSizeDraft}
+            onStep={stepHoverFontSize}
+            step={HOVER_FONT_SIZE_STEP}
+            unit="px"
+            value={hoverFontSizeDraft()}
+          />
         </Row>
       </section>
     </>
@@ -648,120 +761,192 @@ function App() {
     });
   };
 
-  const renderFilePlus = (): JSX.Element => (
-    <section
-      class="section fileplus-idle"
-      onDragEnter={(event) => {
-        event.preventDefault();
-        fpDropDepth++;
-        event.currentTarget.classList.add("dragging");
-      }}
-      onDragLeave={(event) => {
-        event.preventDefault();
-        fpDropDepth = Math.max(0, fpDropDepth - 1);
-        if (fpDropDepth === 0)
-          event.currentTarget.classList.remove("dragging");
-      }}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        fpDropDepth = 0;
-        event.currentTarget.classList.remove("dragging");
-        const file = event.dataTransfer?.files.item(0);
-        if (file) void openFile(file);
-      }}
-    >
-      <h2>{t("fileplus.section.open")}</h2>
-      <FullRow>
-        <div class="url-control">
-          <input
-            aria-label={t("fileplus.openUrl")}
-            class="url-input"
-            disabled={fpBusy()}
-            onInput={(event) => setFpUrl(event.currentTarget.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") void openUrl();
-            }}
-            placeholder={t("fileplus.urlPlaceholder")}
-            spellcheck={false}
-            type="url"
-            value={fpUrl()}
-          />
-          <button
-            class="primary-button"
-            disabled={fpBusy()}
-            onClick={() => void openUrl()}
-            type="button"
-          >
-            {t("fileplus.openButton")}
-          </button>
-        </div>
-      </FullRow>
-      <Row label={t("fileplus.localFile")}>
-        <button
-          class="secondary-button"
-          disabled={fpBusy()}
-          onClick={() => fpFileInput?.click()}
-          type="button"
-        >
-          {t("fileplus.chooseFile")}
-        </button>
-        <input
-          accept={ACCEPTED_FILES}
-          class="visually-hidden"
-          onChange={(event) => {
-            const file = event.currentTarget.files?.item(0);
-            if (file) void openFile(file);
-            event.currentTarget.value = "";
+  const renderFilePlus = (): JSX.Element => {
+    const locked = () =>
+      getLockedFoliateReaderSettings(settings().foliateReaderUseBookLayout);
+    return (
+      <>
+        <section
+          class="section fileplus-idle"
+          onDragEnter={(event) => {
+            event.preventDefault();
+            fpDropDepth++;
+            event.currentTarget.classList.add("dragging");
           }}
-          ref={fpFileInput}
-          type="file"
-        />
-      </Row>
-      <div class="fileplus-dropzone">
-        <h2>{t("fileplus.dropTitle")}</h2>
-        <p>{t("fileplus.dropNote")}</p>
-      </div>
-      <Row
-        description={t("fileplus.sniffLinks.desc")}
-        label={t("fileplus.sniffLinks")}
-      >
-        <Switch
-          checked={settings().documentLinkSniffEnabled}
-          label={t("fileplus.sniffLinks")}
-          onChange={(documentLinkSniffEnabled) =>
-            void setSettings({ documentLinkSniffEnabled })
-          }
-        />
-      </Row>
-      <Row
-        description={t("fileplus.keepOriginal.desc")}
-        label={t("fileplus.keepOriginal")}
-      >
-        <Switch
-          checked={settings().documentLinkSniffKeepOriginal}
-          disabled={!settings().documentLinkSniffEnabled}
-          label={t("fileplus.keepOriginal")}
-          onChange={(documentLinkSniffKeepOriginal) =>
-            void setSettings({ documentLinkSniffKeepOriginal })
-          }
-        />
-      </Row>
-      <Row
-        description={t("fileplus.standalone.desc")}
-        label={t("fileplus.standalone")}
-      >
-        <Switch
-          checked={settings().documentLinkSniffStandalone}
-          disabled={!settings().documentLinkSniffEnabled}
-          label={t("fileplus.standalone")}
-          onChange={(documentLinkSniffStandalone) =>
-            void setSettings({ documentLinkSniffStandalone })
-          }
-        />
-      </Row>
-    </section>
-  );
+          onDragLeave={(event) => {
+            event.preventDefault();
+            fpDropDepth = Math.max(0, fpDropDepth - 1);
+            if (fpDropDepth === 0)
+              event.currentTarget.classList.remove("dragging");
+          }}
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => {
+            event.preventDefault();
+            fpDropDepth = 0;
+            event.currentTarget.classList.remove("dragging");
+            const file = event.dataTransfer?.files.item(0);
+            if (file) void openFile(file);
+          }}
+        >
+          <h2>{t("fileplus.section.open")}</h2>
+          <FullRow>
+            <div class="url-control">
+              <input
+                aria-label={t("fileplus.openUrl")}
+                class="url-input"
+                disabled={fpBusy()}
+                onInput={(event) => setFpUrl(event.currentTarget.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void openUrl();
+                }}
+                placeholder={t("fileplus.urlPlaceholder")}
+                spellcheck={false}
+                type="url"
+                value={fpUrl()}
+              />
+              <button
+                class="primary-button"
+                disabled={fpBusy()}
+                onClick={() => void openUrl()}
+                type="button"
+              >
+                {t("fileplus.openButton")}
+              </button>
+            </div>
+          </FullRow>
+          <Row label={t("fileplus.localFile")}>
+            <button
+              class="secondary-button"
+              disabled={fpBusy()}
+              onClick={() => fpFileInput?.click()}
+              type="button"
+            >
+              {t("fileplus.chooseFile")}
+            </button>
+            <input
+              accept={ACCEPTED_FILES}
+              class="visually-hidden"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.item(0);
+                if (file) void openFile(file);
+                event.currentTarget.value = "";
+              }}
+              ref={fpFileInput}
+              type="file"
+            />
+          </Row>
+          <div class="fileplus-dropzone">
+            <h2>{t("fileplus.dropTitle")}</h2>
+            <p>{t("fileplus.dropNote")}</p>
+          </div>
+          <Row
+            description={t("fileplus.sniffLinks.desc")}
+            label={t("fileplus.sniffLinks")}
+          >
+            <Switch
+              checked={settings().documentLinkSniffEnabled}
+              label={t("fileplus.sniffLinks")}
+              onChange={(documentLinkSniffEnabled) =>
+                void setSettings({ documentLinkSniffEnabled })
+              }
+            />
+          </Row>
+          <Row
+            description={t("fileplus.keepOriginal.desc")}
+            label={t("fileplus.keepOriginal")}
+          >
+            <Switch
+              checked={settings().documentLinkSniffKeepOriginal}
+              disabled={!settings().documentLinkSniffEnabled}
+              label={t("fileplus.keepOriginal")}
+              onChange={(documentLinkSniffKeepOriginal) =>
+                void setSettings({ documentLinkSniffKeepOriginal })
+              }
+            />
+          </Row>
+          <Row
+            description={t("fileplus.standalone.desc")}
+            label={t("fileplus.standalone")}
+          >
+            <Switch
+              checked={settings().documentLinkSniffStandalone}
+              disabled={!settings().documentLinkSniffEnabled}
+              label={t("fileplus.standalone")}
+              onChange={(documentLinkSniffStandalone) =>
+                void setSettings({ documentLinkSniffStandalone })
+              }
+            />
+          </Row>
+        </section>
+
+        <section class="section">
+          <h2>{t("fileplus.section.readerAppearance")}</h2>
+          <Row
+            description={t("fileplus.reader.fontSize.desc")}
+            label={t("fileplus.reader.fontSize")}
+          >
+            <NumberStepper
+              ariaLabel={t("fileplus.reader.fontSize.aria")}
+              max={FOLIATE_READER_FONT_SIZE_MAX}
+              min={FOLIATE_READER_FONT_SIZE_MIN}
+              onCommit={commitReaderFontSizeDraft}
+              onInput={setReaderFontSizeDraft}
+              onStep={stepReaderFontSize}
+              step={FOLIATE_READER_FONT_SIZE_STEP}
+              unit="px"
+              value={readerFontSizeDraft()}
+            />
+          </Row>
+          <Row
+            description={t("fileplus.reader.useBookLayout.desc")}
+            label={t("fileplus.reader.useBookLayout")}
+          >
+            <Switch
+              checked={settings().foliateReaderUseBookLayout}
+              label={t("fileplus.reader.useBookLayout")}
+              onChange={(foliateReaderUseBookLayout) =>
+                updateReaderAppearanceSettings({
+                  useBookLayout: foliateReaderUseBookLayout,
+                })
+              }
+            />
+          </Row>
+          <Row
+            description={t("fileplus.reader.textIndent.desc")}
+            label={t("fileplus.reader.textIndent")}
+          >
+            <Switch
+              checked={settings().foliateReaderTextIndent}
+              disabled={locked().textIndent}
+              label={t("fileplus.reader.textIndent")}
+              onChange={(foliateReaderTextIndent) =>
+                updateReaderAppearanceSettings({
+                  textIndent: foliateReaderTextIndent,
+                })
+              }
+            />
+          </Row>
+          <Row
+            description={t("fileplus.reader.lineHeight.desc")}
+            label={t("fileplus.reader.lineHeight")}
+          >
+            <NumberStepper
+              ariaLabel={t("fileplus.reader.lineHeight.aria")}
+              disabled={locked().lineHeight}
+              max={FOLIATE_READER_LINE_HEIGHT_MAX}
+              min={FOLIATE_READER_LINE_HEIGHT_MIN}
+              onCommit={commitReaderLineHeightDraft}
+              onInput={setReaderLineHeightDraft}
+              onStep={stepReaderLineHeight}
+              step={FOLIATE_READER_LINE_HEIGHT_STEP}
+              unit="x"
+              value={readerLineHeightDraft()}
+            />
+          </Row>
+        </section>
+      </>
+    );
+  };
 
   const renderAbout = (): JSX.Element => (
     <section class="section">

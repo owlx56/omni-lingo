@@ -6,6 +6,7 @@ import type {
   TranslateRequest,
   TranslateResponse,
 } from "@/engines/types";
+import type { FoliateReaderStyleSettings } from "@/lib/foliate-reader-settings";
 import type { FullPageEngineId } from "@/lib/storage/settings";
 import { browser, type Browser } from "wxt/browser";
 
@@ -74,6 +75,10 @@ export interface SniffedDocumentOpen {
   url?: string;
 }
 
+export interface FoliateReaderAppearanceInput {
+  settings: FoliateReaderStyleSettings;
+}
+
 export interface ProtocolMap {
   ping: { input: { text: string }; output: { echo: string; at: number } };
   translate: {
@@ -139,6 +144,10 @@ export interface ProtocolMap {
   consumeSniffedDocument: {
     input: Record<string, never>;
     output: SniffedDocumentOpen | null;
+  };
+  applyFoliateReaderAppearance: {
+    input: FoliateReaderAppearanceInput;
+    output: { applied: boolean };
   };
   translateBatch: {
     input: {

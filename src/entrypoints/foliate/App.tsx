@@ -17,9 +17,9 @@ import {
   pdfViewerUrlForStoredKey,
   type ViewerFormat,
 } from "@/lib/document-viewer-urls";
-import { useT } from "@/lib/i18n";
+import { useT, type TFn } from "@/lib/i18n";
 import type { UiLang } from "@/lib/languages";
-import { sendMessage } from "@/lib/messaging";
+import { onMessage, sendMessage } from "@/lib/messaging";
 import { hideSelectionUi } from "@/features/selection";
 import {
   getStoredSettings,
@@ -27,6 +27,7 @@ import {
   useSettings,
 } from "@/lib/storage/settings";
 import { getEffectiveTheme } from "@/lib/theme";
+import { listenFoliateReaderAppearanceBroadcast } from "@/lib/foliate-reader-live-settings";
 import {
   IconArrowLeftDouble,
   IconArrowRightDouble,
@@ -37,6 +38,7 @@ import {
   IconPin,
   IconPinFilled,
   IconScroll,
+  IconSettings,
   IconSidebar,
 } from "@/lib/ui/icons";
 import { initFoliateBridge } from "./bridge";
@@ -45,6 +47,10 @@ import {
   getReaderChromeState,
   type ReaderChromeZone,
 } from "./reader-chrome";
+import {
+  getRendererVerticalMargins,
+  parseCssPixelValue,
+} from "./reader-layout";
 import {
   HIDDEN_OVERLAY_SCROLLBAR,
   createOverlayScrollbarController,
@@ -73,6 +79,11 @@ import {
   type FootnotePopupPosition,
   type FootnotePopupSize,
 } from "./footnote-popup";
+import {
+  applyFoliateReaderStyleSettings,
+  bindFoliateContentTransforms,
+  createFoliateContentCss,
+} from "./reader-content-style";
 import type {
   FoliateBookLike,
   FoliateBookMetadata,
@@ -89,6 +100,21 @@ import {
   shouldHandleWheelTurn,
   type WheelTurnDirection,
 } from "./wheel-turns";
+import {
+  FOLIATE_READER_FONT_SIZE_MAX,
+  FOLIATE_READER_FONT_SIZE_MIN,
+  FOLIATE_READER_LINE_HEIGHT_MAX,
+  FOLIATE_READER_LINE_HEIGHT_MIN,
+  areFoliateReaderStyleSettingsEqual,
+  foliateReaderStyleSettingsToStoragePatch,
+  getLockedFoliateReaderSettings,
+  mergeFoliateReaderStyleSettings,
+  normalizeFoliateReaderSettings,
+  resolveSavedFoliateReaderSettingsApplication,
+  resolveStoredFoliateReaderSettingsApplication,
+  type FoliateReaderStylePatch,
+  type FoliateReaderStyleSettings,
+} from "./reader-settings";
 
 type ViewState = "loading" | "ready" | "error";
 type ViewMode = "pages" | "scroll";
@@ -121,6 +147,9 @@ type SeriesItem = {
 };
 
 type DetailsSectionKind = "fields" | "series" | "description";
+type ReaderAppearanceLockedSettings = ReturnType<
+  typeof getLockedFoliateReaderSettings
+>;
 
 type FootnotePopupState = {
   position: FootnotePopupPosition;
@@ -132,6 +161,33 @@ type DetailsSectionProps = {
   items: MetadataSection[] | SeriesItem[] | string[];
   kind: DetailsSectionKind;
   label: string;
+};
+
+type ReaderAppearancePanelProps = {
+  fontSize: number;
+  lineHeight: number;
+  locked: ReaderAppearanceLockedSettings;
+  onFontSizeChange: (value: number) => void;
+  onFontSizeStep: (delta: number) => void;
+  onLineHeightChange: (value: number) => void;
+  onLineHeightStep: (delta: number) => void;
+  onTextIndentChange: (value: boolean) => void;
+  onUseBookLayoutChange: (value: boolean) => void;
+  t: TFn;
+  textIndent: boolean;
+  useBookLayout: boolean;
+};
+
+type ReaderNumberStepperProps = {
+  ariaLabel: string;
+  disabled?: boolean;
+  max: number;
+  min: number;
+  onChange: (value: number) => void;
+  onStep: (delta: number) => void;
+  step: number;
+  unit: string;
+  value: number;
 };
 
 type TocLocation = NonNullable<FoliateTocItem["location"]>;
@@ -148,6 +204,8 @@ const SIDEBAR_DEFAULT_DESKTOP = 0.28;
 const SIDEBAR_DEFAULT_MOBILE = 0.25;
 const MOBILE_BREAKPOINT = 720;
 const FOLIATE_SIZE_PER_LOC = 1500;
+const FOLIATE_READER_FONT_SIZE_STEP = 1;
+const FOLIATE_READER_LINE_HEIGHT_STEP = 0.1;
 
 function App(): JSX.Element {
   const t = useT();
@@ -169,6 +227,10 @@ function App(): JSX.Element {
   const [isDragging, setIsDragging] = createSignal(false);
   const [bookState, setBookState] = createSignal<SidebarBookState | null>(null);
   const [detailsOpen, setDetailsOpen] = createSignal(false);
+  const [appearanceOpen, setAppearanceOpen] = createSignal(false);
+  const initialReaderStyleSettings = normalizeFoliateReaderSettings(settings());
+  const [readerStyleSettings, setReaderStyleSettings] =
+    createSignal<FoliateReaderStyleSettings>(initialReaderStyleSettings);
   const [readerChromeZone, setReaderChromeZone] = createSignal<ReaderChromeZone>(null);
   const [pageTurnHoverSide, setPageTurnHoverSide] =
     createSignal<PageTurnSide | null>(null);
@@ -182,6 +244,8 @@ function App(): JSX.Element {
   let stopBridge: (() => void) | undefined;
   let stopFootnoteMainLink: (() => void) | undefined;
   let stopFootnoteHandler: (() => void) | undefined;
+  let stopReaderAppearanceMessage: (() => void) | undefined;
+  let stopReaderAppearanceBroadcast: (() => void) | undefined;
   let coverObjectUrl: string | undefined;
   let bookStateToken = 0;
   let navigationLocked = false;
@@ -194,9 +258,13 @@ function App(): JSX.Element {
   let footnoteAnchorPosition: FootnotePopupPosition | null = null;
   let footnoteHistory: FoliateLinkDetail[] = [];
   let footnoteHistoryIndex = -1;
+  let appliedReaderStyleSettings = initialReaderStyleSettings;
+  let pendingReaderStyleSettings: FoliateReaderStyleSettings | null = null;
+  let readerAppearanceSave: Promise<void> = Promise.resolve();
   let shellRef: HTMLDivElement | undefined;
   let scrollbarTrackRef: HTMLDivElement | undefined;
   let scrollbarDrag: OverlayScrollbarDrag | undefined;
+  let stopContentTransforms: (() => void) | undefined;
   const footnoteHandler = new FootnoteHandler();
   const wheelDocCleanups = new Map<Document, () => void>();
   const wheelTurnDetector = createWheelTurnDetector();
@@ -218,8 +286,12 @@ function App(): JSX.Element {
   });
 
   createEffect(() => {
+    applyStoredReaderAppearance(normalizeFoliateReaderSettings(settings()));
+  });
+
+  createEffect(() => {
     const width = sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null;
-    syncReaderLayout(width, viewMode());
+    syncReaderLayout(width, viewMode(), getReaderChromeMetrics(contentRef));
     syncOverlayScrollbarContainer();
   });
 
@@ -233,12 +305,24 @@ function App(): JSX.Element {
       closeFootnotePopup();
     };
     const onWindowKeydown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") closeFootnotePopup();
+      if (event.key !== "Escape") return;
+      closeFootnotePopup();
+      closeReaderAppearance();
     };
     updateViewport();
     window.addEventListener("resize", updateViewport);
     window.addEventListener("keydown", onWindowKeydown);
     stopFootnoteHandler = bindFootnoteHandler();
+    stopReaderAppearanceMessage = onMessage(
+      "applyFoliateReaderAppearance",
+      (input) => {
+        applyStoredReaderAppearance(input.settings, { force: true });
+        return { applied: true };
+      },
+    );
+    stopReaderAppearanceBroadcast = listenFoliateReaderAppearanceBroadcast(
+      (next) => applyStoredReaderAppearance(next, { force: true }),
+    );
     if (contentRef) {
       contentWheelCleanup = bindWheelTarget(contentRef);
     }
@@ -260,6 +344,12 @@ function App(): JSX.Element {
     closeFootnotePopup();
     stopFootnoteMainLink?.();
     stopFootnoteMainLink = undefined;
+    stopContentTransforms?.();
+    stopContentTransforms = undefined;
+    stopReaderAppearanceMessage?.();
+    stopReaderAppearanceMessage = undefined;
+    stopReaderAppearanceBroadcast?.();
+    stopReaderAppearanceBroadcast = undefined;
     stopFootnoteHandler?.();
     stopFootnoteHandler = undefined;
     revokeCoverObjectUrl();
@@ -366,12 +456,21 @@ function App(): JSX.Element {
     stopFootnoteMainLink = bindFootnoteMainLink(el);
     const file = createReaderFile(source);
     await el.open(file);
+    stopContentTransforms = bindFoliateContentTransforms(
+      el.book?.transformTarget,
+      () => getFoliateContentTransformMetrics(viewMode()),
+    );
     syncViewMode(el, viewMode());
     syncOverlayScrollbarContainer();
     stopBridge = initFoliateBridge(el, {
+      createContentCss: (theme, appearance) =>
+        createFoliateContentCss(theme, appearance),
+      getReaderSettings: readerStyleSettings,
       onContentLoad: onFoliateContentLoad,
       onLocationChange,
+      onReaderSettingsChange: applyStoredReaderAppearance,
     });
+    applyReaderAppearanceStyles(readerStyleSettings());
 
     void loadBookState(el.book);
 
@@ -383,6 +482,7 @@ function App(): JSX.Element {
     syncReaderLayout(
       sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null,
       viewMode(),
+      getReaderChromeMetrics(contentRef),
     );
     syncOverlayScrollbarContainer();
 
@@ -399,6 +499,8 @@ function App(): JSX.Element {
     closeFootnotePopup();
     stopFootnoteMainLink?.();
     stopFootnoteMainLink = undefined;
+    stopContentTransforms?.();
+    stopContentTransforms = undefined;
     bookStateToken += 1;
     stopBridge?.();
     stopBridge = undefined;
@@ -412,6 +514,7 @@ function App(): JSX.Element {
     setLocationLabel("");
     setBookState(null);
     setDetailsOpen(false);
+    setAppearanceOpen(false);
     setSidebarVisible(false);
     setIsDragging(false);
     navigationLocked = false;
@@ -638,7 +741,10 @@ function App(): JSX.Element {
     popupView.addEventListener("relocate", onFootnoteRelocate);
     configureFootnotePopupRenderer(
       popupView.renderer,
-      createFoliateFootnoteContentCss(getEffectiveTheme()),
+      createFoliateFootnoteContentCss(
+        getEffectiveTheme(),
+        normalizeFoliateReaderSettings(settings()),
+      ),
     );
     footnoteContentRef?.replaceChildren(popupView);
   };
@@ -740,7 +846,11 @@ function App(): JSX.Element {
     const nextPinned = !sidebarPinned();
     setSidebarPinned(nextPinned);
     setSidebarVisible(nextPinned);
-    syncReaderLayout(nextPinned ? sidebarWidth() : null, viewMode());
+    syncReaderLayout(
+      nextPinned ? sidebarWidth() : null,
+      viewMode(),
+      getReaderChromeMetrics(contentRef),
+    );
     await setSettings({
       foliateSidebarPinned: nextPinned,
       foliateSidebarWidth: sidebarWidth(),
@@ -753,6 +863,120 @@ function App(): JSX.Element {
 
   const closeDetails = (): void => {
     setDetailsOpen(false);
+  };
+
+  const closeReaderAppearance = (): void => {
+    setAppearanceOpen(false);
+  };
+
+  const toggleReaderAppearance = (): void => {
+    setAppearanceOpen((open) => {
+      const next = !open;
+      if (next) setReaderChromeZone("top");
+      return next;
+    });
+  };
+
+  const readerAppearanceLocked = (): ReaderAppearanceLockedSettings =>
+    getLockedFoliateReaderSettings(readerStyleSettings().useBookLayout);
+
+  const applyStoredReaderAppearance = (
+    next: FoliateReaderStyleSettings,
+    options: { force?: boolean } = {},
+  ): void => {
+    if (options.force) {
+      pendingReaderStyleSettings = null;
+    } else {
+      const application = resolveStoredFoliateReaderSettingsApplication(
+        next,
+        pendingReaderStyleSettings,
+      );
+      pendingReaderStyleSettings = application.pendingLocal;
+      if (!application.shouldApply) return;
+    }
+
+    const previous = appliedReaderStyleSettings;
+    setReaderStyleSettings(next);
+    applyReaderAppearanceStyles(next, {
+      previous,
+      relayout: options.force ? true : undefined,
+    });
+    appliedReaderStyleSettings = next;
+  };
+
+  const updateReaderAppearance = (patch: FoliateReaderStylePatch): void => {
+    const current = readerStyleSettings();
+    const next = mergeFoliateReaderStyleSettings(current, patch);
+    const previous = appliedReaderStyleSettings;
+    pendingReaderStyleSettings = next;
+    setReaderStyleSettings(next);
+    applyReaderAppearanceStyles(next, {
+      previous,
+    });
+    appliedReaderStyleSettings = next;
+    saveReaderAppearance(next);
+  };
+
+  const applyReaderAppearanceStyles = (
+    next: FoliateReaderStyleSettings,
+    options: {
+      previous?: FoliateReaderStyleSettings | null;
+      relayout?: boolean;
+    } = {},
+  ): void => {
+    const theme = getEffectiveTheme();
+    applyFoliateReaderStyleSettings(
+      view ?? getCurrentFoliateView(),
+      theme,
+      next,
+      options,
+    );
+    if (footnoteView?.renderer) {
+      configureFootnotePopupRenderer(
+        footnoteView.renderer,
+        createFoliateFootnoteContentCss(theme, next),
+      );
+    }
+  };
+
+  const saveReaderAppearance = (next: FoliateReaderStyleSettings): void => {
+    const patch = foliateReaderStyleSettingsToStoragePatch(next);
+    readerAppearanceSave = readerAppearanceSave
+      .catch(() => {})
+      .then(async () => {
+        await setSettings(patch);
+        pendingReaderStyleSettings =
+          resolveSavedFoliateReaderSettingsApplication(
+            next,
+            pendingReaderStyleSettings,
+          ).pendingLocal;
+      })
+      .catch((err: unknown) => {
+        if (
+          pendingReaderStyleSettings &&
+          areFoliateReaderStyleSettingsEqual(pendingReaderStyleSettings, next)
+        ) {
+          pendingReaderStyleSettings = null;
+        }
+        console.warn("[OneLingo] failed to save foliate reader appearance:", err);
+      });
+    void readerAppearanceSave;
+  };
+
+  const setReaderFontSize = (value: number): void => {
+    updateReaderAppearance({ fontSize: value });
+  };
+
+  const stepReaderFontSize = (delta: number): void => {
+    setReaderFontSize(readerStyleSettings().fontSize + delta);
+  };
+
+  const setReaderLineHeight = (value: number): void => {
+    updateReaderAppearance({ lineHeight: value });
+  };
+
+  const stepReaderLineHeight = (delta: number): void => {
+    setReaderLineHeight(readerStyleSettings().lineHeight + delta);
   };
 
   const readerChapterLabel = (): string => locationLabel() || docTitle();
@@ -775,6 +999,7 @@ function App(): JSX.Element {
   };
 
   const hideReaderChrome = (zone: Exclude<ReaderChromeZone, null>): void => {
+    if (zone === "top" && appearanceOpen()) return;
     setReaderChromeZone((current) => (current === zone ? null : current));
   };
 
@@ -806,7 +1031,11 @@ function App(): JSX.Element {
     closeFootnotePopup();
     setViewMode(nextMode);
     if (view) syncViewMode(view, nextMode);
-    syncReaderLayout(sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null, nextMode);
+    syncReaderLayout(
+      sidebarVisible() && isDockedSidebar() ? sidebarWidth() : null,
+      nextMode,
+      getReaderChromeMetrics(contentRef),
+    );
     syncOverlayScrollbarContainer(nextMode);
   };
 
@@ -991,7 +1220,7 @@ function App(): JSX.Element {
       const fraction = clamp(startWidth + delta / frameWidth, SIDEBAR_MIN, SIDEBAR_MAX);
       nextWidth = toPercent(fraction);
       setSidebarWidth(nextWidth);
-      syncReaderLayout(nextWidth, viewMode());
+      syncReaderLayout(nextWidth, viewMode(), getReaderChromeMetrics(contentRef));
     };
 
     const stop = (): void => {
@@ -1028,6 +1257,18 @@ function App(): JSX.Element {
   const handleReaderSurfacePointerDown = (event: PointerEvent): void => {
     if (!shouldDismissReaderSelectionPointer(event.target)) return;
     dismissReaderSelection();
+  };
+
+  const handleContentPointerDown = (event: PointerEvent): void => {
+    const target = event.target;
+    if (
+      appearanceOpen() &&
+      target instanceof Element &&
+      !target.closest(".foliate-appearance-panel,.foliate-appearance-button")
+    ) {
+      closeReaderAppearance();
+    }
+    handleReaderSurfacePointerDown(event);
   };
 
   const isActiveToc = (href: string): boolean => activeHref() === href;
@@ -1155,7 +1396,7 @@ function App(): JSX.Element {
           <div
             classList={{
               "foliate-content": true,
-              "has-scroll-chrome-space": readerChromeLayout().reserveChromeSpace,
+              "has-reader-chrome-space": readerChromeLayout().reserveChromeSpace,
             }}
             onMouseMove={(event) => {
               const target = event.target;
@@ -1175,7 +1416,7 @@ function App(): JSX.Element {
               resetReaderChrome();
             }}
             onMouseLeave={resetPageTurnHover}
-            onPointerDown={handleReaderSurfacePointerDown}
+            onPointerDown={handleContentPointerDown}
             ref={(el) => {
               contentRef = el;
             }}
@@ -1286,7 +1527,8 @@ function App(): JSX.Element {
               <header
                 classList={{
                   "foliate-reader-topbar": true,
-                  "is-expanded": readerChromeState().showModeSwitch,
+                  "is-expanded":
+                    readerChromeState().showModeSwitch || appearanceOpen(),
                 }}
                 onMouseEnter={() => showReaderChrome("top")}
                 onMouseLeave={() => hideReaderChrome("top")}
@@ -1306,7 +1548,9 @@ function App(): JSX.Element {
                   <div
                     classList={{
                       "foliate-reader-section-info": true,
-                      "is-hidden": !readerChromeState().showChapterTitle,
+                      "is-hidden":
+                        !readerChromeState().showChapterTitle ||
+                        appearanceOpen(),
                     }}
                     title={readerChapterLabel()}
                   >
@@ -1317,27 +1561,76 @@ function App(): JSX.Element {
                   {readerBookTitle()}
                 </div>
                 <div class="foliate-reader-topbar-end">
-                  <div class="foliate-mode-switch" role="group" aria-label={t("viewer.mode.pages")}>
-                    <button
+                  <div class="foliate-reader-actions">
+                    <div
                       aria-label={t("viewer.mode.pages")}
-                      classList={{ "foliate-mode-button": true, "is-active": viewMode() === "pages" }}
-                      disabled={state() !== "ready"}
-                      onClick={() => setMode("pages")}
-                      title={t("viewer.mode.pages")}
-                      type="button"
+                      class="foliate-mode-switch"
+                      role="group"
                     >
-                      <IconPages size={15} />
-                    </button>
-                    <button
-                      aria-label={t("viewer.mode.scroll")}
-                      classList={{ "foliate-mode-button": true, "is-active": viewMode() === "scroll" }}
-                      disabled={state() !== "ready"}
-                      onClick={() => setMode("scroll")}
-                      title={t("viewer.mode.scroll")}
-                      type="button"
-                    >
-                      <IconScroll size={15} />
-                    </button>
+                      <button
+                        aria-label={t("viewer.mode.pages")}
+                        classList={{
+                          "foliate-mode-button": true,
+                          "is-active": viewMode() === "pages",
+                        }}
+                        disabled={state() !== "ready"}
+                        onClick={() => setMode("pages")}
+                        title={t("viewer.mode.pages")}
+                        type="button"
+                      >
+                        <IconPages size={15} />
+                      </button>
+                      <button
+                        aria-label={t("viewer.mode.scroll")}
+                        classList={{
+                          "foliate-mode-button": true,
+                          "is-active": viewMode() === "scroll",
+                        }}
+                        disabled={state() !== "ready"}
+                        onClick={() => setMode("scroll")}
+                        title={t("viewer.mode.scroll")}
+                        type="button"
+                      >
+                        <IconScroll size={15} />
+                      </button>
+                    </div>
+                    <div class="foliate-appearance-anchor">
+                      <button
+                        aria-expanded={appearanceOpen() ? "true" : "false"}
+                        aria-label={t("fileplus.section.readerAppearance")}
+                        classList={{
+                          "foliate-mode-button": true,
+                          "foliate-appearance-button": true,
+                          "is-active": appearanceOpen(),
+                        }}
+                        disabled={state() !== "ready"}
+                        onClick={toggleReaderAppearance}
+                        title={t("fileplus.section.readerAppearance")}
+                        type="button"
+                      >
+                        <IconSettings size={15} />
+                      </button>
+                      <Show when={appearanceOpen()}>
+                        <ReaderAppearancePanel
+                          fontSize={readerStyleSettings().fontSize}
+                          lineHeight={readerStyleSettings().lineHeight}
+                          locked={readerAppearanceLocked()}
+                          onFontSizeChange={setReaderFontSize}
+                          onFontSizeStep={stepReaderFontSize}
+                          onLineHeightChange={setReaderLineHeight}
+                          onLineHeightStep={stepReaderLineHeight}
+                          onTextIndentChange={(textIndent) =>
+                            updateReaderAppearance({ textIndent })
+                          }
+                          onUseBookLayoutChange={(useBookLayout) =>
+                            updateReaderAppearance({ useBookLayout })
+                          }
+                          t={t}
+                          textIndent={readerStyleSettings().textIndent}
+                          useBookLayout={readerStyleSettings().useBookLayout}
+                        />
+                      </Show>
+                    </div>
                   </div>
                 </div>
               </header>
@@ -1922,6 +2215,148 @@ function DetailsSection({
   );
 }
 
+function ReaderAppearancePanel(props: ReaderAppearancePanelProps): JSX.Element {
+  return (
+    <section
+      aria-label={props.t("fileplus.section.readerAppearance")}
+      class="foliate-appearance-panel"
+      data-onelingo-reader-ui=""
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+      onWheel={(event) => event.stopPropagation()}
+      role="dialog"
+    >
+      <div class="foliate-appearance-panel-head">
+        <span>{props.t("fileplus.section.readerAppearance")}</span>
+      </div>
+      <div class="foliate-appearance-row">
+        <span>{props.t("fileplus.reader.fontSize")}</span>
+        <ReaderNumberStepper
+          ariaLabel={props.t("fileplus.reader.fontSize.aria")}
+          max={FOLIATE_READER_FONT_SIZE_MAX}
+          min={FOLIATE_READER_FONT_SIZE_MIN}
+          onChange={props.onFontSizeChange}
+          onStep={props.onFontSizeStep}
+          step={FOLIATE_READER_FONT_SIZE_STEP}
+          unit="px"
+          value={props.fontSize}
+        />
+      </div>
+      <div class="foliate-appearance-row">
+        <span>{props.t("fileplus.reader.useBookLayout")}</span>
+        <ReaderSwitch
+          checked={props.useBookLayout}
+          label={props.t("fileplus.reader.useBookLayout")}
+          onChange={props.onUseBookLayoutChange}
+        />
+      </div>
+      <div class="foliate-appearance-row">
+        <span>{props.t("fileplus.reader.textIndent")}</span>
+        <ReaderSwitch
+          checked={props.textIndent}
+          disabled={props.locked.textIndent}
+          label={props.t("fileplus.reader.textIndent")}
+          onChange={props.onTextIndentChange}
+        />
+      </div>
+      <div class="foliate-appearance-row">
+        <span>{props.t("fileplus.reader.lineHeight")}</span>
+        <ReaderNumberStepper
+          ariaLabel={props.t("fileplus.reader.lineHeight.aria")}
+          disabled={props.locked.lineHeight}
+          max={FOLIATE_READER_LINE_HEIGHT_MAX}
+          min={FOLIATE_READER_LINE_HEIGHT_MIN}
+          onChange={props.onLineHeightChange}
+          onStep={props.onLineHeightStep}
+          step={FOLIATE_READER_LINE_HEIGHT_STEP}
+          unit="x"
+          value={props.lineHeight}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ReaderNumberStepper(props: ReaderNumberStepperProps): JSX.Element {
+  const commit = (value: string): void => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return;
+    props.onChange(parsed);
+  };
+
+  return (
+    <div
+      class="foliate-appearance-stepper"
+      classList={{ "is-disabled": Boolean(props.disabled) }}
+    >
+      <button
+        aria-label={`${props.ariaLabel} -${props.step}`}
+        disabled={props.disabled}
+        onClick={() => props.onStep(-props.step)}
+        type="button"
+      >
+        -
+      </button>
+      <input
+        aria-label={props.ariaLabel}
+        disabled={props.disabled}
+        inputMode="decimal"
+        max={props.max}
+        min={props.min}
+        onBlur={(event) => commit(event.currentTarget.value)}
+        onChange={(event) => commit(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowUp") {
+            event.preventDefault();
+            props.onStep(props.step);
+          } else if (event.key === "ArrowDown") {
+            event.preventDefault();
+            props.onStep(-props.step);
+          }
+        }}
+        step="any"
+        type="text"
+        value={formatReaderSettingNumber(props.value)}
+      />
+      <span aria-hidden="true">{props.unit}</span>
+      <button
+        aria-label={`${props.ariaLabel} +${props.step}`}
+        disabled={props.disabled}
+        onClick={() => props.onStep(props.step)}
+        type="button"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+function ReaderSwitch(props: {
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  onChange: (value: boolean) => void;
+}): JSX.Element {
+  return (
+    <button
+      aria-checked={props.checked ? "true" : "false"}
+      aria-label={props.label}
+      class="foliate-appearance-switch"
+      classList={{ "is-on": props.checked }}
+      disabled={props.disabled}
+      onClick={() => props.onChange(!props.checked)}
+      role="switch"
+      type="button"
+    >
+      <span />
+    </button>
+  );
+}
+
+function formatReaderSettingNumber(value: number): string {
+  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+}
+
 function buildMetadataSections(
   metadata: FoliateBookMetadata | null,
   t: (key: Parameters<ReturnType<typeof useT>>[0]) => string,
@@ -2136,6 +2571,24 @@ function syncViewMode(targetView: FoliateViewElement, mode: ViewMode): void {
   targetView.renderer?.setAttribute("flow", viewFlow(mode));
 }
 
+function getCurrentFoliateView(): FoliateViewElement | null {
+  return document.querySelector("foliate-view") as FoliateViewElement | null;
+}
+
+function getFoliateContentTransformMetrics(mode: ViewMode): {
+  height: number;
+  vertical: boolean;
+  width: number;
+} {
+  const el = getCurrentFoliateView();
+  const bounds = el?.getBoundingClientRect();
+  return {
+    height: Math.max(1, Math.round(bounds?.height ?? window.innerHeight)),
+    vertical: false,
+    width: Math.max(1, Math.round(bounds?.width ?? window.innerWidth)),
+  };
+}
+
 function nextFrame(): Promise<void> {
   return new Promise((resolve) =>
     requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
@@ -2168,11 +2621,18 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function syncReaderLayout(width: string | null, mode: ViewMode): void {
-  const el = document.querySelector("foliate-view") as FoliateViewElement | null;
+function syncReaderLayout(
+  width: string | null,
+  mode: ViewMode,
+  chromeMetrics = getReaderChromeMetrics(),
+): void {
+  const el = getCurrentFoliateView();
   const renderer = el?.renderer;
   if (!renderer) return;
+  const verticalMargins = getRendererVerticalMargins(mode, chromeMetrics);
   renderer.setAttribute("gap", mode === "scroll" ? "3%" : "4%");
+  renderer.setAttribute("margin-top", `${Math.round(verticalMargins.top)}px`);
+  renderer.setAttribute("margin-bottom", `${Math.round(verticalMargins.bottom)}px`);
   renderer.setAttribute("max-column-count", mode === "scroll" ? "1" : "2");
   if (mode === "pages") {
     const sidebarFraction = width ? parseWidthFraction(width) : 0;
@@ -2180,9 +2640,29 @@ function syncReaderLayout(width: string | null, mode: ViewMode): void {
     const available = Math.max(360, Math.round(viewport * (1 - sidebarFraction)));
     const maxInline = clamp(available * 0.55, 420, 680);
     renderer.setAttribute("max-inline-size", `${Math.round(maxInline)}px`);
+    const maxBlock = Math.max(320, window.innerHeight - verticalMargins.top - verticalMargins.bottom);
+    renderer.setAttribute("max-block-size", `${Math.round(maxBlock)}px`);
   } else {
     renderer.removeAttribute("max-inline-size");
+    renderer.removeAttribute("max-block-size");
   }
+}
+
+function getReaderChromeMetrics(content: HTMLElement | undefined = undefined): {
+  bottom: number;
+  top: number;
+} {
+  if (!content) {
+    return {
+      bottom: 56,
+      top: 48,
+    };
+  }
+  const style = getComputedStyle(content);
+  return {
+    bottom: parseCssPixelValue(style.getPropertyValue("--foliate-reader-bottombar-size"), 56),
+    top: parseCssPixelValue(style.getPropertyValue("--foliate-reader-topbar-size"), 48),
+  };
 }
 
 function isFoliateLinkDetail(value: unknown): value is FoliateLinkDetail {

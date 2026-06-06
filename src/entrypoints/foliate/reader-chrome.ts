@@ -24,7 +24,8 @@ export function getReaderChromeState(zone: ReaderChromeZone): ReaderChromeState 
 }
 
 export function getReaderChromeLayout(mode: ReaderViewMode): ReaderChromeLayout {
+  void mode;
   return {
-    reserveChromeSpace: mode === "scroll",
+    reserveChromeSpace: true,
   };
 }

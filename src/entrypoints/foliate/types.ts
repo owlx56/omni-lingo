@@ -112,6 +112,7 @@ export interface FoliateViewRenderer {
     options?: boolean | EventListenerOptions,
   ): void;
   removeAttribute(name: string): void;
+  render?(): void;
   setAttribute(name: string, value: string): void;
   nextSection?(): Promise<void> | void;
   prevSection?(): Promise<void> | void;

@@ -25,11 +25,37 @@ import type {
   FoliateRelocateDetail,
   FoliateViewElement,
 } from "./types";
-import { createFoliateContentCss } from "./reader-content-style";
+import {
+  applyFoliateContentCss,
+  applyFoliateViewContentCss,
+  createFoliateContentCss,
+  createFoliateContentCssFromSource,
+} from "./reader-content-style";
+import {
+  normalizeFoliateReaderSettings,
+  areFoliateReaderStyleSettingsEqual,
+  type FoliateReaderStyleSettings,
+} from "./reader-settings";
 
 type FoliateBridgeCallbacks = {
+  createContentCss?: (
+    theme: EffectiveTheme,
+    settings: FoliateReaderStyleSettings,
+  ) => string;
+  getReaderSettings?: () => FoliateReaderStyleSettings;
   onContentLoad?: (doc: Document) => void;
   onLocationChange?: (location: FoliateRelocateDetail) => void;
+  onReaderSettingsChange?: (settings: FoliateReaderStyleSettings) => void;
+};
+
+type FoliateBridgePrefs = {
+  readerSettings: FoliateReaderStyleSettings;
+  theme: EffectiveTheme;
+  uiLang: UiLang;
+};
+
+type FoliateBridgeCssOptions = {
+  readerSettingsOverride?: FoliateReaderStyleSettings;
 };
 
 const boundDocs = new WeakSet<Document>();
@@ -46,26 +72,51 @@ export function initFoliateBridge(
   initSelection({ captureDocumentSelection: false });
   document.documentElement.setAttribute("data-onelingo-foliate-viewer", "");
 
-  let currentTheme = getEffectiveTheme();
-  let currentUiLang: UiLang = "zh-Hans";
+  const prefs: FoliateBridgePrefs = {
+    readerSettings: normalizeFoliateReaderSettings(null),
+    theme: getEffectiveTheme(),
+    uiLang: "zh-Hans",
+  };
   void getSettings()
     .then((settings) => {
-      currentUiLang = settings.uiLang;
-      syncCurrentContents(view, currentTheme, currentUiLang, hover, callbacks);
+      prefs.uiLang = settings.uiLang;
+      prefs.readerSettings = normalizeFoliateReaderSettings(settings);
+      callbacks.onReaderSettingsChange?.(prefs.readerSettings);
+      applyViewPrefs(view, prefs, callbacks, {
+        readerSettingsOverride: prefs.readerSettings,
+        relayout: true,
+      });
+      syncCurrentContents(view, prefs, hover, callbacks, {
+        readerSettingsOverride: prefs.readerSettings,
+      });
     })
     .catch((err: unknown) => {
       console.warn("[OneLingo] failed to read foliate settings:", err);
     });
 
   const stopThemeWatch = watchEffectiveTheme((theme) => {
-    currentTheme = theme;
-    syncCurrentContents(view, currentTheme, currentUiLang, hover, callbacks);
+    prefs.theme = theme;
+    applyViewPrefs(view, prefs, callbacks);
+    syncCurrentContents(view, prefs, hover, callbacks);
   });
   let stopSettingsWatch = (): void => {};
   try {
     stopSettingsWatch = watchSettings((settings) => {
-      currentUiLang = settings.uiLang;
-      syncCurrentContents(view, currentTheme, currentUiLang, hover, callbacks);
+      const nextReaderSettings = normalizeFoliateReaderSettings(settings);
+      const shouldRelayout = !areFoliateReaderStyleSettingsEqual(
+        prefs.readerSettings,
+        nextReaderSettings,
+      );
+      prefs.uiLang = settings.uiLang;
+      prefs.readerSettings = nextReaderSettings;
+      callbacks.onReaderSettingsChange?.(nextReaderSettings);
+      applyViewPrefs(view, prefs, callbacks, {
+        readerSettingsOverride: nextReaderSettings,
+        relayout: shouldRelayout,
+      });
+      syncCurrentContents(view, prefs, hover, callbacks, {
+        readerSettingsOverride: nextReaderSettings,
+      });
     });
   } catch (err) {
     console.warn("[OneLingo] failed to watch foliate settings:", err);
@@ -74,8 +125,7 @@ export function initFoliateBridge(
   const stopHooks = registerViewHooks(
     view,
     hover,
-    currentTheme,
-    currentUiLang,
+    prefs,
     callbacks,
   );
 
@@ -90,24 +140,36 @@ export function initFoliateBridge(
   };
 }
 
+function applyViewPrefs(
+  view: FoliateViewElement,
+  prefs: FoliateBridgePrefs,
+  callbacks: FoliateBridgeCallbacks,
+  options: { relayout?: boolean } & FoliateBridgeCssOptions = {},
+): void {
+  applyFoliateViewContentCss(
+    view,
+    createBridgeContentCss(prefs, callbacks, options),
+    options,
+  );
+}
+
 function registerViewHooks(
   view: FoliateViewElement,
   hover: HoverController,
-  theme: EffectiveTheme,
-  uiLang: UiLang,
+  prefs: FoliateBridgePrefs,
   callbacks: FoliateBridgeCallbacks,
 ): () => void {
   const handleLoad = (event: Event): void => {
     const detail = (event as CustomEvent<FoliateLoadDetail>).detail;
-    bindDoc(view, detail.doc, hover, theme, uiLang);
+    bindDoc(view, detail.doc, hover, prefs, callbacks);
     callbacks.onContentLoad?.(detail.doc);
-    syncCurrentContents(view, theme, uiLang, hover, callbacks);
+    syncCurrentContents(view, prefs, hover, callbacks);
   };
 
   const handleRelocate = (event: Event): void => {
     const detail = (event as CustomEvent<FoliateRelocateDetail>).detail;
     callbacks.onLocationChange?.(detail);
-    syncCurrentContents(view, theme, uiLang, hover, callbacks);
+    syncCurrentContents(view, prefs, hover, callbacks);
   };
 
   view.addEventListener("load", handleLoad);
@@ -115,11 +177,11 @@ function registerViewHooks(
 
   const timers = [
     window.setTimeout(
-      () => syncCurrentContents(view, theme, uiLang, hover, callbacks),
+      () => syncCurrentContents(view, prefs, hover, callbacks),
       0,
     ),
     window.setTimeout(
-      () => syncCurrentContents(view, theme, uiLang, hover, callbacks),
+      () => syncCurrentContents(view, prefs, hover, callbacks),
       250,
     ),
   ];
@@ -133,15 +195,15 @@ function registerViewHooks(
 
 function syncCurrentContents(
   view: FoliateViewElement,
-  theme: EffectiveTheme,
-  uiLang: UiLang,
+  prefs: FoliateBridgePrefs,
   hover: HoverController,
   callbacks: FoliateBridgeCallbacks,
+  options: { contentCss?: boolean } & FoliateBridgeCssOptions = {},
 ): void {
   const contents = view.getContents?.();
   if (!Array.isArray(contents)) return;
   for (const item of contents) {
-    bindDoc(view, item.doc, hover, theme, uiLang);
+    bindDoc(view, item.doc, hover, prefs, callbacks, options);
     callbacks.onContentLoad?.(item.doc);
   }
 }
@@ -150,10 +212,11 @@ function bindDoc(
   view: FoliateViewElement,
   doc: Document,
   hover: HoverController,
-  theme: EffectiveTheme,
-  uiLang: UiLang,
+  prefs: FoliateBridgePrefs,
+  callbacks: FoliateBridgeCallbacks,
+  options: { contentCss?: boolean } & FoliateBridgeCssOptions = {},
 ): void {
-  applyDocPrefs(doc, theme, uiLang);
+  applyDocPrefs(doc, prefs, callbacks, options);
   if (boundDocs.has(doc)) return;
   boundDocs.add(doc);
 
@@ -185,18 +248,42 @@ function dismissReaderSelection(view: FoliateViewElement): void {
   clearReaderSelections(view);
 }
 
-function applyDocPrefs(doc: Document, theme: EffectiveTheme, uiLang: UiLang): void {
-  applyThemeToDocument(doc, theme);
-  doc.documentElement.lang ||= htmlLang(uiLang);
-  if (!doc.documentElement.dir && (uiLang === "ar" || uiLang === "fa")) {
+function applyDocPrefs(
+  doc: Document,
+  prefs: FoliateBridgePrefs,
+  callbacks: FoliateBridgeCallbacks,
+  options: { contentCss?: boolean } & FoliateBridgeCssOptions = {},
+): void {
+  applyThemeToDocument(doc, prefs.theme);
+  doc.documentElement.lang ||= htmlLang(prefs.uiLang);
+  if (!doc.documentElement.dir && (prefs.uiLang === "ar" || prefs.uiLang === "fa")) {
     doc.documentElement.dir = "rtl";
   }
 
-  const styleId = "onelingo-foliate-theme";
-  const style = doc.getElementById(styleId) ?? doc.createElement("style");
-  style.id = styleId;
-  style.textContent = createFoliateContentCss(theme);
-  if (!style.parentNode) (doc.head ?? doc.documentElement).appendChild(style);
+  if (options.contentCss !== false) {
+    applyFoliateContentCss(doc, createBridgeContentCss(prefs, callbacks, options));
+  }
+}
+
+function createBridgeContentCss(
+  prefs: FoliateBridgePrefs,
+  callbacks: FoliateBridgeCallbacks,
+  options: FoliateBridgeCssOptions = {},
+): string {
+  if (callbacks.createContentCss) {
+    return callbacks.createContentCss(
+      prefs.theme,
+      options.readerSettingsOverride ??
+        callbacks.getReaderSettings?.() ??
+        prefs.readerSettings,
+    );
+  }
+  return createFoliateContentCssFromSource({
+    getReaderSettings: callbacks.getReaderSettings,
+    readerSettings: prefs.readerSettings,
+    readerSettingsOverride: options.readerSettingsOverride,
+    theme: prefs.theme,
+  });
 }
 
 function htmlLang(uiLang: UiLang): string {

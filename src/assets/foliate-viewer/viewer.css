@@ -479,6 +479,13 @@ body {
     transform: translateY(0);
 }
 
+.foliate-reader-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
 .foliate-mode-switch {
     display: inline-flex;
     align-items: center;
@@ -509,6 +516,181 @@ body {
     background: var(--surface);
     color: var(--text);
     box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+
+.foliate-appearance-anchor {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.foliate-appearance-button {
+    border: 1px solid var(--border);
+    background: var(--surface-alt);
+}
+
+.foliate-appearance-button.is-active {
+    background: var(--surface);
+}
+
+.foliate-appearance-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 32;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: min(320px, calc(100vw - 24px));
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--sidebar-bg);
+    color: var(--text);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+}
+
+.foliate-appearance-panel-head {
+    display: flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 2px 4px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.foliate-appearance-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 38px;
+    padding: 4px 2px;
+}
+
+.foliate-appearance-row > label,
+.foliate-appearance-row > span {
+    min-width: 0;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.35;
+    text-align: left;
+}
+
+.foliate-appearance-select {
+    width: 136px;
+    min-width: 0;
+    min-height: 30px;
+    padding: 0 28px 0 10px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+}
+
+.foliate-appearance-stepper {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    background: var(--surface);
+    overflow: hidden;
+}
+
+.foliate-appearance-stepper.is-disabled {
+    opacity: 0.55;
+}
+
+.foliate-appearance-stepper button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.foliate-appearance-stepper button:hover {
+    background: var(--surface-alt);
+    color: var(--text);
+}
+
+.foliate-appearance-stepper button:disabled {
+    cursor: default;
+}
+
+.foliate-appearance-stepper button:disabled:hover {
+    background: transparent;
+    color: var(--text-muted);
+}
+
+.foliate-appearance-stepper input {
+    width: 46px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    text-align: center;
+}
+
+.foliate-appearance-stepper input:focus {
+    outline: none;
+}
+
+.foliate-appearance-stepper span {
+    min-width: 18px;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.foliate-appearance-switch {
+    position: relative;
+    width: 38px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface-alt);
+    cursor: pointer;
+    transition: background-color 120ms ease;
+}
+
+.foliate-appearance-switch span {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    background: var(--text-muted);
+    transition:
+        background-color 120ms ease,
+        transform 120ms ease;
+}
+
+.foliate-appearance-switch.is-on {
+    background: var(--text);
+}
+
+.foliate-appearance-switch.is-on span {
+    background: var(--surface);
+    transform: translateX(16px);
+}
+
+.foliate-appearance-switch:disabled {
+    cursor: default;
+    opacity: 0.55;
 }
 
 .foliate-reader-bottom-hover-zone {
@@ -580,7 +762,7 @@ body {
     background: var(--surface);
 }
 
-.foliate-content.has-scroll-chrome-space .foliate-render-area {
+.foliate-content.has-reader-chrome-space .foliate-render-area {
     inset: var(--foliate-reader-topbar-size) 0 var(--foliate-reader-bottombar-size);
 }
 

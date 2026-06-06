@@ -5,6 +5,11 @@ import {
   type TargetLang,
   type UiLang,
 } from "@/lib/languages";
+import { browser, type Browser } from "wxt/browser";
+import {
+  DEFAULT_FOLIATE_READER_SETTINGS,
+  normalizeFoliateReaderSettings,
+} from "@/lib/foliate-reader-settings";
 
 export type { TargetLang, UiLang } from "@/lib/languages";
 
@@ -77,11 +82,16 @@ export interface Settings {
   documentLinkSniffStandalone: boolean;
   foliateSidebarWidth: string;
   foliateSidebarPinned: boolean;
+  foliateReaderFontSize: number;
+  foliateReaderLineHeight: number;
+  foliateReaderTextIndent: boolean;
+  foliateReaderUseBookLayout: boolean;
   translationStyle: TranslationStyle;
 }
 
 // 老版本存储可能带 hoverLargeText：boolean -> hoverFontSize 13/17 迁移。
 type LegacySettings = Partial<Settings> & {
+  foliateReaderFontFamily?: unknown;
   hoverLargeText?: unknown;
 };
 
@@ -114,6 +124,7 @@ const DEFAULTS: Settings = {
   documentLinkSniffStandalone: false,
   foliateSidebarWidth: "24%",
   foliateSidebarPinned: true,
+  ...DEFAULT_FOLIATE_READER_SETTINGS,
   translationStyle: {
     underlineStyle: "none",
     fontFamily: "inherit",
@@ -123,9 +134,13 @@ const DEFAULTS: Settings = {
 };
 
 const KEY = "sync:settings" as const;
+const SETTINGS_STORAGE_AREA = "sync" as const;
+const SETTINGS_STORAGE_KEY = "settings" as const;
 
 function withDefaults(raw: Partial<Settings> | null): Settings {
   const legacy = raw as LegacySettings | null;
+  const rawWithoutRemovedReaderFont = { ...(legacy ?? {}) };
+  delete rawWithoutRemovedReaderFont.foliateReaderFontFamily;
 
   // 浅 merge 会丢 engines 内部字段，必须二级合并
   const engines = { ...DEFAULTS.engines, ...(raw?.engines ?? {}) };
@@ -197,10 +212,11 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     legacy?.foliateSidebarPinned,
     DEFAULTS.foliateSidebarPinned,
   );
+  const foliateReaderSettings = normalizeFoliateReaderSettings(legacy);
   // 所有 normalize 过的字段必须在 return 末尾显式覆盖，否则 raw 里的脏值会绕开守门。
   return {
     ...DEFAULTS,
-    ...(raw ?? {}),
+    ...rawWithoutRemovedReaderFont,
     engines,
     translationStyle,
     hoverFontSize,
@@ -219,6 +235,10 @@ function withDefaults(raw: Partial<Settings> | null): Settings {
     documentLinkSniffStandalone,
     foliateSidebarWidth,
     foliateSidebarPinned,
+    foliateReaderFontSize: foliateReaderSettings.fontSize,
+    foliateReaderLineHeight: foliateReaderSettings.lineHeight,
+    foliateReaderTextIndent: foliateReaderSettings.textIndent,
+    foliateReaderUseBookLayout: foliateReaderSettings.useBookLayout,
   };
 }
 
@@ -323,6 +343,16 @@ export async function getStoredSettings(): Promise<Partial<Settings> | null> {
 export async function setSettings(patch: SettingsPatch): Promise<void> {
   const cur = await getSettings();
   const uiLang = patch.uiLang ?? cur.uiLang;
+  const foliateReaderSettings = normalizeFoliateReaderSettings({
+    foliateReaderFontSize:
+      patch.foliateReaderFontSize ?? cur.foliateReaderFontSize,
+    foliateReaderLineHeight:
+      patch.foliateReaderLineHeight ?? cur.foliateReaderLineHeight,
+    foliateReaderTextIndent:
+      patch.foliateReaderTextIndent ?? cur.foliateReaderTextIndent,
+    foliateReaderUseBookLayout:
+      patch.foliateReaderUseBookLayout ?? cur.foliateReaderUseBookLayout,
+  });
   const next: Settings = {
     ...cur,
     ...patch,
@@ -368,12 +398,35 @@ export async function setSettings(patch: SettingsPatch): Promise<void> {
       patch.foliateSidebarPinned,
       cur.foliateSidebarPinned,
     ),
+    foliateReaderFontSize: foliateReaderSettings.fontSize,
+    foliateReaderLineHeight: foliateReaderSettings.lineHeight,
+    foliateReaderTextIndent: foliateReaderSettings.textIndent,
+    foliateReaderUseBookLayout: foliateReaderSettings.useBookLayout,
   };
   await storage.setItem<Settings>(KEY, next);
 }
 
 export function watchSettings(cb: (s: Settings) => void): () => void {
-  return storage.watch<Partial<Settings>>(KEY, (raw) => cb(withDefaults(raw)));
+  const stops: Array<() => void> = [];
+  let primaryError: unknown;
+
+  const emit = (raw: Partial<Settings> | null | undefined): void => {
+    cb(withDefaults(raw ?? null));
+  };
+
+  try {
+    stops.push(storage.watch<Partial<Settings>>(KEY, emit));
+  } catch (err) {
+    primaryError = err;
+  }
+
+  const stopGlobalWatch = watchSettingsGlobalStorageChanges(emit);
+  if (stopGlobalWatch) stops.push(stopGlobalWatch);
+
+  if (stops.length === 0 && primaryError) throw primaryError;
+  return () => {
+    for (const stop of stops.splice(0)) stop();
+  };
 }
 
 // Solid 侧订阅入口：返回一个只读 signal，自动在 onCleanup 时解绑。
@@ -388,4 +441,26 @@ export function useSettings(): Accessor<Settings> {
   }
   onCleanup(stop);
   return s;
+}
+
+type StorageChangeMap = Record<
+  string,
+  Browser.storage.StorageChange | undefined
+>;
+
+function watchSettingsGlobalStorageChanges(
+  cb: (raw: Partial<Settings> | null | undefined) => void,
+): (() => void) | undefined {
+  const onChanged = browser.storage?.onChanged;
+  if (!onChanged?.addListener || !onChanged.removeListener) return undefined;
+
+  const listener = (changes: StorageChangeMap, areaName: string): void => {
+    if (areaName !== SETTINGS_STORAGE_AREA) return;
+    const change = changes[SETTINGS_STORAGE_KEY];
+    if (!change) return;
+    cb((change.newValue as Partial<Settings> | undefined) ?? null);
+  };
+
+  onChanged.addListener(listener);
+  return () => onChanged.removeListener(listener);
 }

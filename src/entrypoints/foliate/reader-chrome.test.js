@@ -33,9 +33,9 @@ describe("getReaderChromeState", () => {
 });
 
 describe("getReaderChromeLayout", () => {
-  test("reserves top and bottom chrome space only in scroll mode", () => {
+  test("reserves top and bottom chrome space for the render surface", () => {
     expect(getReaderChromeLayout("pages")).toEqual({
-      reserveChromeSpace: false,
+      reserveChromeSpace: true,
     });
 
     expect(getReaderChromeLayout("scroll")).toEqual({

@@ -473,6 +473,10 @@ select {
     color: var(--text);
 }
 
+.number-stepper.is-disabled {
+    opacity: 0.55;
+}
+
 .number-stepper-input {
     width: 78px;
     min-width: 0;
@@ -496,6 +500,10 @@ select {
     border-color: var(--switch-on);
     outline: none;
     box-shadow: 0 0 0 1px var(--switch-on);
+}
+
+.number-stepper-input:disabled {
+    cursor: default;
 }
 
 .number-stepper-unit {
@@ -532,6 +540,15 @@ select {
 .number-stepper-button:hover {
     background: var(--surface-alt);
     color: var(--text);
+}
+
+.number-stepper-button:disabled {
+    cursor: default;
+    transform: none;
+}
+
+.number-stepper-button:disabled:hover {
+    background: transparent;
 }
 
 .number-stepper-button:active {
