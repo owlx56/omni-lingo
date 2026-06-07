@@ -29,6 +29,15 @@ import {
 import { getEffectiveTheme } from "@/lib/theme";
 import { listenFoliateReaderAppearanceBroadcast } from "@/lib/foliate-reader-live-settings";
 import {
+  FOLIATE_SIDEBAR_DEFAULT_DESKTOP,
+  FOLIATE_SIDEBAR_DEFAULT_MOBILE,
+  FOLIATE_SIDEBAR_MAX,
+  FOLIATE_SIDEBAR_MIN,
+  normalizeFoliateSidebarWidth,
+  parseFoliateSidebarWidthFraction,
+  toFoliateSidebarPercent,
+} from "@/lib/foliate-sidebar";
+import {
   IconArrowLeftDouble,
   IconArrowRightDouble,
   IconPages,
@@ -47,6 +56,9 @@ import {
   getReaderChromeState,
   type ReaderChromeZone,
 } from "./reader-chrome";
+import {
+  shouldCloseReaderAppearanceFromPointerTarget,
+} from "./reader-appearance-popover";
 import {
   getRendererVerticalMargins,
   parseCssPixelValue,
@@ -209,10 +221,6 @@ type TocLocationContext = {
   sectionLocations: TocLocation[];
 };
 
-const SIDEBAR_MIN = 0.05;
-const SIDEBAR_MAX = 0.45;
-const SIDEBAR_DEFAULT_DESKTOP = 0.28;
-const SIDEBAR_DEFAULT_MOBILE = 0.25;
 const MOBILE_BREAKPOINT = 720;
 const FOLIATE_SIZE_PER_LOC = 1500;
 const FOLIATE_READER_FONT_SIZE_STEP = 1;
@@ -229,7 +237,7 @@ function App(): JSX.Element {
   const [sidebarVisible, setSidebarVisible] = createSignal(false);
   const [sidebarPinned, setSidebarPinned] = createSignal(false);
   const [sidebarWidth, setSidebarWidth] = createSignal(
-    toPercent(SIDEBAR_DEFAULT_DESKTOP),
+    toFoliateSidebarPercent(FOLIATE_SIDEBAR_DEFAULT_DESKTOP),
   );
   const [viewMode, setViewMode] = createSignal<ViewMode>("pages");
   const [toc, setToc] = createSignal<FoliateTocItem[]>([]);
@@ -322,9 +330,22 @@ function App(): JSX.Element {
       closeFootnotePopup();
       closeReaderAppearance();
     };
+    const onWindowPointerDown = (event: PointerEvent): void => {
+      if (
+        shouldCloseReaderAppearanceFromPointerTarget(
+          event.target,
+          appearanceOpen(),
+        )
+      ) {
+        closeReaderAppearance();
+      }
+    };
     updateViewport();
     window.addEventListener("resize", updateViewport);
     window.addEventListener("keydown", onWindowKeydown);
+    window.addEventListener("pointerdown", onWindowPointerDown, {
+      capture: true,
+    });
     stopFootnoteHandler = bindFootnoteHandler();
     stopReaderAppearanceMessage = onMessage(
       "applyFoliateReaderAppearance",
@@ -342,6 +363,9 @@ function App(): JSX.Element {
     resizeCleanup = () => {
       window.removeEventListener("resize", updateViewport);
       window.removeEventListener("keydown", onWindowKeydown);
+      window.removeEventListener("pointerdown", onWindowPointerDown, {
+        capture: true,
+      });
     };
     void init();
   });
@@ -619,7 +643,9 @@ function App(): JSX.Element {
       : false;
     const nextWidth = normalizeSidebarWidth(
       storedWidth,
-      desktop ? SIDEBAR_DEFAULT_DESKTOP : SIDEBAR_DEFAULT_MOBILE,
+      desktop
+        ? FOLIATE_SIDEBAR_DEFAULT_DESKTOP
+        : FOLIATE_SIDEBAR_DEFAULT_MOBILE,
     );
     setIsDesktop(desktop);
     setSidebarPinned(nextPinned);
@@ -1184,9 +1210,11 @@ function App(): JSX.Element {
     if (wheelDocCleanups.has(doc)) return;
     const cleanupWheel = bindWheelTarget(doc);
     const cleanupChrome = bindReaderChromeContentDocument(doc);
+    const cleanupAppearance = bindReaderAppearanceContentDocument(doc);
     wheelDocCleanups.set(doc, () => {
       cleanupWheel();
       cleanupChrome();
+      cleanupAppearance();
     });
   };
 
@@ -1222,6 +1250,21 @@ function App(): JSX.Element {
         capture: true,
       });
       doc.removeEventListener("mouseleave", onMouseLeave);
+    };
+  };
+
+  const bindReaderAppearanceContentDocument = (doc: Document): (() => void) => {
+    const onPointerDown = (): void => {
+      closeReaderAppearance();
+    };
+    doc.addEventListener("pointerdown", onPointerDown, {
+      capture: true,
+      passive: true,
+    });
+    return () => {
+      doc.removeEventListener("pointerdown", onPointerDown, {
+        capture: true,
+      });
     };
   };
 
@@ -1265,8 +1308,12 @@ function App(): JSX.Element {
 
     const move = (moveEvent: PointerEvent): void => {
       const delta = moveEvent.clientX - startX;
-      const fraction = clamp(startWidth + delta / frameWidth, SIDEBAR_MIN, SIDEBAR_MAX);
-      nextWidth = toPercent(fraction);
+      const fraction = clamp(
+        startWidth + delta / frameWidth,
+        FOLIATE_SIDEBAR_MIN,
+        FOLIATE_SIDEBAR_MAX,
+      );
+      nextWidth = toFoliateSidebarPercent(fraction);
       setSidebarWidth(nextWidth);
       syncReaderLayout(nextWidth, viewMode(), getReaderChromeMetrics(contentRef));
     };
@@ -1310,9 +1357,10 @@ function App(): JSX.Element {
   const handleContentPointerDown = (event: PointerEvent): void => {
     const target = event.target;
     if (
-      appearanceOpen() &&
-      target instanceof Element &&
-      !target.closest(".foliate-appearance-panel,.foliate-appearance-button")
+      shouldCloseReaderAppearanceFromPointerTarget(
+        target,
+        appearanceOpen(),
+      )
     ) {
       closeReaderAppearance();
     }
@@ -2686,22 +2734,12 @@ function isWideViewport(): boolean {
   return window.innerWidth >= MOBILE_BREAKPOINT;
 }
 
-function toPercent(fraction: number): string {
-  return `${Math.round(fraction * 10000) / 100}%`;
-}
-
 function normalizeSidebarWidth(value: unknown, fallback: number): string {
-  if (typeof value !== "string") return toPercent(fallback);
-  const trimmed = value.trim();
-  if (!/^\d+(?:\.\d+)?%$/.test(trimmed)) return toPercent(fallback);
-  const fraction = Number.parseFloat(trimmed) / 100;
-  if (!Number.isFinite(fraction)) return toPercent(fallback);
-  return toPercent(clamp(fraction, SIDEBAR_MIN, SIDEBAR_MAX));
+  return normalizeFoliateSidebarWidth(value, fallback);
 }
 
 function parseWidthFraction(value: string): number {
-  const fraction = Number.parseFloat(value);
-  return Number.isFinite(fraction) ? fraction / 100 : SIDEBAR_DEFAULT_DESKTOP;
+  return parseFoliateSidebarWidthFraction(value);
 }
 
 function clamp(value: number, min: number, max: number): number {

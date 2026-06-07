@@ -10,6 +10,11 @@ import {
   DEFAULT_FOLIATE_READER_SETTINGS,
   normalizeFoliateReaderSettings,
 } from "@/lib/foliate-reader-settings";
+import {
+  DEFAULT_FOLIATE_SIDEBAR_WIDTH,
+  FOLIATE_SIDEBAR_DEFAULT_DESKTOP,
+  normalizeFoliateSidebarWidth,
+} from "@/lib/foliate-sidebar";
 
 export type { TargetLang, UiLang } from "@/lib/languages";
 
@@ -122,7 +127,7 @@ const DEFAULTS: Settings = {
   documentLinkSniffEnabled: true,
   documentLinkSniffKeepOriginal: false,
   documentLinkSniffStandalone: false,
-  foliateSidebarWidth: "24%",
+  foliateSidebarWidth: DEFAULT_FOLIATE_SIDEBAR_WIDTH,
   foliateSidebarPinned: true,
   ...DEFAULT_FOLIATE_READER_SETTINGS,
   translationStyle: {
@@ -261,13 +266,10 @@ function normalizeBoolean(value: unknown, fallback: boolean): boolean {
 }
 
 function normalizeSidebarWidth(value: unknown): string {
-  if (typeof value !== "string") return DEFAULTS.foliateSidebarWidth;
-  const trimmed = value.trim();
-  if (!/^\d+(?:\.\d+)?%$/.test(trimmed)) return DEFAULTS.foliateSidebarWidth;
-  const fraction = Number.parseFloat(trimmed) / 100;
-  if (!Number.isFinite(fraction)) return DEFAULTS.foliateSidebarWidth;
-  const clamped = Math.min(0.45, Math.max(0.05, fraction));
-  return `${Math.round(clamped * 10000) / 100}%`;
+  return normalizeFoliateSidebarWidth(
+    value,
+    FOLIATE_SIDEBAR_DEFAULT_DESKTOP,
+  );
 }
 
 function normalizeTranslationColor(value: unknown): TranslationColor {

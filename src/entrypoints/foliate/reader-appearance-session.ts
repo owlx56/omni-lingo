@@ -1,4 +1,5 @@
 import {
+  areFoliateReaderStyleSettingsEqual,
   normalizeFoliateReaderSettings,
   type FoliateReaderStyleSettings,
 } from "./reader-settings";
@@ -104,6 +105,12 @@ export function resolveFoliateReaderAppearanceGlobalUpdate(input: {
   shouldApply: boolean;
 } {
   if (input.detached) {
+    return {
+      settings: input.current,
+      shouldApply: false,
+    };
+  }
+  if (areFoliateReaderStyleSettingsEqual(input.current, input.global)) {
     return {
       settings: input.current,
       shouldApply: false,

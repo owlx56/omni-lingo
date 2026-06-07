@@ -142,6 +142,19 @@ describe("reader appearance session overrides", () => {
     });
   });
 
+  test("does not reapply equal global settings with a new object identity", () => {
+    expect(
+      resolveFoliateReaderAppearanceGlobalUpdate({
+        current: { ...globalSettings },
+        detached: false,
+        global: { ...globalSettings },
+      }),
+    ).toEqual({
+      settings: { ...globalSettings },
+      shouldApply: false,
+    });
+  });
+
   test("ignores global options updates after the viewer tab is detached", () => {
     const current = {
       fontSize: 20,
