@@ -1,26 +1,31 @@
-// Popup 面板：immersive 翻译的快速入口 + 其他功能开关。
+// Popup 面板：原生 toolbar popup 内的 immersive 快速入口 + 功能开关。
 //
 // 设计（Claude.ai 扁平 row + 紧凑布局）：
-//   - 顶部 logo + brand，右侧 settings 按钮
+//   - 顶部 logo + brand，支持页右侧显示 settings 按钮
 //   - 大 CTA：翻译此页面 / 显示原文（根据 active 切换）+ 状态摘要
 //   - 段 1「当前页面」：目标语言 / 引擎 / 显示模式 / 点击显示原文
 //   - 段 2「其他功能」：悬停翻译 / 划词翻译 总开关
-//   - 底部 ⚙ 打开完整设置
 //
 // 行为约定：
 //   - target / engine / mode 默认跟随 options 的 immersive 全局设置。
 //   - popup 内显式修改 target / engine / mode 后，写成当前页面的独立设置。
 //     当前页面 active 时立即重翻；未 active 则只保存 per-page pref。
-//   - popup 内修改 clickToShowOriginal / hoverEnabled / selectionEnabled 后，
-//     写成当前页面 tab 的独立设置；未修改时跟随 options 全局默认。
+//   - 普通网页 / reader 内修改 hoverEnabled / selectionEnabled 后写成当前
+//     tab 的独立设置；Options / unsupported 只显示轻量说明。
 
-import { createSignal, onMount, type JSX } from "solid-js";
+import { Show, createSignal, onMount, type JSX } from "solid-js";
 import { UI_LANG_LABELS, UI_LANGS, type UiLang } from "@/lib/languages";
 import {
   sendMessage,
   type PageFeaturePrefs,
   type PageFeatureStatus,
 } from "@/lib/messaging";
+import {
+  classifyPopupCapability,
+  popupShowsFeatureControls,
+  popupShowsPageControls,
+  type PopupCapability,
+} from "@/lib/popup-capability";
 import {
   resolveTargetLang,
   useSettings,
@@ -32,6 +37,7 @@ import {
   IconArrowRight,
   IconBilingualMode,
   IconChevron,
+  IconInfo,
   IconLogo,
   IconReplaceMode,
   IconSettings,
@@ -42,6 +48,7 @@ import {
   Switch,
   type SelectOption,
 } from "@/lib/ui/controls";
+import { browser } from "wxt/browser";
 
 const ENGINES: SelectOption<FullPageEngineId>[] = [
   { value: "google2", label: "Google" },
@@ -59,6 +66,12 @@ function pageTargetOptions(): SelectOption<PageTargetLang>[] {
 
 type ActionState = "idle" | "starting" | "restoring" | "retranslating";
 
+export interface PopupAppProps {
+  capability?: PopupCapability;
+  onClose?: () => void;
+  surface?: "native";
+}
+
 const DEFAULT_PAGE_FEATURE_STATUS: PageFeatureStatus = {
   fullPageClickToShowOriginal: true,
   hoverEnabled: true,
@@ -67,6 +80,18 @@ const DEFAULT_PAGE_FEATURE_STATUS: PageFeatureStatus = {
   hasHoverEnabledPref: false,
   hasSelectionEnabledPref: false,
 };
+
+async function detectActiveTabCapability(): Promise<PopupCapability> {
+  try {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
+    return classifyPopupCapability(tab?.url, browser.runtime.getURL("/"));
+  } catch {
+    return "unsupported";
+  }
+}
 
 function EngineMark(props: { engine: FullPageEngineId }): JSX.Element {
   if (props.engine === "microsoft") {
@@ -83,6 +108,23 @@ function EngineMark(props: { engine: FullPageEngineId }): JSX.Element {
   return <span aria-hidden="true" class="engine-mark google-mark">G</span>;
 }
 
+function CapabilityNotice(props: {
+  description: string;
+  title: string;
+}): JSX.Element {
+  return (
+    <section class="popup-notice-card">
+      <span aria-hidden="true" class="popup-notice-icon">
+        <IconInfo size={18} />
+      </span>
+      <span class="popup-notice-copy">
+        <strong>{props.title}</strong>
+        <span>{props.description}</span>
+      </span>
+    </section>
+  );
+}
+
 function isMissingContentScriptError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return (
@@ -91,7 +133,7 @@ function isMissingContentScriptError(error: unknown): boolean {
   );
 }
 
-function App(): JSX.Element {
+function App(props: PopupAppProps = {}): JSX.Element {
   const t = useT();
   const settings = useSettings();
 
@@ -105,9 +147,18 @@ function App(): JSX.Element {
   const [hasPagePrefs, setHasPagePrefs] = createSignal(false);
   const [pageFeatureStatus, setPageFeatureStatus] =
     createSignal<PageFeatureStatus>(DEFAULT_PAGE_FEATURE_STATUS);
+  const [detectedCapability, setDetectedCapability] =
+    createSignal<PopupCapability>(props.capability ?? "unsupported");
 
   let actionSeq = 0;
   let lastCommandId = 0;
+
+  const capability = (): PopupCapability =>
+    props.capability ?? detectedCapability();
+  const canTranslatePage = (): boolean =>
+    popupShowsPageControls(capability());
+  const canToggleFeatures = (): boolean =>
+    popupShowsFeatureControls(capability());
 
   const nextCommandId = (): number => {
     lastCommandId = Math.max(lastCommandId + 1, Date.now());
@@ -163,18 +214,18 @@ function App(): JSX.Element {
 
   const clickToShowOriginalValue = (): boolean =>
     pageFeatureStatus().hasFullPageClickToShowOriginalPref
-      ? pageFeatureStatus().fullPageClickToShowOriginal
-      : settings().fullPageClickToShowOriginal;
+        ? pageFeatureStatus().fullPageClickToShowOriginal
+        : settings().fullPageClickToShowOriginal;
 
   const hoverEnabledValue = (): boolean =>
     pageFeatureStatus().hasHoverEnabledPref
-      ? pageFeatureStatus().hoverEnabled
-      : settings().hoverEnabled;
+        ? pageFeatureStatus().hoverEnabled
+        : settings().hoverEnabled;
 
   const selectionEnabledValue = (): boolean =>
     pageFeatureStatus().hasSelectionEnabledPref
-      ? pageFeatureStatus().selectionEnabled
-      : settings().selectionEnabled;
+        ? pageFeatureStatus().selectionEnabled
+        : settings().selectionEnabled;
 
   const pageStateText = (): string =>
     immersiveActive()
@@ -188,8 +239,6 @@ function App(): JSX.Element {
           target: targetLabel(pageTargetValue()),
           mode: modeLabel(pageModeValue()),
         });
-
-  // ─── 应用当前页面偏好 ────────────────────────────────────────
 
   const applyPagePref = (
     patch: {
@@ -215,12 +264,10 @@ function App(): JSX.Element {
     );
 
     if (!immersiveActive()) {
-      // 未翻译时只保存当前页 pref，待用户点 CTA 时统一发起
       void savePagePrefs;
       return;
     }
 
-    // 已翻译：立即重翻
     const seq = ++actionSeq;
     setAction("retranslating");
     setInfoStatus(pendingStatus);
@@ -254,8 +301,6 @@ function App(): JSX.Element {
       });
   };
 
-  // ─── 应用当前 tab 功能开关 ──────────────────────────────────
-
   const applyPageFeaturePref = (patch: PageFeaturePrefs): void => {
     setPageFeatureStatus((cur) => ({
       ...cur,
@@ -278,8 +323,6 @@ function App(): JSX.Element {
         setErrorStatus(e);
       });
   };
-
-  // ─── CTA：开始翻译 / 显示原文 ────────────────────────────────
 
   const runCta = async (): Promise<void> => {
     if (immersiveActive()) {
@@ -332,28 +375,39 @@ function App(): JSX.Element {
     }
   };
 
-  // ─── 初始化 ────────────────────────────────────────────────
-
   onMount(() => {
     void (async () => {
+      const activeCapability = props.capability ?? (await detectActiveTabCapability());
+      setDetectedCapability(activeCapability);
       const defaults = settings();
-      try {
-        const res = await sendMessage("getPageTranslateStatus", {});
-        const mode = res.mode ?? defaults.fullPageMode;
-        const engine = res.engine ?? defaults.engines.fullPage;
-        const resolved = resolveTargetLang(
-          defaults.immersiveTargetLang,
-          defaults.uiLang,
-        );
-        const target = (res.target as PageTargetLang | undefined) ?? resolved;
+      if (activeCapability === "web") {
+        try {
+          const res = await sendMessage("getPageTranslateStatus", {});
+          const mode = res.mode ?? defaults.fullPageMode;
+          const engine = res.engine ?? defaults.engines.fullPage;
+          const resolved = resolveTargetLang(
+            defaults.immersiveTargetLang,
+            defaults.uiLang,
+          );
+          const target = (res.target as PageTargetLang | undefined) ?? resolved;
 
-        setPageMode(mode);
-        setPageEngine(engine);
-        setPageTarget(target);
-        setHasPagePrefs(res.hasPagePrefs);
-        setImmersiveActive(res.active || res.translating);
-      } catch {
-        // 没拿到页面状态就用全局默认值兜底
+          setPageMode(mode);
+          setPageEngine(engine);
+          setPageTarget(target);
+          setHasPagePrefs(res.hasPagePrefs);
+          setImmersiveActive(res.active || res.translating);
+        } catch {
+          setPageMode(defaults.fullPageMode);
+          setPageEngine(defaults.engines.fullPage);
+          setPageTarget(
+            resolveTargetLang(
+              defaults.immersiveTargetLang,
+              defaults.uiLang,
+            ) as PageTargetLang,
+          );
+          setHasPagePrefs(false);
+        }
+      } else {
         setPageMode(defaults.fullPageMode);
         setPageEngine(defaults.engines.fullPage);
         setPageTarget(
@@ -365,11 +419,13 @@ function App(): JSX.Element {
         setHasPagePrefs(false);
       }
 
-      try {
-        setPageFeatureStatus(await sendMessage("getPageFeatureStatus", {}));
-      } catch (e) {
-        if (!isMissingContentScriptError(e)) setErrorStatus(e);
-        setPageFeatureStatus(DEFAULT_PAGE_FEATURE_STATUS);
+      if (popupShowsFeatureControls(activeCapability)) {
+        try {
+          setPageFeatureStatus(await sendMessage("getPageFeatureStatus", {}));
+        } catch (e) {
+          if (!isMissingContentScriptError(e)) setErrorStatus(e);
+          setPageFeatureStatus(DEFAULT_PAGE_FEATURE_STATUS);
+        }
       }
     })().catch(() => {});
   });
@@ -393,7 +449,12 @@ function App(): JSX.Element {
   };
 
   return (
-    <main class="popup">
+    <main
+      class="popup"
+      data-onelingo-reader-ui=""
+      data-popup-capability={capability()}
+      data-popup-surface={props.surface ?? "native"}
+    >
       <header class="popup-header">
         <span class="popup-brand">
           <span aria-hidden="true" class="popup-logo">
@@ -412,135 +473,155 @@ function App(): JSX.Element {
         </button>
       </header>
 
-      <section aria-label={t("popup.section.page")} class="translate-card">
-        <div class="language-flow">
-          <button
-            aria-disabled="true"
-            aria-label={t("popup.label.sourceLang")}
-            class="source-language-button"
-            tabIndex={-1}
-            type="button"
-          >
-            <span>{t("popup.label.sourceAuto")}</span>
-            <IconChevron size={16} />
-          </button>
-          <span aria-hidden="true" class="language-arrow">
-            <IconArrowRight />
-          </span>
-          <div class="target-language-select">
-            <Select
-              label={t("popup.label.lang")}
-              onChange={(target) =>
-                applyPagePref(
-                  { target },
-                  t("popup.status.modeSwitching"),
-                )
-              }
-              options={pageTargetOptions()}
-              value={pageTargetValue()}
-            />
+      <Show when={capability() === "unsupported" || capability() === "options"}>
+        <CapabilityNotice
+          description={t("popup.unsupported.description")}
+          title={t("popup.unsupported.title")}
+        />
+      </Show>
+
+      <Show when={capability() === "reader"}>
+        <CapabilityNotice
+          description={t("viewer.scope")}
+          title={t("viewer.title")}
+        />
+      </Show>
+
+      <Show when={canTranslatePage()}>
+        <section aria-label={t("popup.section.page")} class="translate-card">
+          <div class="language-flow">
+            <button
+              aria-disabled="true"
+              aria-label={t("popup.label.sourceLang")}
+              class="source-language-button"
+              tabIndex={-1}
+              type="button"
+            >
+              <span>{t("popup.label.sourceAuto")}</span>
+              <IconChevron size={16} />
+            </button>
+            <span aria-hidden="true" class="language-arrow">
+              <IconArrowRight />
+            </span>
+            <div class="target-language-select">
+              <Select
+                label={t("popup.label.lang")}
+                onChange={(target) =>
+                  applyPagePref(
+                    { target },
+                    t("popup.status.modeSwitching"),
+                  )
+                }
+                options={pageTargetOptions()}
+                value={pageTargetValue()}
+              />
+            </div>
           </div>
-        </div>
 
-        <div class="service-row">
-          <span class="service-label">
-            {t("popup.label.service")}:
-            <span class="service-label-spacer"></span>
-          </span>
-          <span class="service-control">
-            <Select
-              label={t("popup.label.service")}
-              onChange={(engine) =>
-                applyPagePref(
-                  { engine },
-                  t("popup.status.engineSwitchPending", {
-                    engine: engineLabel(engine),
-                  }),
-                )
-              }
-              options={ENGINES}
-              value={pageEngineValue()}
-            />
-          </span>
-        </div>
-      </section>
+          <div class="service-row">
+            <span class="service-label">
+              {t("popup.label.service")}:
+              <span class="service-label-spacer"></span>
+            </span>
+            <span class="service-control">
+              <Select
+                label={t("popup.label.service")}
+                onChange={(engine) =>
+                  applyPagePref(
+                    { engine },
+                    t("popup.status.engineSwitchPending", {
+                      engine: engineLabel(engine),
+                    }),
+                  )
+                }
+                options={ENGINES}
+                value={pageEngineValue()}
+              />
+            </span>
+          </div>
+        </section>
 
-      <div class="popup-primary-actions">
-        <div aria-label={t("popup.label.mode")} class="mode-switch" role="group">
+        <div class="popup-primary-actions">
+          <div aria-label={t("popup.label.mode")} class="mode-switch" role="group">
+            <button
+              aria-label={t("mode.replace")}
+              aria-pressed={pageModeValue() === "replace"}
+              class="mode-button"
+              classList={{ active: pageModeValue() === "replace" }}
+              disabled={action() !== "idle"}
+              onClick={() => selectMode("replace")}
+              title={t("mode.replace")}
+              type="button"
+            >
+              <IconReplaceMode />
+            </button>
+            <button
+              aria-label={t("mode.bilingual")}
+              aria-pressed={pageModeValue() === "bilingual"}
+              class="mode-button"
+              classList={{ active: pageModeValue() === "bilingual" }}
+              disabled={action() !== "idle"}
+              onClick={() => selectMode("bilingual")}
+              title={t("mode.bilingual")}
+              type="button"
+            >
+              <IconBilingualMode />
+            </button>
+          </div>
+
           <button
-            aria-label={t("mode.replace")}
-            aria-pressed={pageModeValue() === "replace"}
-            class="mode-button"
-            classList={{ active: pageModeValue() === "replace" }}
+            class="popup-cta"
+            classList={{ active: immersiveActive() }}
             disabled={action() !== "idle"}
-            onClick={() => selectMode("replace")}
-            title={t("mode.replace")}
+            onClick={() => void runCta()}
             type="button"
           >
-            <IconReplaceMode />
-          </button>
-          <button
-            aria-label={t("mode.bilingual")}
-            aria-pressed={pageModeValue() === "bilingual"}
-            class="mode-button"
-            classList={{ active: pageModeValue() === "bilingual" }}
-            disabled={action() !== "idle"}
-            onClick={() => selectMode("bilingual")}
-            title={t("mode.bilingual")}
-            type="button"
-          >
-            <IconBilingualMode />
+            <span>{ctaLabel()}</span>
+            <span class="popup-shortcut">{t("popup.shortcut")}</span>
           </button>
         </div>
 
-        <button
-          class="popup-cta"
-          classList={{ active: immersiveActive() }}
-          disabled={action() !== "idle"}
-          onClick={() => void runCta()}
-          type="button"
+        <p
+          class="popup-status"
+          classList={{ error: statusIsError() }}
         >
-          <span>{ctaLabel()}</span>
-          <span class="popup-shortcut">{t("popup.shortcut")}</span>
-        </button>
-      </div>
+          {status() || pageStateText()}
+        </p>
+      </Show>
 
-      <p
-        class="popup-status"
-        classList={{ error: statusIsError() }}
-      >
-        {status() || pageStateText()}
-      </p>
-
-      <section class="section popup-settings-section">
-        <Row label={t("section.clickToShowOriginal")}>
-          <Switch
-            checked={clickToShowOriginalValue()}
-            label={t("section.clickToShowOriginal")}
-            onChange={(fullPageClickToShowOriginal) =>
-              applyPageFeaturePref({ fullPageClickToShowOriginal })
-            }
-          />
-        </Row>
-<Row label={t("popup.row.hoverEnabled")}>
-          <Switch
-            checked={hoverEnabledValue()}
-            label={t("popup.row.hoverEnabled")}
-            onChange={(hoverEnabled) =>
-              applyPageFeaturePref({ hoverEnabled })
-            }
-          />
-        </Row>
-        <Row label={t("popup.row.selectionEnabled")}>
-          <Switch
-            checked={selectionEnabledValue()}
-            label={t("popup.row.selectionEnabled")}
-            onChange={(selectionEnabled) =>
-              applyPageFeaturePref({ selectionEnabled })
-            }
-          />
-        </Row>
-      </section>
+      <Show when={canToggleFeatures()}>
+        <section class="section popup-settings-section">
+          <Show when={canTranslatePage()}>
+            <Row label={t("section.clickToShowOriginal")}>
+              <Switch
+                checked={clickToShowOriginalValue()}
+                label={t("section.clickToShowOriginal")}
+                onChange={(fullPageClickToShowOriginal) =>
+                  applyPageFeaturePref({ fullPageClickToShowOriginal })
+                }
+              />
+            </Row>
+          </Show>
+          <Row label={t("popup.row.hoverEnabled")}>
+            <Switch
+              checked={hoverEnabledValue()}
+              label={t("popup.row.hoverEnabled")}
+              onChange={(hoverEnabled) =>
+                applyPageFeaturePref({ hoverEnabled })
+              }
+            />
+          </Row>
+          <Row label={t("popup.row.selectionEnabled")}>
+            <Switch
+              checked={selectionEnabledValue()}
+              label={t("popup.row.selectionEnabled")}
+              onChange={(selectionEnabled) =>
+                applyPageFeaturePref({ selectionEnabled })
+              }
+            />
+          </Row>
+        </section>
+      </Show>
 
     </main>
   );

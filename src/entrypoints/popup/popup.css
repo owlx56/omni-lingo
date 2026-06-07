@@ -79,6 +79,47 @@ body {
     color: var(--text);
 }
 
+.popup-notice-card {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--surface);
+}
+
+.popup-notice-icon {
+    display: inline-grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 9px;
+    background: var(--surface-alt);
+    color: var(--text);
+}
+
+.popup-notice-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.popup-notice-copy strong {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+.popup-notice-copy span {
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 /* ── Immersive quick controls ───────────────────────────── */
 
 .translate-card {
