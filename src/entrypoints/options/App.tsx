@@ -72,15 +72,20 @@ import {
   type SelectOption,
 } from "@/lib/ui/controls";
 import { browser } from "wxt/browser";
-import { storeDocument } from "@/lib/document-store";
+import {
+  ACCEPTED_DOCUMENT_FILES,
+  storeLocalDocumentAndGetViewerUrl,
+} from "@/lib/document-open";
 import {
   documentViewerUrlForUrl,
-  foliateViewerUrlForStoredKey,
-  pdfViewerUrlForStoredKey,
 } from "@/lib/document-viewer-urls";
+import {
+  normalizeOptionsTabId,
+  optionsUrlForTab,
+  type TabId,
+} from "@/lib/options-tabs";
 
 
-type TabId = "account" | "hover" | "selection" | "immersive" | "fileplus" | "about";
 type OptionIcon = (props: { size?: number }) => JSX.Element;
 
 const VERSION = "0.0.0";
@@ -361,13 +366,14 @@ function parseNumberDraft(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-const ACCEPTED_FILES =
-  ".pdf,.epub,.mobi,.azw3,.kf8,.fb2,.fb2.zip,.fbz,application/pdf,application/epub+zip,application/x-fictionbook+xml,application/x-zip-compressed-fb2";
-
 function App() {
   const settings = useSettings();
   const t = useT();
-  const [activeTab, setActiveTab] = createSignal<TabId>("account");
+  const [activeTab, setActiveTab] = createSignal<TabId>(
+    normalizeOptionsTabId(
+      new URLSearchParams(window.location.search).get("tab"),
+    ),
+  );
   const [hoverFontSizeDraft, setHoverFontSizeDraft] = createSignal(
     formatPx(HOVER_FONT_SIZE_MIN),
   );
@@ -732,22 +738,22 @@ function App() {
     </>
   );
 
-  const inferKind = (name: string, mime?: string): "pdf" | "foliate" => {
-    const lower = name.split(/[?#]/)[0]?.toLowerCase() ?? "";
-    if (lower.endsWith(".pdf") || mime === "application/pdf") return "pdf";
-    return "foliate";
+  const selectTab = (tab: TabId): void => {
+    setActiveTab(tab);
+    window.history.replaceState(
+      null,
+      "",
+      optionsUrlForTab(window.location.href, tab),
+    );
   };
 
   const openFile = async (file: File): Promise<void> => {
-    const kind = inferKind(file.name, file.type);
     setFpBusy(true);
     try {
-      const data = await file.arrayBuffer();
-      const key = await storeDocument(data, kind, file.name);
-      const viewerUrl =
-        kind === "pdf"
-          ? pdfViewerUrlForStoredKey(key, settings().uiLang)
-          : foliateViewerUrlForStoredKey(key);
+      const viewerUrl = await storeLocalDocumentAndGetViewerUrl(
+        file,
+        settings().uiLang,
+      );
       await browser.tabs.create({ url: viewerUrl });
     } finally {
       setFpBusy(false);
@@ -825,7 +831,7 @@ function App() {
               {t("fileplus.chooseFile")}
             </button>
             <input
-              accept={ACCEPTED_FILES}
+              accept={ACCEPTED_DOCUMENT_FILES}
               class="visually-hidden"
               onChange={(event) => {
                 const file = event.currentTarget.files?.item(0);
@@ -993,7 +999,7 @@ function App() {
       </header>
 
       <div class="settings-shell">
-        <Sidebar activeTab={activeTab()} onSelect={setActiveTab} t={t} />
+        <Sidebar activeTab={activeTab()} onSelect={selectTab} t={t} />
         <section aria-label={tabTitle()} class="content-panel">
           {renderActiveTab()}
         </section>

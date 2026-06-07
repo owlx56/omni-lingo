@@ -51,6 +51,16 @@ export function IconSettings(props: IconProps): JSX.Element {
   );
 }
 
+export function IconUser(props: IconProps): JSX.Element {
+  return icon(
+    <>
+      <path d="M19 21a7 7 0 0 0-14 0" />
+      <circle cx="12" cy="7" r="4" />
+    </>,
+    props,
+  );
+}
+
 export function IconLogo(props: IconProps): JSX.Element {
   return icon(
     <>
@@ -60,6 +70,52 @@ export function IconLogo(props: IconProps): JSX.Element {
     </>,
     props,
     { defaultSize: 22 },
+  );
+}
+
+export function IconLanguages(props: IconProps): JSX.Element {
+  return icon(
+    <>
+      <path d="m5 8 6 6" />
+      <path d="m4 14 6-6 2-3" />
+      <path d="M2 5h12" />
+      <path d="M7 2h1" />
+      <path d="m22 22-5-10-5 10" />
+      <path d="M14 18h6" />
+    </>,
+    props,
+  );
+}
+
+export function IconMessageCircle(props: IconProps): JSX.Element {
+  return icon(
+    <>
+      <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" />
+      <path d="M8 12h.01" />
+      <path d="M12 12h.01" />
+      <path d="M16 12h.01" />
+    </>,
+    props,
+  );
+}
+
+export function IconBell(props: IconProps): JSX.Element {
+  return icon(
+    <>
+      <path d="M10.27 21a2 2 0 0 0 3.46 0" />
+      <path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.8 14.3 19 13.2 19 10a7 7 0 1 0-14 0c0 3.2-.8 4.3-1.74 5.33" />
+    </>,
+    props,
+  );
+}
+
+export function IconSparkles(props: IconProps): JSX.Element {
+  return icon(
+    <>
+      <path d="M9.9 3.1 8.4 7.3 4.2 8.8l4.2 1.5 1.5 4.2 1.5-4.2 4.2-1.5-4.2-1.5z" />
+      <path d="M18.5 13.5 17.7 16l-2.5.8 2.5.8.8 2.5.8-2.5 2.5-.8-2.5-.8z" />
+    </>,
+    props,
   );
 }
 
@@ -172,6 +228,18 @@ export function IconClose(props: IconProps): JSX.Element {
   );
 }
 
+export function IconMoreHorizontal(props: IconProps): JSX.Element {
+  return icon(
+    <>
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+      <circle cx="5" cy="12" r="1" />
+    </>,
+    props,
+    { fill: "currentColor", stroke: "none" },
+  );
+}
+
 export function IconHover(props: IconProps): JSX.Element {
   return icon(
     <>
@@ -218,6 +286,18 @@ export function IconFile(props: IconProps): JSX.Element {
   );
 }
 
+export function IconUploadFile(props: IconProps): JSX.Element {
+  return icon(
+    <>
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+      <path d="M14 2v6h6" />
+      <path d="M12 18v-6" />
+      <path d="m9 15 3-3 3 3" />
+    </>,
+    props,
+  );
+}
+
 export function IconSystem(props: IconProps): JSX.Element {
   return icon(
     <>
@@ -254,31 +334,53 @@ export function IconMoon(props: IconProps): JSX.Element {
 }
 
 export function IconReplaceMode(props: IconProps): JSX.Element {
-  return icon(
-    <>
-      <path d="M7 5H4v14h3" />
-      <path d="M17 5h3v14h-3" />
-      <path d="m9 16 3-8 3 8" />
-      <path d="M10.1 13h3.8" />
-    </>,
-    props,
-    { defaultSize: 30 },
+  const size = props.size ?? 24;
+  return (
+    <svg
+      aria-hidden="true"
+      class={props.class}
+      fill="none"
+      height={size}
+      viewBox="0 0 24 24"
+      width={size}
+    >
+      <path
+        d="M14 4.7998C14 5.24152 13.6419 5.59961 13.2002 5.59961H5C4.77909 5.59961 4.59961 5.77909 4.59961 6V18C4.59961 18.2209 4.77909 18.4004 5 18.4004H6.2002C6.64192 18.4004 7 18.7585 7 19.2002C7 19.6419 6.64192 20 6.2002 20H5L4.7959 19.9893C3.78722 19.887 3 19.0357 3 18V6C3 4.89543 3.89543 4 5 4H13.2002C13.6419 4 14 4.35808 14 4.7998ZM19 4C20.1046 4 21 4.89543 21 6V18C21 19.0357 20.2128 19.887 19.2041 19.9893L19 20H10.7998C10.3581 20 10 19.6419 10 19.2002C10 18.7585 10.3581 18.4004 10.7998 18.4004H19C19.2209 18.4004 19.4004 18.2209 19.4004 18V6C19.4004 5.77909 19.2209 5.59961 19 5.59961H17.7998C17.3581 5.59961 17 5.24152 17 4.7998C17 4.35808 17.3581 4 17.7998 4H19Z"
+        fill="currentColor"
+      />
+      <path
+        d="M9.49261 15.9987C8.96837 15.9987 8.59583 15.4884 8.75553 14.989L10.8172 8.54302C10.9497 8.12877 11.3348 7.84766 11.7697 7.84766H12.2346C12.6695 7.84766 13.0545 8.12877 13.187 8.54302L15.2361 14.9496C15.402 15.4684 15.0149 15.9987 14.4702 15.9987C14.1074 15.9987 13.7895 15.7557 13.6943 15.4056L12.7006 11.7527C12.576 11.3273 12.455 10.8873 12.3376 10.4327C12.2276 9.97066 12.1103 9.52332 11.9856 9.09066H11.9416C11.839 9.53066 11.7253 9.97799 11.6006 10.4327C11.4833 10.8873 11.366 11.3273 11.2486 11.7527L10.2389 15.4297C10.1466 15.7657 9.84109 15.9987 9.49261 15.9987ZM10.0496 13.9087V12.6437H13.9216V13.9087H10.0496Z"
+        fill="currentColor"
+      />
+    </svg>
   );
 }
 
 export function IconBilingualMode(props: IconProps): JSX.Element {
-  return icon(
-    <>
-      <rect height="11" rx="2" width="11" x="4" y="4" />
-      <rect height="11" rx="2" width="11" x="9" y="9" />
-      <path d="m7 12 2.2-5 2.2 5" />
-      <path d="M7.8 10h2.8" />
-      <path d="M12.5 15h4.5" />
-      <path d="M14.8 12.8v5.2" />
-      <path d="M12.8 18c1.9-.7 3.2-2 3.6-4" />
-      <path d="M17.4 18c-1.7-.6-2.8-1.7-3.3-3.3" />
-    </>,
-    props,
-    { defaultSize: 30 },
+  const size = props.size ?? 24;
+  return (
+    <svg
+      aria-hidden="true"
+      class={props.class}
+      fill="none"
+      height={size}
+      viewBox="0 0 24 24"
+      width={size}
+    >
+      <path
+        d="M12.6154 4H5C4.44772 4 4 4.44772 4 5V15C4 15.5523 4.44772 16 5 16H9.52384C9.90883 16 10.2596 15.779 10.4258 15.4317L14.1895 7.56827C14.3558 7.22101 14.7066 7 15.0915 7H19C19.5523 7 20 7.44772 20 8V18C20 18.5523 19.5523 19 19 19H10.7692"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-width="1.4"
+      />
+      <path
+        d="M7.11453 10.5492L6.90563 11.3173C6.84619 11.5358 6.64775 11.6875 6.42125 11.6875C6.08601 11.6875 5.84498 11.3652 5.93974 11.0436L7.05435 7.26136C7.15463 6.9211 7.467 6.6875 7.82173 6.6875H7.98842C8.34378 6.6875 8.65654 6.92191 8.75627 7.26298L9.85802 11.0309C9.95398 11.3591 9.70787 11.6875 9.36592 11.6875C9.13369 11.6875 8.93047 11.5314 8.87057 11.307L8.66827 10.5492H7.11453ZM8.39307 9.51171L7.9344 7.78981H7.8656L7.39547 9.51171H8.39307Z"
+        fill="currentColor"
+      />
+      <path
+        d="M17.9893 15.9063C17.8945 16.0966 17.6762 16.1922 17.4748 16.1243C16.8658 15.9191 16.3734 15.6851 15.9976 15.4221C15.7749 15.5779 15.5156 15.7224 15.2198 15.8555C15.018 15.9485 14.794 16.0393 14.5478 16.1277C14.3417 16.2018 14.1147 16.1082 14.0131 15.9143C13.8786 15.6578 14.0188 15.344 14.2951 15.2574C14.7177 15.125 15.0641 14.9834 15.3343 14.8328C15.1434 14.612 14.9796 14.3636 14.8428 14.0877C14.7092 13.8117 14.5946 13.4984 14.4992 13.1477H14.2709C14.0544 13.1477 13.8788 12.9722 13.8788 12.7557C13.8788 12.5392 14.0544 12.3636 14.2709 12.3636H15.592C15.5892 12.3465 15.5863 12.3292 15.5833 12.3118C15.5369 12.0407 15.7309 11.782 16.0057 11.7691C16.2354 11.7583 16.4347 11.9262 16.4631 12.1544L16.4891 12.3636H17.7148C17.9313 12.3636 18.1068 12.5392 18.1068 12.7557C18.1068 12.9722 17.9313 13.1477 17.7148 13.1477H17.4531C17.3545 13.5114 17.2399 13.8312 17.1095 14.1071C16.9791 14.3831 16.8232 14.6282 16.6418 14.8425C16.9389 15.012 17.2848 15.15 17.6794 15.2567C17.9613 15.3329 18.1195 15.645 17.9893 15.9063ZM15.3725 13.1477C15.4838 13.6153 15.689 14.0097 15.9881 14.3312C16.128 14.1818 16.2442 14.0114 16.3364 13.8198C16.4319 13.625 16.513 13.401 16.5798 13.1477H15.3725Z"
+        fill="currentColor"
+      />
+    </svg>
   );
 }
