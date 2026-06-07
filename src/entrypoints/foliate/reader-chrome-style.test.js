@@ -43,13 +43,13 @@ describe("Foliate reader chrome layout styling", () => {
 
   test("matches options number stepper proportions in the appearance panel", () => {
     expect(css).toMatch(
-      /\.foliate-appearance-stepper\s*\{[\s\S]*gap:\s*10px;[\s\S]*\}/,
+      /\.foliate-appearance-stepper\s*\{[\s\S]*gap:\s*6px;[\s\S]*min-height:\s*28px;/,
     );
     expect(css).toMatch(
-      /\.foliate-appearance-stepper input\s*\{[\s\S]*width:\s*78px;[\s\S]*border:\s*1px solid var\(--border\);/,
+      /\.foliate-appearance-stepper input\s*\{[\s\S]*width:\s*68px;[\s\S]*height:\s*28px;[\s\S]*line-height:\s*28px;/,
     );
     expect(css).toMatch(
-      /\.foliate-appearance-stepper button\s*\{[\s\S]*width:\s*28px;[\s\S]*height:\s*28px;[\s\S]*border-radius:\s*8px;/,
+      /\.foliate-appearance-stepper button\s*\{[\s\S]*width:\s*26px;[\s\S]*height:\s*26px;[\s\S]*border-radius:\s*7px;/,
     );
   });
 });

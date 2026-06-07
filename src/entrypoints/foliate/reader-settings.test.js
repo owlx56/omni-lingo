@@ -16,12 +16,12 @@ import {
 } from "./reader-settings.ts";
 
 describe("normalizeFoliateReaderSettings", () => {
-  test("keeps Readest defaults for missing values", () => {
+  test("keeps OneLingo defaults for missing values", () => {
     expect(normalizeFoliateReaderSettings({})).toEqual({
-      fontSize: 16,
+      fontSize: 17,
       lineHeight: 1.4,
       textIndent: false,
-      useBookLayout: false,
+      useBookLayout: true,
     });
   });
 

@@ -113,16 +113,18 @@ import {
   FOLIATE_READER_FONT_SIZE_MIN,
   FOLIATE_READER_LINE_HEIGHT_MAX,
   FOLIATE_READER_LINE_HEIGHT_MIN,
-  areFoliateReaderStyleSettingsEqual,
-  foliateReaderStyleSettingsToStoragePatch,
   getLockedFoliateReaderSettings,
   mergeFoliateReaderStyleSettings,
   normalizeFoliateReaderSettings,
-  resolveSavedFoliateReaderSettingsApplication,
-  resolveStoredFoliateReaderSettingsApplication,
   type FoliateReaderStylePatch,
   type FoliateReaderStyleSettings,
 } from "./reader-settings";
+import {
+  createFoliateReaderAppearanceDocumentKey,
+  resolveFoliateReaderAppearanceFromSession,
+  resolveFoliateReaderAppearanceGlobalUpdate,
+  writeFoliateReaderAppearanceSession,
+} from "./reader-appearance-session";
 
 type ViewState = "loading" | "ready" | "error";
 type ViewMode = "pages" | "scroll";
@@ -131,6 +133,7 @@ type ReaderSource = {
   data: ArrayBuffer;
   format: ViewerFormat;
   name: string;
+  storageKey?: string;
   url?: string;
 };
 
@@ -269,8 +272,8 @@ function App(): JSX.Element {
   let footnoteHistoryIndex = -1;
   let progressSeekTimer: number | undefined;
   let appliedReaderStyleSettings = initialReaderStyleSettings;
-  let pendingReaderStyleSettings: FoliateReaderStyleSettings | null = null;
-  let readerAppearanceSave: Promise<void> = Promise.resolve();
+  let readerAppearanceDetached = false;
+  let readerAppearanceDocumentKey: string | null = null;
   let shellRef: HTMLDivElement | undefined;
   let scrollbarTrackRef: HTMLDivElement | undefined;
   let scrollbarDrag: OverlayScrollbarDrag | undefined;
@@ -425,6 +428,7 @@ function App(): JSX.Element {
         data: doc.data,
         format: doc.format,
         name: doc.name,
+        storageKey: key,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -455,8 +459,22 @@ function App(): JSX.Element {
     }
   };
 
+  const loadReaderAppearanceForSource = (source: ReaderSource): void => {
+    const documentKey = createFoliateReaderAppearanceDocumentKey(source);
+    const appearance = resolveFoliateReaderAppearanceFromSession(
+      getReaderAppearanceSessionStorage(),
+      documentKey,
+      normalizeFoliateReaderSettings(settings()),
+    );
+    readerAppearanceDocumentKey = documentKey;
+    readerAppearanceDetached = appearance.detached;
+    setReaderStyleSettings(appearance.settings);
+    appliedReaderStyleSettings = appearance.settings;
+  };
+
   const openReader = async (source: ReaderSource): Promise<void> => {
     resetReaderState();
+    loadReaderAppearanceForSource(source);
     await loadSidebarPrefs();
     setDocTitle(stripDocumentName(source.name));
     setState("loading");
@@ -531,6 +549,8 @@ function App(): JSX.Element {
     setIsDragging(false);
     clearProgressSeekTimer();
     navigationLocked = false;
+    readerAppearanceDetached = false;
+    readerAppearanceDocumentKey = null;
   };
 
   const loadBookState = async (book?: FoliateBookLike): Promise<void> => {
@@ -756,7 +776,7 @@ function App(): JSX.Element {
       popupView.renderer,
       createFoliateFootnoteContentCss(
         getEffectiveTheme(),
-        normalizeFoliateReaderSettings(settings()),
+        readerStyleSettings(),
       ),
     );
     footnoteContentRef?.replaceChildren(popupView);
@@ -899,37 +919,39 @@ function App(): JSX.Element {
     next: FoliateReaderStyleSettings,
     options: { force?: boolean } = {},
   ): void => {
-    if (options.force) {
-      pendingReaderStyleSettings = null;
-    } else {
-      const application = resolveStoredFoliateReaderSettingsApplication(
-        next,
-        pendingReaderStyleSettings,
-      );
-      pendingReaderStyleSettings = application.pendingLocal;
-      if (!application.shouldApply) return;
-    }
+    const application = resolveFoliateReaderAppearanceGlobalUpdate({
+      current: readerStyleSettings(),
+      detached: readerAppearanceDetached,
+      global: next,
+    });
+    if (!application.shouldApply) return;
 
     const previous = appliedReaderStyleSettings;
-    setReaderStyleSettings(next);
-    applyReaderAppearanceStyles(next, {
+    setReaderStyleSettings(application.settings);
+    applyReaderAppearanceStyles(application.settings, {
       previous,
       relayout: options.force ? true : undefined,
     });
-    appliedReaderStyleSettings = next;
+    appliedReaderStyleSettings = application.settings;
   };
 
   const updateReaderAppearance = (patch: FoliateReaderStylePatch): void => {
     const current = readerStyleSettings();
     const next = mergeFoliateReaderStyleSettings(current, patch);
     const previous = appliedReaderStyleSettings;
-    pendingReaderStyleSettings = next;
+    readerAppearanceDetached = true;
     setReaderStyleSettings(next);
     applyReaderAppearanceStyles(next, {
       previous,
     });
     appliedReaderStyleSettings = next;
-    saveReaderAppearance(next);
+    if (readerAppearanceDocumentKey) {
+      writeFoliateReaderAppearanceSession(
+        getReaderAppearanceSessionStorage(),
+        readerAppearanceDocumentKey,
+        next,
+      );
+    }
   };
 
   const applyReaderAppearanceStyles = (
@@ -952,30 +974,6 @@ function App(): JSX.Element {
         createFoliateFootnoteContentCss(theme, next),
       );
     }
-  };
-
-  const saveReaderAppearance = (next: FoliateReaderStyleSettings): void => {
-    const patch = foliateReaderStyleSettingsToStoragePatch(next);
-    readerAppearanceSave = readerAppearanceSave
-      .catch(() => {})
-      .then(async () => {
-        await setSettings(patch);
-        pendingReaderStyleSettings =
-          resolveSavedFoliateReaderSettingsApplication(
-            next,
-            pendingReaderStyleSettings,
-          ).pendingLocal;
-      })
-      .catch((err: unknown) => {
-        if (
-          pendingReaderStyleSettings &&
-          areFoliateReaderStyleSettingsEqual(pendingReaderStyleSettings, next)
-        ) {
-          pendingReaderStyleSettings = null;
-        }
-        console.warn("[OneLingo] failed to save foliate reader appearance:", err);
-      });
-    void readerAppearanceSave;
   };
 
   const setReaderFontSize = (value: number): void => {
@@ -2580,6 +2578,14 @@ function createReaderFile(source: ReaderSource): File {
   return new File([source.data.slice(0)], source.name || `document.${source.format}`, {
     type: mimeFromName(source.name, source.format),
   });
+}
+
+function getReaderAppearanceSessionStorage(): Storage | undefined {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return undefined;
+  }
 }
 
 function mimeFromName(name: string, format: ViewerFormat): string {

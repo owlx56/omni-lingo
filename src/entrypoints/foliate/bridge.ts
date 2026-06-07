@@ -79,15 +79,22 @@ export function initFoliateBridge(
   };
   void getSettings()
     .then((settings) => {
+      const previousReaderSettings =
+        callbacks.getReaderSettings?.() ?? prefs.readerSettings;
       prefs.uiLang = settings.uiLang;
       prefs.readerSettings = normalizeFoliateReaderSettings(settings);
       callbacks.onReaderSettingsChange?.(prefs.readerSettings);
+      const effectiveReaderSettings =
+        callbacks.getReaderSettings?.() ?? prefs.readerSettings;
       applyViewPrefs(view, prefs, callbacks, {
-        readerSettingsOverride: prefs.readerSettings,
-        relayout: true,
+        readerSettingsOverride: effectiveReaderSettings,
+        relayout: !areFoliateReaderStyleSettingsEqual(
+          previousReaderSettings,
+          effectiveReaderSettings,
+        ),
       });
       syncCurrentContents(view, prefs, hover, callbacks, {
-        readerSettingsOverride: prefs.readerSettings,
+        readerSettingsOverride: effectiveReaderSettings,
       });
     })
     .catch((err: unknown) => {
@@ -102,20 +109,24 @@ export function initFoliateBridge(
   let stopSettingsWatch = (): void => {};
   try {
     stopSettingsWatch = watchSettings((settings) => {
+      const previousReaderSettings =
+        callbacks.getReaderSettings?.() ?? prefs.readerSettings;
       const nextReaderSettings = normalizeFoliateReaderSettings(settings);
-      const shouldRelayout = !areFoliateReaderStyleSettingsEqual(
-        prefs.readerSettings,
-        nextReaderSettings,
-      );
       prefs.uiLang = settings.uiLang;
       prefs.readerSettings = nextReaderSettings;
       callbacks.onReaderSettingsChange?.(nextReaderSettings);
+      const effectiveReaderSettings =
+        callbacks.getReaderSettings?.() ?? prefs.readerSettings;
+      const shouldRelayout = !areFoliateReaderStyleSettingsEqual(
+        previousReaderSettings,
+        effectiveReaderSettings,
+      );
       applyViewPrefs(view, prefs, callbacks, {
-        readerSettingsOverride: nextReaderSettings,
+        readerSettingsOverride: effectiveReaderSettings,
         relayout: shouldRelayout,
       });
       syncCurrentContents(view, prefs, hover, callbacks, {
-        readerSettingsOverride: nextReaderSettings,
+        readerSettingsOverride: effectiveReaderSettings,
       });
     });
   } catch (err) {

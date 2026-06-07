@@ -629,8 +629,8 @@ body {
 .foliate-appearance-stepper {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    min-height: 32px;
+    gap: 6px;
+    min-height: 28px;
     color: var(--text);
 }
 
@@ -642,15 +642,15 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     padding: 0;
     border: none;
-    border-radius: 8px;
+    border-radius: 7px;
     background: transparent;
     color: var(--text);
     cursor: pointer;
-    font-size: 18px;
+    font-size: 16px;
     line-height: 1;
     transition:
         background-color 120ms ease,
@@ -678,18 +678,18 @@ body {
 }
 
 .foliate-appearance-stepper input {
-    width: 78px;
+    width: 68px;
     min-width: 0;
-    height: 32px;
-    padding: 0 27px 0 18px;
+    height: 28px;
+    padding: 0 22px 0 12px;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--surface);
     color: var(--text);
     box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.015);
-    font-size: 15px;
+    font-size: 14px;
     font-variant-numeric: tabular-nums;
-    line-height: 32px;
+    line-height: 28px;
     text-align: center;
     transition:
         border-color 120ms ease,
@@ -709,10 +709,10 @@ body {
 .foliate-appearance-stepper span {
     display: inline-flex;
     align-items: center;
-    margin-left: -36px;
-    min-width: 24px;
+    margin-left: -30px;
+    min-width: 20px;
     color: var(--text-muted);
-    font-size: 13px;
+    font-size: 12px;
     pointer-events: none;
 }
 

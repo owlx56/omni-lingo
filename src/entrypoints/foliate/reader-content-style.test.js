@@ -16,12 +16,12 @@ import {
 } from "./reader-content-style.ts";
 
 describe("createFoliateContentCss", () => {
-  test("uses Readest's default reader font size", () => {
+  test("uses OneLingo's default reader font size", () => {
     const css = createFoliateContentCss("light");
 
     expect(READEST_DEFAULT_FONT_SIZE).toBe(16);
-    expect(css).toContain("font-size:16px!important");
-    expect(css).toContain("--font-size:16px");
+    expect(css).toContain("font-size:17px!important");
+    expect(css).toContain("--font-size:17px");
   });
 
   test("keeps the EPUB font family by not injecting a reader font family", () => {

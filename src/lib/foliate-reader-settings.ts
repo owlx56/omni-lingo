@@ -21,10 +21,10 @@ export const FOLIATE_READER_LINE_HEIGHT_MAX = 3;
 export const FOLIATE_READER_TEXT_INDENT_EM = 2;
 
 export const DEFAULT_FOLIATE_READER_SETTINGS: FoliateReaderSettings = {
-  foliateReaderFontSize: 16,
+  foliateReaderFontSize: 17,
   foliateReaderLineHeight: 1.4,
   foliateReaderTextIndent: false,
-  foliateReaderUseBookLayout: false,
+  foliateReaderUseBookLayout: true,
 };
 
 export function normalizeFoliateReaderSettings(
