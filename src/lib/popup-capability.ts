@@ -46,11 +46,43 @@ export function popupPathForCapability(
 }
 
 export function popupShowsPageControls(capability: PopupCapability): boolean {
-  return capability === "web";
+  return (
+    capability === "web" ||
+    capability === "reader" ||
+    capability === "options" ||
+    capability === "unsupported"
+  );
 }
 
 export function popupShowsFeatureControls(capability: PopupCapability): boolean {
+  return (
+    capability === "web" ||
+    capability === "reader" ||
+    capability === "options" ||
+    capability === "unsupported"
+  );
+}
+
+export function popupCanTranslatePage(capability: PopupCapability): boolean {
+  return capability === "web";
+}
+
+export function popupCanToggleClickToShowOriginal(
+  capability: PopupCapability,
+): boolean {
+  return capability === "web";
+}
+
+export function popupCanToggleFeatureControls(
+  capability: PopupCapability,
+): boolean {
   return capability === "web" || capability === "reader";
+}
+
+export function popupLoadsPageFeatureStatus(
+  capability: PopupCapability,
+): boolean {
+  return popupCanToggleFeatureControls(capability);
 }
 
 function isOwnExtensionUrl(url: URL, extensionBaseUrl: string): boolean {

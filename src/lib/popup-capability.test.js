@@ -2,6 +2,10 @@ import { describe, expect, test } from "bun:test";
 
 import {
   classifyPopupCapability,
+  popupCanToggleClickToShowOriginal,
+  popupCanToggleFeatureControls,
+  popupCanTranslatePage,
+  popupLoadsPageFeatureStatus,
   popupPathForCapability,
   popupShowsFeatureControls,
   popupShowsPageControls,
@@ -73,15 +77,39 @@ describe("popup capability classification", () => {
     expect(popupPathForCapability("unsupported")).toBe("popup.html");
   });
 
-  test("shows concrete controls only where they can affect the current page", () => {
+  test("renders the same toolbar popup controls for every page type", () => {
     expect(popupShowsPageControls("web")).toBe(true);
-    expect(popupShowsPageControls("reader")).toBe(false);
-    expect(popupShowsPageControls("options")).toBe(false);
-    expect(popupShowsPageControls("unsupported")).toBe(false);
+    expect(popupShowsPageControls("reader")).toBe(true);
+    expect(popupShowsPageControls("options")).toBe(true);
+    expect(popupShowsPageControls("unsupported")).toBe(true);
 
     expect(popupShowsFeatureControls("web")).toBe(true);
     expect(popupShowsFeatureControls("reader")).toBe(true);
-    expect(popupShowsFeatureControls("options")).toBe(false);
-    expect(popupShowsFeatureControls("unsupported")).toBe(false);
+    expect(popupShowsFeatureControls("options")).toBe(true);
+    expect(popupShowsFeatureControls("unsupported")).toBe(true);
+  });
+
+  test("enables only actions that can affect the current page", () => {
+    expect(popupCanTranslatePage("web")).toBe(true);
+    expect(popupCanTranslatePage("reader")).toBe(false);
+    expect(popupCanTranslatePage("options")).toBe(false);
+    expect(popupCanTranslatePage("unsupported")).toBe(false);
+
+    expect(popupCanToggleClickToShowOriginal("web")).toBe(true);
+    expect(popupCanToggleClickToShowOriginal("reader")).toBe(false);
+    expect(popupCanToggleClickToShowOriginal("options")).toBe(false);
+    expect(popupCanToggleClickToShowOriginal("unsupported")).toBe(false);
+
+    expect(popupCanToggleFeatureControls("web")).toBe(true);
+    expect(popupCanToggleFeatureControls("reader")).toBe(true);
+    expect(popupCanToggleFeatureControls("options")).toBe(false);
+    expect(popupCanToggleFeatureControls("unsupported")).toBe(false);
+  });
+
+  test("loads page feature status only for pages with live feature controls", () => {
+    expect(popupLoadsPageFeatureStatus("web")).toBe(true);
+    expect(popupLoadsPageFeatureStatus("reader")).toBe(true);
+    expect(popupLoadsPageFeatureStatus("options")).toBe(false);
+    expect(popupLoadsPageFeatureStatus("unsupported")).toBe(false);
   });
 });

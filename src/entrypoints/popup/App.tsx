@@ -11,7 +11,7 @@
 //   - popup 内显式修改 target / engine / mode 后，写成当前页面的独立设置。
 //     当前页面 active 时立即重翻；未 active 则只保存 per-page pref。
 //   - 普通网页 / reader 内修改 hoverEnabled / selectionEnabled 后写成当前
-//     tab 的独立设置；Options / unsupported 只显示轻量说明。
+//     tab 的独立设置；不支持页面保留同一套控件但禁用无效动作。
 
 import { Show, createSignal, onMount, type JSX } from "solid-js";
 import { UI_LANG_LABELS, UI_LANGS, type UiLang } from "@/lib/languages";
@@ -22,6 +22,10 @@ import {
 } from "@/lib/messaging";
 import {
   classifyPopupCapability,
+  popupCanToggleClickToShowOriginal,
+  popupCanToggleFeatureControls,
+  popupCanTranslatePage,
+  popupLoadsPageFeatureStatus,
   popupShowsFeatureControls,
   popupShowsPageControls,
   type PopupCapability,
@@ -37,7 +41,6 @@ import {
   IconArrowRight,
   IconBilingualMode,
   IconChevron,
-  IconInfo,
   IconLogo,
   IconReplaceMode,
   IconSettings,
@@ -108,23 +111,6 @@ function EngineMark(props: { engine: FullPageEngineId }): JSX.Element {
   return <span aria-hidden="true" class="engine-mark google-mark">G</span>;
 }
 
-function CapabilityNotice(props: {
-  description: string;
-  title: string;
-}): JSX.Element {
-  return (
-    <section class="popup-notice-card">
-      <span aria-hidden="true" class="popup-notice-icon">
-        <IconInfo size={18} />
-      </span>
-      <span class="popup-notice-copy">
-        <strong>{props.title}</strong>
-        <span>{props.description}</span>
-      </span>
-    </section>
-  );
-}
-
 function isMissingContentScriptError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return (
@@ -156,9 +142,15 @@ function App(props: PopupAppProps = {}): JSX.Element {
   const capability = (): PopupCapability =>
     props.capability ?? detectedCapability();
   const canTranslatePage = (): boolean =>
+    popupCanTranslatePage(capability());
+  const showPageControls = (): boolean =>
     popupShowsPageControls(capability());
   const canToggleFeatures = (): boolean =>
+    popupCanToggleFeatureControls(capability());
+  const showFeatureControls = (): boolean =>
     popupShowsFeatureControls(capability());
+  const canToggleClickToShowOriginal = (): boolean =>
+    popupCanToggleClickToShowOriginal(capability());
 
   const nextCommandId = (): number => {
     lastCommandId = Math.max(lastCommandId + 1, Date.now());
@@ -302,6 +294,8 @@ function App(props: PopupAppProps = {}): JSX.Element {
   };
 
   const applyPageFeaturePref = (patch: PageFeaturePrefs): void => {
+    if (!canToggleFeatures()) return;
+
     setPageFeatureStatus((cur) => ({
       ...cur,
       ...patch,
@@ -419,7 +413,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
         setHasPagePrefs(false);
       }
 
-      if (popupShowsFeatureControls(activeCapability)) {
+      if (popupLoadsPageFeatureStatus(activeCapability)) {
         try {
           setPageFeatureStatus(await sendMessage("getPageFeatureStatus", {}));
         } catch (e) {
@@ -473,21 +467,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
         </button>
       </header>
 
-      <Show when={capability() === "unsupported" || capability() === "options"}>
-        <CapabilityNotice
-          description={t("popup.unsupported.description")}
-          title={t("popup.unsupported.title")}
-        />
-      </Show>
-
-      <Show when={capability() === "reader"}>
-        <CapabilityNotice
-          description={t("viewer.scope")}
-          title={t("viewer.title")}
-        />
-      </Show>
-
-      <Show when={canTranslatePage()}>
+      <Show when={showPageControls()}>
         <section aria-label={t("popup.section.page")} class="translate-card">
           <div class="language-flow">
             <button
@@ -572,7 +552,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
           <button
             class="popup-cta"
             classList={{ active: immersiveActive() }}
-            disabled={action() !== "idle"}
+            disabled={action() !== "idle" || !canTranslatePage()}
             onClick={() => void runCta()}
             type="button"
           >
@@ -589,22 +569,22 @@ function App(props: PopupAppProps = {}): JSX.Element {
         </p>
       </Show>
 
-      <Show when={canToggleFeatures()}>
+      <Show when={showFeatureControls()}>
         <section class="section popup-settings-section">
-          <Show when={canTranslatePage()}>
-            <Row label={t("section.clickToShowOriginal")}>
-              <Switch
-                checked={clickToShowOriginalValue()}
-                label={t("section.clickToShowOriginal")}
-                onChange={(fullPageClickToShowOriginal) =>
-                  applyPageFeaturePref({ fullPageClickToShowOriginal })
-                }
-              />
-            </Row>
-          </Show>
+          <Row label={t("section.clickToShowOriginal")}>
+            <Switch
+              checked={clickToShowOriginalValue()}
+              disabled={!canToggleClickToShowOriginal()}
+              label={t("section.clickToShowOriginal")}
+              onChange={(fullPageClickToShowOriginal) =>
+                applyPageFeaturePref({ fullPageClickToShowOriginal })
+              }
+            />
+          </Row>
           <Row label={t("popup.row.hoverEnabled")}>
             <Switch
               checked={hoverEnabledValue()}
+              disabled={!canToggleFeatures()}
               label={t("popup.row.hoverEnabled")}
               onChange={(hoverEnabled) =>
                 applyPageFeaturePref({ hoverEnabled })
@@ -614,6 +594,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
           <Row label={t("popup.row.selectionEnabled")}>
             <Switch
               checked={selectionEnabledValue()}
+              disabled={!canToggleFeatures()}
               label={t("popup.row.selectionEnabled")}
               onChange={(selectionEnabled) =>
                 applyPageFeaturePref({ selectionEnabled })
