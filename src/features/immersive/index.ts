@@ -267,9 +267,11 @@ let lastCommandId = 0;
 let pendingCount = 0;
 let currentMode: PageTranslateMode | null = null;
 let currentEngine: FullPageEngineId | null = null;
+let currentSource: string | null = null;
 let currentTarget: string | null = null;
 let preferredMode: PageTranslateMode | null = null;
 let preferredEngine: FullPageEngineId | null = null;
+let preferredSource: string | null = null;
 let preferredTarget: string | null = null;
 let settingsMode: FullPageMode = "replace";
 let settingsEngine: FullPageEngineId = "google2";
@@ -320,8 +322,16 @@ export function initFullPage(): void {
     applyCommandId(input.commandId);
 
     const mode = input.mode ?? "replace";
-    const key = `${input.engine}|${input.target}`;
-    if (canSwitchMode(key)) {
+    if (
+      canSwitchMode({
+        engine: input.engine,
+        source:
+          "source" in input
+            ? normalizePreferredSource(input.source)
+            : preferredSource,
+        target: input.target,
+      })
+    ) {
       switchAppliedMode(mode);
       return buildAck(true);
     }
@@ -361,14 +371,20 @@ async function startPageTranslate(
   }
 
   const mode = input.mode ?? "replace";
+  const source =
+    "source" in input ? normalizePreferredSource(input.source) : preferredSource;
   currentMode = mode;
 
-  currentRule = await loadRule(input);
+  const ruleInput = source ? { ...input, source } : input;
+  currentRule = await loadRule(ruleInput);
+  currentSource = source;
+  preferredSource = source;
   currentEngine = currentRule.engine;
   currentTarget = currentRule.target;
   lastTranslateInput = {
     target: currentRule.target,
     engine: currentRule.engine,
+    ...(source ? { source } : {}),
     mode,
   };
   ensureSiteLayoutStyles();
@@ -394,6 +410,7 @@ function restoreOriginals(): void {
   runSeq++;
   currentMode = null;
   currentEngine = null;
+  currentSource = null;
   currentTarget = null;
   lastTranslateInput = null;
   pendingCount = 0;
@@ -417,7 +434,17 @@ function restoreOriginals(): void {
 function updatePageTranslatePrefs(input: PageTranslatePrefs): void {
   if (input.mode) preferredMode = input.mode;
   if (input.engine) preferredEngine = input.engine;
+  if ("source" in input)
+    preferredSource = normalizePreferredSource(input.source);
   if (input.target) preferredTarget = input.target;
+}
+
+function normalizePreferredSource(
+  value: string | null | undefined,
+): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed && trimmed !== "auto" ? trimmed : null;
 }
 
 export function getFullPageClickToShowOriginalStatus(): {
@@ -1360,12 +1387,18 @@ function hideOriginalForSingleMode(
 
 // ── Mode switching ────────────────────────────────────────────────────────────
 
-function canSwitchMode(translationKey: string): boolean {
+function canSwitchMode(input: {
+  engine: FullPageEngineId;
+  source: string | null;
+  target: string;
+}): boolean {
   return (
     currentRule !== null &&
     currentEngine !== null &&
+    currentSource === input.source &&
     currentTarget !== null &&
-    translationKey === `${currentEngine}|${currentTarget}` &&
+    input.engine === currentEngine &&
+    input.target === currentTarget &&
     (wrapperHosts.size > 0 || translatedHosts.size > 0 || pendingCount > 0)
   );
 }
@@ -1379,7 +1412,12 @@ function switchAppliedMode(mode: PageTranslateMode): void {
   const rule = currentRule;
   if (!rule) return;
   if (currentEngine !== null && currentTarget !== null) {
-    lastTranslateInput = { target: currentTarget, engine: currentEngine, mode };
+    lastTranslateInput = {
+      target: currentTarget,
+      engine: currentEngine,
+      ...(currentSource ? { source: currentSource } : {}),
+      mode,
+    };
   }
 
   let layoutChanged = false;
@@ -1598,7 +1636,10 @@ function getStatus(): PageTranslateStatus {
   const blocks =
     observedNodes.size > 0 ? observedNodes.size : translatedHosts.size;
   const hasPagePrefs =
-    preferredMode !== null || preferredEngine !== null || preferredTarget !== null;
+    preferredMode !== null ||
+    preferredEngine !== null ||
+    preferredSource !== null ||
+    preferredTarget !== null;
   return {
     active: translatedHosts.size > 0 || pendingCount > 0,
     translating: pendingCount > 0,
@@ -1606,6 +1647,7 @@ function getStatus(): PageTranslateStatus {
     hasPagePrefs,
     mode: currentMode ?? preferredMode ?? settingsMode,
     engine: currentEngine ?? preferredEngine ?? settingsEngine,
+    source: preferredSource ?? undefined,
     target: currentTarget ?? preferredTarget ?? settingsTarget ?? undefined,
   };
 }
@@ -1718,6 +1760,7 @@ function handleSoftNavigation(): void {
   if (!input) {
     preferredMode = null;
     preferredEngine = null;
+    preferredSource = null;
     preferredTarget = null;
     return;
   }

@@ -15,11 +15,14 @@ export type FootnotePopupPosition = {
 
 export type FootnotePopupSize = {
   height: number;
+  scrollable: boolean;
   width: number;
 };
 
 export const FOLIATE_FOOTNOTE_POPUP_DEFAULT_WIDTH = 360;
 export const FOLIATE_FOOTNOTE_POPUP_DEFAULT_HEIGHT = 88;
+export const FOLIATE_FOOTNOTE_POPUP_MAX_HEIGHT = 320;
+export const FOLIATE_FOOTNOTE_POPUP_MAX_HEIGHT_RATIO = 0.45;
 export const FOLIATE_FOOTNOTE_POPUP_PADDING = 12;
 export const FOLIATE_FOOTNOTE_POPUP_MIN_WIDTH = 220;
 export const FOLIATE_FOOTNOTE_POPUP_MIN_HEIGHT = 56;
@@ -154,18 +157,33 @@ export function getFootnotePopupSize(
     FOLIATE_FOOTNOTE_POPUP_MIN_HEIGHT,
     bounds.height - padding * 2,
   );
+  const dynamicMaxHeight = Math.max(
+    FOLIATE_FOOTNOTE_POPUP_MIN_HEIGHT,
+    Math.round(bounds.height * FOLIATE_FOOTNOTE_POPUP_MAX_HEIGHT_RATIO),
+  );
+  const maxHeight = Math.min(
+    availableHeight,
+    FOLIATE_FOOTNOTE_POPUP_MAX_HEIGHT,
+    dynamicMaxHeight,
+  );
+  const hasMeasuredContent =
+    typeof contentHeight === "number" &&
+    Number.isFinite(contentHeight) &&
+    contentHeight > 0;
   const preferredHeight =
-    typeof contentHeight === "number" && Number.isFinite(contentHeight) && contentHeight > 0
+    hasMeasuredContent
       ? contentHeight
       : FOLIATE_FOOTNOTE_POPUP_DEFAULT_HEIGHT;
-  return {
-    height: Math.round(
-      clamp(
-        preferredHeight,
-        typeof contentHeight === "number" ? 1 : FOLIATE_FOOTNOTE_POPUP_MIN_HEIGHT,
-        availableHeight,
-      ),
+  const height = Math.round(
+    clamp(
+      preferredHeight,
+      hasMeasuredContent ? 1 : FOLIATE_FOOTNOTE_POPUP_MIN_HEIGHT,
+      maxHeight,
     ),
+  );
+  return {
+    height,
+    scrollable: hasMeasuredContent && preferredHeight > height + 1,
     width: Math.round(
       clamp(
         FOLIATE_FOOTNOTE_POPUP_DEFAULT_WIDTH,
@@ -196,6 +214,7 @@ export function configureFootnotePopupRenderer(
 export function createFoliateFootnoteContentCss(
   theme: EffectiveTheme,
   settings?: Partial<FoliateReaderStyleSettings> | null,
+  scrollable = false,
 ): string {
   return [
     createFoliateContentCss(theme, settings),
@@ -210,6 +229,7 @@ export function createFoliateFootnoteContentCss(
       "p,li,blockquote,dd{margin:unset!important;text-indent:unset!important;}",
       "div{margin:unset!important;padding:unset!important;}",
       "dt{font-weight:700;line-height:1.6;}",
+      createFoliateFootnoteScrollbarCss(theme, scrollable),
       [
         ".epubtype-footnote,",
         "aside[epub|type~=\"endnote\"],",
@@ -218,6 +238,29 @@ export function createFoliateFootnoteContentCss(
         "aside[epub|type~=\"rearnote\"]{display:block!important;}",
       ].join(""),
     ].join("\n"),
+  ].join("\n");
+}
+
+function createFoliateFootnoteScrollbarCss(
+  theme: EffectiveTheme,
+  scrollable: boolean,
+): string {
+  if (!scrollable) {
+    return [
+      "html,body{-ms-overflow-style:none;scrollbar-width:none;}",
+      "::-webkit-scrollbar{display:none;width:0;height:0;}",
+    ].join("\n");
+  }
+  const thumb =
+    theme === "dark" ? "rgba(255,255,255,.36)" : "rgba(31,30,29,.28)";
+  const thumbHover =
+    theme === "dark" ? "rgba(255,255,255,.48)" : "rgba(31,30,29,.46)";
+  return [
+    `html,body{scrollbar-color:${thumb} transparent;scrollbar-width:thin;}`,
+    "::-webkit-scrollbar{width:8px;height:8px;}",
+    "::-webkit-scrollbar-track{background:transparent;}",
+    `::-webkit-scrollbar-thumb{min-height:36px;border:2px solid transparent;border-radius:999px;background:${thumb};background-clip:content-box;}`,
+    `::-webkit-scrollbar-thumb:hover{background-color:${thumbHover};}`,
   ].join("\n");
 }
 

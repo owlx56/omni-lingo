@@ -2,11 +2,9 @@
 // keeping OneLingo's existing page-translation/session semantics.
 
 import {
-  For,
   Show,
-  createMemo,
+  type Accessor,
   createSignal,
-  createUniqueId,
   onCleanup,
   onMount,
   type JSX,
@@ -42,8 +40,6 @@ import {
   IconArrowRight,
   IconBell,
   IconBilingualMode,
-  IconCheck,
-  IconChevron,
   IconFile,
   IconInfo,
   IconLanguages,
@@ -55,18 +51,24 @@ import {
   IconUploadFile,
   IconUser,
 } from "@/lib/ui/icons";
+import { Select, type SelectOption } from "@/lib/ui/controls";
 import { browser } from "wxt/browser";
 import { optionsUrlForTab, type TabId } from "@/lib/options-tabs";
+import {
+  createPopupPagePrefSync,
+  pagePrefsFromLocalSaveAck,
+} from "./page-pref-sync";
+import {
+  pageSourceFromStatus,
+  pageSourceOptions,
+  pageSourceToCommandSource,
+  pageSourceToPrefSource,
+  type PageSourceLang,
+} from "./popup-language-options";
 
 type PageTargetLang = UiLang;
 type ActionState = "idle" | "starting" | "restoring" | "retranslating";
 type AiStyleId = "default";
-
-type PopupSelectOption<T extends string> = {
-  value: T;
-  label: string;
-  icon?: () => JSX.Element;
-};
 
 const DEFAULT_PAGE_FEATURE_STATUS: PageFeatureStatus = {
   fullPageClickToShowOriginal: true,
@@ -83,11 +85,18 @@ export interface PopupAppProps {
   surface?: "native";
 }
 
-function pageTargetOptions(): PopupSelectOption<PageTargetLang>[] {
+function pageTargetOptions(): SelectOption<PageTargetLang>[] {
   return UI_LANGS.map((value) => ({
     value,
     label: UI_LANG_LABELS[value],
   }));
+}
+
+function commandSourceField(source: PageSourceLang): {
+  source?: UiLang;
+} {
+  const commandSource = pageSourceToCommandSource(source);
+  return commandSource ? { source: commandSource } : {};
 }
 
 async function detectActiveTabCapability(): Promise<PopupCapability> {
@@ -132,201 +141,17 @@ function ProviderMark(props: { engine: FullPageEngineId }): JSX.Element {
   );
 }
 
-function PopupSelect<T extends string>(props: {
-  value: T;
-  options: PopupSelectOption<T>[];
-  onChange: (next: T) => void;
-  label: string;
-  disabled?: boolean;
-  class?: string;
-  menuClass?: string;
-  renderValue?: (option: PopupSelectOption<T>) => JSX.Element;
-}) {
-  let root: HTMLSpanElement | undefined;
-  let button: HTMLButtonElement | undefined;
-  const id = createUniqueId();
-  const [open, setOpen] = createSignal(false);
-  const [activeIndex, setActiveIndex] = createSignal(-1);
-
-  const selectedIndex = createMemo(() => {
-    const index = props.options.findIndex(
-      (option) => option.value === props.value,
-    );
-    return index >= 0 ? index : 0;
-  });
-  const selectedOption = createMemo(() => props.options[selectedIndex()]);
-
-  const close = (): void => {
-    setOpen(false);
-  };
-  const openMenu = (): void => {
-    if (props.disabled) return;
-    setActiveIndex(-1);
-    setOpen(true);
-  };
-  const selectOption = (option: PopupSelectOption<T>): void => {
-    props.onChange(option.value);
-    close();
-    button?.focus();
-  };
-
-  const handleDocumentPointerDown = (event: PointerEvent): void => {
-    if (!root?.contains(event.target as Node)) close();
-  };
-  document.addEventListener("pointerdown", handleDocumentPointerDown);
-  onCleanup(() =>
-    document.removeEventListener("pointerdown", handleDocumentPointerDown),
-  );
-
-  const moveActive = (delta: number): void => {
-    if (props.options.length === 0) return;
-    setActiveIndex((current) => {
-      if (current < 0) return selectedIndex();
-      const next = current + delta;
-      if (next < 0) return props.options.length - 1;
-      if (next >= props.options.length) return 0;
-      return next;
-    });
-  };
-
-  const handleKeyDown: JSX.EventHandlerUnion<HTMLButtonElement, KeyboardEvent> =
-    (event) => {
-      if (props.disabled) return;
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        if (!open()) openMenu();
-        else moveActive(1);
-        return;
-      }
-      if (event.key === "ArrowUp") {
-        event.preventDefault();
-        if (!open()) openMenu();
-        else moveActive(-1);
-        return;
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        close();
-        return;
-      }
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        if (!open()) {
-          openMenu();
-          return;
-        }
-        const option = props.options[
-          activeIndex() >= 0 ? activeIndex() : selectedIndex()
-        ];
-        if (option) selectOption(option);
-      }
-    };
-
-  return (
-    <span
-      class="popup-select"
-      classList={{
-        disabled: props.disabled,
-        open: open(),
-      }}
-      ref={root}
-    >
-      <button
-        aria-activedescendant={
-          open() && activeIndex() >= 0
-            ? `${id}-option-${activeIndex()}`
-            : undefined
-        }
-        aria-controls={`${id}-menu`}
-        aria-expanded={open()}
-        aria-label={props.label}
-        class={`popup-select-trigger ${props.class ?? ""}`}
-        disabled={props.disabled}
-        onClick={() => {
-          if (open()) close();
-          else openMenu();
-        }}
-        onKeyDown={handleKeyDown}
-        ref={button}
-        role="combobox"
-        type="button"
-      >
-        <Show when={selectedOption()}>
-          {(option) => (
-            <Show
-              fallback={
-                <span class="popup-select-value">
-                  {option().icon?.()}
-                  <span class="popup-select-text">{option().label}</span>
-                </span>
-              }
-              when={props.renderValue}
-            >
-              {(renderValue) => renderValue()(option())}
-            </Show>
-          )}
-        </Show>
-        <span aria-hidden="true" class="popup-select-chevron">
-          <IconChevron size={14} />
-        </span>
-      </button>
-      <Show when={open()}>
-        <div
-          class={`popup-select-menu ${props.menuClass ?? ""}`}
-          id={`${id}-menu`}
-          role="listbox"
-        >
-          <For each={props.options}>
-            {(option, index) => (
-              <button
-                aria-selected={props.value === option.value}
-                class="popup-select-option"
-                classList={{
-                  active: activeIndex() === index(),
-                  selected: props.value === option.value,
-                }}
-                id={`${id}-option-${index()}`}
-                onClick={() => selectOption(option)}
-                role="option"
-                type="button"
-              >
-                <span class="popup-select-option-main">
-                  {option.icon?.()}
-                  <span>{option.label}</span>
-                </span>
-                <Show when={props.value === option.value}>
-                  <span aria-hidden="true" class="popup-select-check">
-                    <IconCheck size={16} />
-                  </span>
-                </Show>
-              </button>
-            )}
-          </For>
-        </div>
-      </Show>
-    </span>
-  );
-}
-
-function ReadFrogRow(props: {
-  label: string;
-  help?: string;
-  children: JSX.Element;
-}) {
-  return (
-    <div class="popup-setting-row">
-      <span class="popup-setting-label">
-        {props.label}
-        <Show when={props.help}>
-          {(help) => (
-            <span class="popup-help-icon" title={help()}>
-              <IconInfo size={13} />
-            </span>
-          )}
-        </Show>
+function renderAiConfigSelectValue<T extends string>(
+  label: string,
+): (option: Accessor<SelectOption<T>>) => JSX.Element {
+  return (option) => (
+    <span class="popup-ai-select-line">
+      <span class="popup-ai-select-label">{label}:</span>
+      <span class="popup-ai-select-value">
+        {option().icon?.()}
+        <span class="popup-ai-select-text">{option().label}</span>
       </span>
-      {props.children}
-    </div>
+    </span>
   );
 }
 
@@ -349,6 +174,30 @@ function PopupSwitch(props: {
     >
       <span aria-hidden="true" class="popup-switch-thumb" />
     </button>
+  );
+}
+
+function PopupAiConfigCard(props: {
+  serviceLabel: string;
+  serviceControl: JSX.Element;
+  aiStyleLabel: string;
+  aiStyleControl: JSX.Element;
+  smartContextLabel: string;
+}) {
+  return (
+    <section
+      aria-label={`${props.serviceLabel}, ${props.aiStyleLabel}, ${props.smartContextLabel}`}
+      class="popup-ai-config-card"
+    >
+      <div class="popup-ai-config-select-group">
+        {props.serviceControl}
+        {props.aiStyleControl}
+      </div>
+      <div class="popup-ai-config-row popup-ai-config-context-row">
+        <span class="popup-ai-config-label">{props.smartContextLabel}</span>
+        <PopupSwitch checked={false} disabled label={props.smartContextLabel} />
+      </div>
+    </section>
   );
 }
 
@@ -398,6 +247,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
   const [immersiveActive, setImmersiveActive] = createSignal(false);
   const [pageMode, setPageMode] = createSignal<FullPageMode>("replace");
   const [pageEngine, setPageEngine] = createSignal<FullPageEngineId>("google2");
+  const [pageSource, setPageSource] = createSignal<PageSourceLang>("auto");
   const [pageTarget, setPageTarget] = createSignal<PageTargetLang>("en");
   const [hasPagePrefs, setHasPagePrefs] = createSignal(false);
   const [pageFeatureStatus, setPageFeatureStatus] =
@@ -410,6 +260,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
   let actionSeq = 0;
   let lastCommandId = 0;
   let fileInput: HTMLInputElement | undefined;
+  const pagePrefSync = createPopupPagePrefSync();
 
   const capability = (): PopupCapability =>
     props.capability ?? detectedCapability();
@@ -422,7 +273,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
   const canToggleClickToShowOriginal = (): boolean =>
     popupCanToggleClickToShowOriginal(capability());
 
-  const engineOptions = (): PopupSelectOption<FullPageEngineId>[] => [
+  const engineOptions = (): SelectOption<FullPageEngineId>[] => [
     {
       value: "google2",
       label: "Google",
@@ -434,13 +285,15 @@ function App(props: PopupAppProps = {}): JSX.Element {
       icon: () => <ProviderMark engine="microsoft" />,
     },
   ];
-  const aiStyleOptions = (): PopupSelectOption<AiStyleId>[] => [
+  const aiStyleOptions = (): SelectOption<AiStyleId>[] => [
     {
       value: "default",
       label: t("popup.aiStyle.default"),
       icon: () => <IconSparkles size={13} />,
     },
   ];
+  const sourceOptions = (): SelectOption<PageSourceLang>[] =>
+    pageSourceOptions(t("popup.label.sourceAuto"));
 
   const nextCommandId = (): number => {
     lastCommandId = Math.max(lastCommandId + 1, Date.now());
@@ -486,6 +339,8 @@ function App(props: PopupAppProps = {}): JSX.Element {
     hasPagePrefs() || immersiveActive() ? pageMode() : defaultPageMode();
   const pageEngineValue = (): FullPageEngineId =>
     hasPagePrefs() || immersiveActive() ? pageEngine() : defaultPageEngine();
+  const pageSourceValue = (): PageSourceLang =>
+    hasPagePrefs() || immersiveActive() ? pageSource() : "auto";
   const pageTargetValue = (): PageTargetLang =>
     hasPagePrefs() || immersiveActive() ? pageTarget() : defaultPageTarget();
 
@@ -506,6 +361,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
     patch: {
       target?: PageTargetLang;
       engine?: FullPageEngineId;
+      source?: PageSourceLang;
       mode?: FullPageMode;
     },
     pendingStatus: string,
@@ -513,20 +369,37 @@ function App(props: PopupAppProps = {}): JSX.Element {
     const next = {
       target: patch.target ?? pageTargetValue(),
       engine: patch.engine ?? pageEngineValue(),
+      source: patch.source ?? pageSourceValue(),
       mode: patch.mode ?? pageModeValue(),
     };
+    const prefSnapshot = pagePrefSync.markLocalChange();
 
     setHasPagePrefs(true);
     setPageTarget(next.target);
     setPageEngine(next.engine);
+    setPageSource(next.source);
     setPageMode(next.mode);
 
+    const prefsInput = {
+      target: next.target,
+      engine: next.engine,
+      source: pageSourceToPrefSource(next.source),
+      mode: next.mode,
+    };
     const savePagePrefs = canTranslatePage()
-      ? sendMessage("setPageTranslatePrefs", next).catch(() => null)
+      ? sendMessage("setPageTranslatePrefs", prefsInput).catch(() => null)
       : Promise.resolve(null);
 
     if (!immersiveActive()) {
-      void savePagePrefs;
+      void savePagePrefs.then((res) => {
+        if (!pagePrefSync.canApplyRemote(prefSnapshot)) return;
+        const saved = pagePrefsFromLocalSaveAck(next, res);
+        setHasPagePrefs(saved.hasPagePrefs);
+        setPageMode(saved.mode);
+        setPageEngine(saved.engine);
+        setPageSource(saved.source);
+        setPageTarget(saved.target);
+      });
       return;
     }
 
@@ -538,17 +411,24 @@ function App(props: PopupAppProps = {}): JSX.Element {
         sendMessage("translatePage", {
           target: next.target,
           engine: next.engine,
+          ...commandSourceField(next.source),
           mode: next.mode,
           commandId: nextCommandId(),
         }),
       )
       .then((res) => {
-        if (seq !== actionSeq) return;
+        if (seq !== actionSeq || !pagePrefSync.canApplyRemote(prefSnapshot))
+          return;
         const active = res.active || res.translating === true;
         setImmersiveActive(active);
         setHasPagePrefs(true);
         setPageMode(res.mode ?? next.mode);
         setPageEngine(res.engine ?? next.engine);
+        setPageSource(
+          res.source === undefined
+            ? next.source
+            : pageSourceFromStatus(res.source),
+        );
         setPageTarget((res.target as PageTargetLang) ?? next.target);
         setInfoStatus(
           active ? t("popup.status.retranslated") : startedStatus(res.blocks),
@@ -612,6 +492,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
     const commandId = nextCommandId();
     const mode = pageModeValue();
     const engine = pageEngineValue();
+    const source = pageSourceValue();
     const target = pageTargetValue();
     setAction("starting");
     setImmersiveActive(true);
@@ -620,6 +501,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
       const res = await sendMessage("translatePage", {
         target,
         engine,
+        ...commandSourceField(source),
         mode,
         commandId,
       });
@@ -628,6 +510,9 @@ function App(props: PopupAppProps = {}): JSX.Element {
       setHasPagePrefs(res.hasPagePrefs);
       setPageMode(res.mode ?? mode);
       setPageEngine(res.engine ?? engine);
+      setPageSource(
+        res.source === undefined ? source : pageSourceFromStatus(res.source),
+      );
       setPageTarget((res.target as PageTargetLang) ?? target);
       setInfoStatus(startedStatus(res.blocks));
     } catch (e) {
@@ -647,6 +532,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
     document.addEventListener("keydown", onPopupKeyDown);
 
     void (async () => {
+      const initialPrefSnapshot = pagePrefSync.capture();
       const activeCapability =
         props.capability ?? (await detectActiveTabCapability());
       setDetectedCapability(activeCapability);
@@ -662,14 +548,33 @@ function App(props: PopupAppProps = {}): JSX.Element {
           );
           const target = (res.target as PageTargetLang | undefined) ?? resolved;
 
-          setPageMode(mode);
-          setPageEngine(engine);
-          setPageTarget(target);
-          setHasPagePrefs(res.hasPagePrefs);
+          if (pagePrefSync.canApplyRemote(initialPrefSnapshot)) {
+            setPageMode(mode);
+            setPageEngine(engine);
+            setPageSource(pageSourceFromStatus(res.source));
+            setPageTarget(target);
+            setHasPagePrefs(res.hasPagePrefs);
+          }
           setImmersiveActive(res.active || res.translating);
         } catch {
+          if (pagePrefSync.canApplyRemote(initialPrefSnapshot)) {
+            setPageMode(defaults.fullPageMode);
+            setPageEngine(defaults.engines.fullPage);
+            setPageSource("auto");
+            setPageTarget(
+              resolveTargetLang(
+                defaults.immersiveTargetLang,
+                defaults.uiLang,
+              ) as PageTargetLang,
+            );
+            setHasPagePrefs(false);
+          }
+        }
+      } else {
+        if (pagePrefSync.canApplyRemote(initialPrefSnapshot)) {
           setPageMode(defaults.fullPageMode);
           setPageEngine(defaults.engines.fullPage);
+          setPageSource("auto");
           setPageTarget(
             resolveTargetLang(
               defaults.immersiveTargetLang,
@@ -678,16 +583,6 @@ function App(props: PopupAppProps = {}): JSX.Element {
           );
           setHasPagePrefs(false);
         }
-      } else {
-        setPageMode(defaults.fullPageMode);
-        setPageEngine(defaults.engines.fullPage);
-        setPageTarget(
-          resolveTargetLang(
-            defaults.immersiveTargetLang,
-            defaults.uiLang,
-          ) as PageTargetLang,
-        );
-        setHasPagePrefs(false);
       }
 
       if (popupLoadsPageFeatureStatus(activeCapability)) {
@@ -781,37 +676,40 @@ function App(props: PopupAppProps = {}): JSX.Element {
 
         <Show when={showPageControls()}>
           <div class="popup-language-row">
-            <button
-              aria-disabled="true"
-              aria-label={t("popup.label.sourceLang")}
-              class="language-card source-language-card"
-              tabIndex={-1}
-              type="button"
-            >
-              <span class="language-card-main">
-                {t("popup.label.sourceAuto")}
-              </span>
-              <span class="language-card-subtitle">
-                {t("popup.label.sourceLang")}
-              </span>
-              <span aria-hidden="true" class="language-card-chevron">
-                <IconChevron size={14} />
-              </span>
-            </button>
+            <Select
+              class="language-card language-card-select"
+              label={t("popup.label.sourceLang")}
+              menuClass="language-card-menu"
+              menuPlacement="left"
+              onChange={(source) =>
+                applyPagePref({ source }, t("popup.status.modeSwitching"))
+              }
+              options={sourceOptions()}
+              renderValue={(option) => (
+                <span class="language-card-content">
+                  <span class="language-card-main">{option().label}</span>
+                  <span class="language-card-subtitle">
+                    {t("popup.label.sourceLang")}
+                  </span>
+                </span>
+              )}
+              value={pageSourceValue()}
+            />
             <span aria-hidden="true" class="language-flow-arrow">
               <IconArrowRight size={16} />
             </span>
-            <PopupSelect
+            <Select
               class="language-card language-card-select"
               label={t("popup.label.lang")}
               menuClass="language-card-menu"
+              menuPlacement="right"
               onChange={(target) =>
                 applyPagePref({ target }, t("popup.status.modeSwitching"))
               }
               options={pageTargetOptions()}
               renderValue={(option) => (
                 <span class="language-card-content">
-                  <span class="language-card-main">{option.label}</span>
+                  <span class="language-card-main">{option().label}</span>
                   <span class="language-card-subtitle">
                     {t("popup.label.lang")}
                   </span>
@@ -821,34 +719,42 @@ function App(props: PopupAppProps = {}): JSX.Element {
             />
           </div>
 
-          <ReadFrogRow label={t("popup.label.service")}>
-            <PopupSelect
-              class="popup-row-select"
-              disabled={action() !== "idle"}
-              label={t("popup.label.service")}
-              onChange={(engine) =>
-                applyPagePref(
-                  { engine },
-                  t("popup.status.engineSwitchPending", {
-                    engine: engineLabel(engine),
-                  }),
-                )
-              }
-              options={engineOptions()}
-              value={pageEngineValue()}
-            />
-          </ReadFrogRow>
-
-          <ReadFrogRow label={t("popup.aiStyle")}>
-            <PopupSelect
-              class="popup-row-select"
-              disabled
-              label={t("popup.aiStyle")}
-              onChange={() => undefined}
-              options={aiStyleOptions()}
-              value="default"
-            />
-          </ReadFrogRow>
+          <PopupAiConfigCard
+            aiStyleControl={
+              <Select
+                class="popup-ai-config-select-row"
+                disabled
+                label={t("popup.aiStyle")}
+                menuClass="popup-ai-config-menu"
+                onChange={() => undefined}
+                options={aiStyleOptions()}
+                renderValue={renderAiConfigSelectValue(t("popup.aiStyle"))}
+                value="default"
+              />
+            }
+            aiStyleLabel={t("popup.aiStyle")}
+            serviceControl={
+              <Select
+                class="popup-ai-config-select-row"
+                disabled={action() !== "idle"}
+                label={t("popup.label.service")}
+                menuClass="popup-ai-config-menu"
+                onChange={(engine) =>
+                  applyPagePref(
+                    { engine },
+                    t("popup.status.engineSwitchPending", {
+                      engine: engineLabel(engine),
+                    }),
+                  )
+                }
+                options={engineOptions()}
+                renderValue={renderAiConfigSelectValue(t("popup.label.service"))}
+                value={pageEngineValue()}
+              />
+            }
+            serviceLabel={t("popup.label.service")}
+            smartContextLabel={t("popup.aiSmartContext")}
+          />
 
           <div class="popup-action-row">
             <button
@@ -917,11 +823,6 @@ function App(props: PopupAppProps = {}): JSX.Element {
               onChange={(selectionEnabled) =>
                 applyPageFeaturePref({ selectionEnabled })
               }
-            />
-            <SwitchRow
-              checked={false}
-              disabled
-              label={t("popup.aiSmartContext")}
             />
           </section>
         </Show>

@@ -14,6 +14,7 @@
 import {
   For,
   Show,
+  type Accessor,
   createMemo,
   createSignal,
   createUniqueId,
@@ -85,6 +86,7 @@ export function Switch(props: {
 export interface SelectOption<T extends string> {
   value: T;
   label: string;
+  icon?: () => JSX.Element;
 }
 
 export function Select<T extends string>(props: {
@@ -93,6 +95,11 @@ export function Select<T extends string>(props: {
   onChange: (next: T) => void;
   label?: string;
   disabled?: boolean;
+  class?: string;
+  menuClass?: string;
+  menuPlacement?: "left" | "right";
+  renderValue?: (option: Accessor<SelectOption<T>>) => JSX.Element;
+  renderOption?: (option: SelectOption<T>) => JSX.Element;
 }) {
   let root: HTMLSpanElement | undefined;
   let button: HTMLButtonElement | undefined;
@@ -183,7 +190,7 @@ export function Select<T extends string>(props: {
         aria-controls={`${id}-menu`}
         aria-expanded={open()}
         aria-label={props.label}
-        class="select-button"
+        class={`select-button ${props.class ?? ""}`}
         disabled={props.disabled}
         onClick={() => {
           if (open()) close();
@@ -194,13 +201,31 @@ export function Select<T extends string>(props: {
         role="combobox"
         type="button"
       >
-        <span class="select-value">{selectedOption()?.label ?? ""}</span>
+        <Show when={selectedOption()}>
+          {(option) => (
+            <Show
+              fallback={
+                <span class="select-value">
+                  {option().icon?.()}
+                  <span class="select-value-text">{option().label}</span>
+                </span>
+              }
+              when={props.renderValue}
+            >
+              {(renderValue) => renderValue()(option)}
+            </Show>
+          )}
+        </Show>
         <span aria-hidden="true" class="select-chevron">
           <IconChevron size={15} />
         </span>
       </button>
       <Show when={open()}>
-        <div class="select-menu" id={`${id}-menu`} role="listbox">
+        <div
+          class={`select-menu select-menu-${props.menuPlacement ?? "right"} ${props.menuClass ?? ""}`}
+          id={`${id}-menu`}
+          role="listbox"
+        >
           <For each={props.options}>
             {(option, index) => (
               <button
@@ -215,7 +240,17 @@ export function Select<T extends string>(props: {
                 role="option"
                 type="button"
               >
-                <span class="select-option-label">{option.label}</span>
+                <Show
+                  fallback={
+                    <span class="select-option-label">
+                      {option.icon?.()}
+                      <span>{option.label}</span>
+                    </span>
+                  }
+                  when={props.renderOption}
+                >
+                  {(renderOption) => renderOption()(option)}
+                </Show>
                 <Show when={props.value === option.value}>
                   <span aria-hidden="true" class="select-option-check">
                     <IconCheck size={17} />

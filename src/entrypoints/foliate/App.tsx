@@ -278,6 +278,7 @@ function App(): JSX.Element {
   let footnoteAnchorPosition: FootnotePopupPosition | null = null;
   let footnoteHistory: FoliateLinkDetail[] = [];
   let footnoteHistoryIndex = -1;
+  let footnoteContentScrollable = false;
   let progressSeekTimer: number | undefined;
   let appliedReaderStyleSettings = initialReaderStyleSettings;
   let readerAppearanceDetached = false;
@@ -792,6 +793,7 @@ function App(): JSX.Element {
   const mountFootnoteView = (popupView: FoliateViewElement): void => {
     removeFootnoteView();
     footnoteView = popupView;
+    footnoteContentScrollable = false;
     popupView.setAttribute("data-onelingo-reader-ui", "");
     popupView.style.display = "block";
     popupView.style.width = "100%";
@@ -803,6 +805,7 @@ function App(): JSX.Element {
       createFoliateFootnoteContentCss(
         getEffectiveTheme(),
         readerStyleSettings(),
+        footnoteContentScrollable,
       ),
     );
     footnoteContentRef?.replaceChildren(popupView);
@@ -816,6 +819,18 @@ function App(): JSX.Element {
     if (footnoteView) showFootnoteView();
   };
 
+  const syncFootnoteContentScrollbar = (scrollable: boolean): void => {
+    if (footnoteContentScrollable === scrollable) return;
+    footnoteContentScrollable = scrollable;
+    footnoteView?.renderer?.setStyles?.(
+      createFoliateFootnoteContentCss(
+        getEffectiveTheme(),
+        readerStyleSettings(),
+        scrollable,
+      ),
+    );
+  };
+
   const showFootnoteView = (): void => {
     if (!contentRef) return;
     const bounds = contentRef.getBoundingClientRect();
@@ -824,6 +839,7 @@ function App(): JSX.Element {
       FOLIATE_FOOTNOTE_POPUP_PADDING,
       footnoteView?.renderer?.viewSize,
     );
+    syncFootnoteContentScrollbar(size.scrollable);
     const anchorPosition =
       footnoteAnchorPosition ??
       ({
@@ -882,6 +898,7 @@ function App(): JSX.Element {
     footnoteView.close?.();
     footnoteView.remove();
     footnoteView = undefined;
+    footnoteContentScrollable = false;
     footnoteContentRef?.replaceChildren();
   };
 
@@ -997,7 +1014,7 @@ function App(): JSX.Element {
     if (footnoteView?.renderer) {
       configureFootnotePopupRenderer(
         footnoteView.renderer,
-        createFoliateFootnoteContentCss(theme, next),
+        createFoliateFootnoteContentCss(theme, next, footnoteContentScrollable),
       );
     }
   };
@@ -1869,6 +1886,7 @@ function App(): JSX.Element {
                     classList={{
                       "foliate-footnote-popup": true,
                       "is-down": popup().position.dir === "down",
+                      "is-scrollable": popup().size.scrollable,
                       "is-up": popup().position.dir === "up",
                     }}
                     data-onelingo-reader-ui=""

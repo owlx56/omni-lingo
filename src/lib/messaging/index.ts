@@ -13,6 +13,7 @@ import { browser, type Browser } from "wxt/browser";
 export interface PageTranslateCommand {
   target: string;
   engine: FullPageEngineId;
+  source?: string;
   mode?: "replace" | "bilingual";
   commandId?: number;
 }
@@ -20,6 +21,7 @@ export interface PageTranslateCommand {
 export interface PageTranslatePrefs {
   target?: string;
   engine?: FullPageEngineId;
+  source?: string | null;
   mode?: "replace" | "bilingual";
 }
 
@@ -41,6 +43,7 @@ export interface PageTranslateAck {
   translating?: boolean;
   mode?: "replace" | "bilingual";
   engine?: FullPageEngineId;
+  source?: string;
   target?: string;
 }
 
@@ -51,6 +54,7 @@ export interface PageTranslateStatus {
   hasPagePrefs: boolean;
   mode?: "replace" | "bilingual";
   engine?: FullPageEngineId;
+  source?: string;
   target?: string;
 }
 

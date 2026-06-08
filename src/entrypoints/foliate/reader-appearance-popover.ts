@@ -19,9 +19,10 @@ function isReaderAppearanceTarget(
 ): boolean {
   if (!target || typeof target !== "object") return false;
   const targetWithClosest = getClosestCapableTarget(target);
-  const closest = targetWithClosest?.closest;
-  if (typeof closest !== "function") return false;
-  return Boolean(closest(READER_APPEARANCE_DISMISS_EXCLUSION_SELECTOR));
+  if (typeof targetWithClosest?.closest !== "function") return false;
+  return Boolean(
+    targetWithClosest.closest(READER_APPEARANCE_DISMISS_EXCLUSION_SELECTOR),
+  );
 }
 
 function getClosestCapableTarget(

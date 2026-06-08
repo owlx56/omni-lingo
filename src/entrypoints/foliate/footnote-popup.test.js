@@ -163,6 +163,7 @@ describe("footnote popup positioning", () => {
   test("uses Readest compact default size when the reader area has room", () => {
     expect(getFootnotePopupSize(new FakeDOMRect(0, 0, 900, 600))).toEqual({
       height: FOLIATE_FOOTNOTE_POPUP_DEFAULT_HEIGHT,
+      scrollable: false,
       width: FOLIATE_FOOTNOTE_POPUP_DEFAULT_WIDTH,
     });
   });
@@ -170,6 +171,15 @@ describe("footnote popup positioning", () => {
   test("shrinks to the rendered footnote content height", () => {
     expect(getFootnotePopupSize(new FakeDOMRect(0, 0, 900, 600), 12, 48)).toEqual({
       height: 48,
+      scrollable: false,
+      width: FOLIATE_FOOTNOTE_POPUP_DEFAULT_WIDTH,
+    });
+  });
+
+  test("caps tall rendered footnotes and marks them scrollable", () => {
+    expect(getFootnotePopupSize(new FakeDOMRect(0, 0, 900, 600), 12, 520)).toEqual({
+      height: 270,
+      scrollable: true,
       width: FOLIATE_FOOTNOTE_POPUP_DEFAULT_WIDTH,
     });
   });
@@ -264,5 +274,21 @@ describe("createFoliateFootnoteContentCss", () => {
     expect(css).toContain("body{margin:0!important;padding:12px!important;min-height:0!important;height:auto!important;overflow-wrap:break-word;}");
     expect(css).toContain("body>:first-child{margin-top:0!important;}");
     expect(css).toContain("body>:last-child{margin-bottom:0!important;}");
+  });
+
+  test("hides iframe scrollbars until the popup enters scrollable mode", () => {
+    const css = createFoliateFootnoteContentCss("light");
+
+    expect(css).toContain("html,body{-ms-overflow-style:none;scrollbar-width:none;}");
+    expect(css).toContain("::-webkit-scrollbar{display:none;width:0;height:0;}");
+    expect(css).not.toContain("scrollbar-width:thin");
+  });
+
+  test("uses dropdown-style iframe scrollbars for tall scrollable notes", () => {
+    const css = createFoliateFootnoteContentCss("dark", null, true);
+
+    expect(css).toContain("html,body{scrollbar-color:rgba(255,255,255,.36) transparent;scrollbar-width:thin;}");
+    expect(css).toContain("::-webkit-scrollbar{width:8px;height:8px;}");
+    expect(css).toContain("::-webkit-scrollbar-thumb{min-height:36px;border:2px solid transparent;border-radius:999px;");
   });
 });

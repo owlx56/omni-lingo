@@ -250,11 +250,19 @@ select {
 }
 
 .select-value {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     min-width: 0;
     overflow: hidden;
     padding-bottom: 1px;
     line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.select-value-text {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -287,6 +295,16 @@ select {
         0 0 0 1px rgba(31, 30, 29, 0.04),
         0 16px 36px rgba(31, 30, 29, 0.12),
         0 3px 10px rgba(31, 30, 29, 0.08);
+}
+
+.select-menu-left {
+    left: 0;
+    right: auto;
+}
+
+.select-menu-right {
+    right: 0;
+    left: auto;
 }
 
 :root[data-theme="dark"] .select-menu {
@@ -373,11 +391,19 @@ select {
 }
 
 .select-option-label {
-    display: block;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     min-width: 0;
     overflow: hidden;
     padding-bottom: 1px;
     line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.select-option-label span:last-child {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }

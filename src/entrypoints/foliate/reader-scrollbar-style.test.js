@@ -30,6 +30,10 @@ describe("Foliate reader scrollbar styling", () => {
   });
 
   test("shows only the thumb and solid triangle buttons", () => {
+    const triangleBlock =
+      css.match(/\.foliate-scrollbar-button-triangle\s*\{[\s\S]*?\n\}/)?.[0] ??
+      "";
+
     expect(css).toMatch(/\.foliate-scrollbar\s*\{[\s\S]*width:\s*18px/);
     expect(css).toMatch(/\.foliate-scrollbar\s*\{[\s\S]*pointer-events:\s*auto/);
     expect(css).toMatch(
@@ -53,8 +57,8 @@ describe("Foliate reader scrollbar styling", () => {
       /\.foliate-scrollbar-button-triangle\s*\{[\s\S]*-webkit-mask:[\s\S]*svg/,
     );
     expect(css).toContain("C5.45%201%205.87%201.21%206.14%201.58");
-    expect(css).not.toContain("solid transparent");
-    expect(css).not.toContain("solid currentColor");
+    expect(triangleBlock).not.toContain("solid transparent");
+    expect(triangleBlock).not.toContain("solid currentColor");
     expect(css).not.toContain(".foliate-scrollbar-track::before");
   });
 
@@ -73,6 +77,36 @@ describe("Foliate reader scrollbar styling", () => {
     );
     expect(css).not.toMatch(
       /\.foliate-scrollbar\.is-expanded\s*\{[\s\S]*grid-template-rows/,
+    );
+  });
+
+  test("keeps footnote popup content scrollable without showing scrollbars", () => {
+    expect(css).toMatch(
+      /\.foliate-footnote-content\s*\{[\s\S]*overflow:\s*auto[\s\S]*scrollbar-width:\s*none/,
+    );
+    expect(css).toMatch(
+      /\.foliate-footnote-content::-webkit-scrollbar\s*\{[\s\S]*display:\s*none[\s\S]*width:\s*0[\s\S]*height:\s*0/,
+    );
+    expect(css).toMatch(
+      /\.foliate-footnote-content foliate-view::part\(container\)\s*\{[\s\S]*scrollbar-width:\s*none/,
+    );
+    expect(css).toMatch(
+      /\.foliate-footnote-content foliate-view::part\(container\)::-webkit-scrollbar\s*\{[\s\S]*display:\s*none[\s\S]*width:\s*0[\s\S]*height:\s*0/,
+    );
+  });
+
+  test("shows dropdown-style footnote scrollbars only for tall scrollable popups", () => {
+    expect(css).toMatch(
+      /\.foliate-footnote-popup\.is-scrollable \.foliate-footnote-content,[\s\S]*foliate-view::part\(container\)\s*\{[\s\S]*scrollbar-width:\s*thin/,
+    );
+    expect(css).toMatch(
+      /\.foliate-footnote-popup\.is-scrollable \.foliate-footnote-content::-webkit-scrollbar,[\s\S]*foliate-view::part\(container\)::-webkit-scrollbar\s*\{[\s\S]*width:\s*8px[\s\S]*height:\s*8px/,
+    );
+    expect(css).toMatch(
+      /\.foliate-footnote-popup\.is-scrollable \.foliate-footnote-content::-webkit-scrollbar-thumb,[\s\S]*foliate-view::part\(container\)::-webkit-scrollbar-thumb\s*\{[\s\S]*min-height:\s*36px[\s\S]*border:\s*2px solid transparent[\s\S]*border-radius:\s*999px/,
+    );
+    expect(css).toContain(
+      ':root[data-theme="dark"] .foliate-footnote-popup.is-scrollable .foliate-footnote-content',
     );
   });
 });

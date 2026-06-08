@@ -559,7 +559,9 @@ export function resolveFullPageRule(
     richHtmlSelector: rule.richHtmlSelector?.trim() ?? "",
     richHtmlExcludeSelector: rule.richHtmlExcludeSelector?.trim() ?? "",
     engine,
-    source: normalizeSourceLang(rule.fromLang),
+    source:
+      normalizeSourceLang(input.source ?? "") ??
+      normalizeSourceLang(rule.fromLang),
     target,
     transOnly,
     autoScan: toggleValue(rule.autoScan, true),
