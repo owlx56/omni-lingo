@@ -79,6 +79,7 @@ body {
 
 .popup-account-avatar {
     display: inline-grid;
+    padding: 0;
     width: 28px;
     height: 28px;
     flex: 0 0 auto;
@@ -87,13 +88,25 @@ body {
     border-radius: 999px;
     background: var(--surface);
     color: var(--text-muted);
+    cursor: pointer;
+    transition:
+        background-color 0.16s ease,
+        border-color 0.16s ease,
+        color 0.16s ease;
+}
+
+.popup-account-avatar:hover,
+.popup-account-avatar:focus-visible {
+    border-color: var(--border-strong);
+    background: rgba(31, 30, 29, 0.025);
+    color: var(--text);
+    outline: none;
 }
 
 .popup-account-copy {
     display: flex;
     min-width: 0;
-    flex-direction: column;
-    gap: 1px;
+    align-items: center;
 }
 
 .popup-account-name {
@@ -104,13 +117,6 @@ body {
     line-height: 21px;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.popup-account-login {
-    color: var(--text-muted);
-    font-size: 12px;
-    font-weight: 400;
-    line-height: 18px;
 }
 
 .popup-header-actions {

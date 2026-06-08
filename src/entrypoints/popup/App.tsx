@@ -752,12 +752,15 @@ function App(props: PopupAppProps = {}): JSX.Element {
       <section class="popup-panel">
         <header class="popup-header">
           <div class="popup-account" aria-label={t("popup.account.guest")}>
-            <span class="popup-account-avatar" aria-hidden="true">
+            <button
+              aria-label={t("popup.account.login")}
+              class="popup-account-avatar"
+              type="button"
+            >
               <IconUser size={16} />
-            </span>
+            </button>
             <span class="popup-account-copy">
               <span class="popup-account-name">{t("popup.account.guest")}</span>
-              <span class="popup-account-login">{t("popup.account.login")}</span>
             </span>
           </div>
           <div class="popup-header-actions">
