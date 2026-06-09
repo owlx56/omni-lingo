@@ -2,8 +2,8 @@
 //
 // 粒度（hoverGranularity）：
 //   word      — word 几何校验 → 直接返回命中词
-//   sentence  — word 几何校验 → sentence segmenter 取句（文本节点内）
-//   paragraph — word 几何校验 → 找最近 block 祖先 → innerText 整段
+//   sentence  — word 几何校验 → sentence segmenter 取句（PDF textLayer 会跨行拼接）
+//   paragraph — word 几何校验 → 找最近 block 祖先；PDF textLayer 会按行块拼接
 //
 // 缓存共用：key = engine|src|tgt|text，全文翻译按相同粒度拆句即可命中。
 
@@ -21,6 +21,9 @@ import {
   watchSettings,
   type HoverGranularity,
 } from "@/lib/storage/settings";
+import { shouldKeepHoverZoneAlive } from "./hover-zone";
+import { pdfTextLayerHit } from "./pdf-text-layer";
+import { computeTooltipPosition } from "./tooltip-position";
 
 const TRANSLATE_DELAY_MS = 10;
 const HIGHLIGHT_NAME = "onelingo-hover";
@@ -48,7 +51,7 @@ type CSSWithHighlights = typeof CSS & { highlights?: HighlightRegistry };
 
 interface TextHit {
   text: string; // 翻译单元（句子 or 段落）
-  rect: DOMRect; // 词位置（tooltip 锚点）
+  rect: DOMRect; // tooltip 锚点
   range: Range; // 高亮范围
 }
 
@@ -104,6 +107,8 @@ interface State {
   lastText: string | null; // 上次翻译的文本（去重）
   lastRange: Range | null; // 上次命中的翻译单元范围（避免同文不同位时被误去重）
   lastAnchor: DOMRect | null; // 设置变更时重新定位用
+  lastHoverZone: DOMRect | null; // 句/段模式下用于避免词间隙闪烁
+  lastHoverZoneDocument: Document | null;
   tooltip: HTMLDivElement | null;
   seq: number;
   wordSegmenter: Intl.Segmenter;
@@ -185,6 +190,8 @@ function createState(options: ResolvedHoverControllerOptions): State {
     lastText: null,
     lastRange: null,
     lastAnchor: null,
+    lastHoverZone: null,
+    lastHoverZoneDocument: null,
     tooltip: null,
     seq: 0,
     wordSegmenter: new Intl.Segmenter(undefined, { granularity: "word" }),
@@ -294,6 +301,18 @@ function handleMove(s: State, input: HoverPointerInput): void {
     s.granularity,
   );
   if (!hit) {
+    if (
+      shouldKeepHoverZoneAlive({
+        granularity: s.granularity,
+        sourceDocument,
+        zoneDocument: s.lastHoverZoneDocument,
+        zone: s.lastHoverZone,
+        x: input.clientX,
+        y: input.clientY,
+      })
+    ) {
+      return;
+    }
     dismiss(s);
     return;
   }
@@ -301,6 +320,8 @@ function handleMove(s: State, input: HoverPointerInput): void {
     dismiss(s);
     return;
   }
+  s.lastHoverZone = hit.rect;
+  s.lastHoverZoneDocument = sourceDocument;
   if (hit.text === s.lastText && sameRange(s.lastRange, hit.range)) return;
 
   clearTimer(s);
@@ -397,6 +418,16 @@ export function hitAtInDocument(
   }
 
   if (granularity === "sentence") {
+    const pdfHit = pdfTextLayerHit(
+      doc,
+      textNode,
+      hitRect,
+      wordStart,
+      sentSeg,
+      granularity,
+    );
+    if (pdfHit) return pdfHit;
+
     for (const sent of sentSeg.segment(text)) {
       const ss = sent.index;
       const se = ss + sent.segment.length;
@@ -406,10 +437,24 @@ export function hitAtInDocument(
       const sentRange = doc.createRange();
       sentRange.setStart(textNode, ss);
       sentRange.setEnd(textNode, se);
-      return { text: sentText, rect: hitRect, range: sentRange };
+      return {
+        text: sentText,
+        rect: usableRect(sentRange.getBoundingClientRect(), hitRect),
+        range: sentRange,
+      };
     }
     return null;
   }
+
+  const pdfHit = pdfTextLayerHit(
+    doc,
+    textNode,
+    hitRect,
+    wordStart,
+    sentSeg,
+    granularity,
+  );
+  if (pdfHit) return pdfHit;
 
   return paragraphHit(doc, textNode, hitRect);
 }
@@ -455,7 +500,23 @@ function paragraphHit(
   const paraRange = doc.createRange();
   paraRange.selectNodeContents(el);
 
-  return { text: paraText, rect: hitRect, range: paraRange };
+  return {
+    text: paraText,
+    rect: usableRect(el.getBoundingClientRect(), hitRect),
+    range: paraRange,
+  };
+}
+
+function usableRect(rect: DOMRect, fallback: DOMRect): DOMRect {
+  if (
+    !Number.isFinite(rect.left) ||
+    !Number.isFinite(rect.top) ||
+    rect.width <= 0 ||
+    rect.height <= 0
+  ) {
+    return fallback;
+  }
+  return rect;
 }
 
 // ─── 显示 / 收起 ─────────────────────────────────────
@@ -500,15 +561,14 @@ function positionTooltip(el: HTMLElement, anchor: DOMRect): void {
   const th = el.offsetHeight;
   const vw = hostWindow.innerWidth;
   const vh = hostWindow.innerHeight;
-  const margin = 14;
+  const pos = computeTooltipPosition(
+    anchor,
+    { width: tw, height: th },
+    { width: vw, height: vh },
+  );
 
-  let left = anchor.left;
-  let top = anchor.top - th - margin;
-  if (top < 4) top = Math.min(anchor.bottom + margin, vh - th - 4);
-  if (left + tw > vw - 4) left = Math.max(4, vw - tw - 4);
-
-  el.style.left = `${left}px`;
-  el.style.top = `${top}px`;
+  el.style.left = `${pos.left}px`;
+  el.style.top = `${pos.top}px`;
 }
 
 function applyTooltipFontSize(s: State): void {
@@ -529,6 +589,8 @@ function dismiss(s: State): void {
   s.lastText = null;
   s.lastRange = null;
   s.lastAnchor = null;
+  s.lastHoverZone = null;
+  s.lastHoverZoneDocument = null;
   s.seq++;
   clearHighlight(s);
   if (s.tooltip) s.tooltip.style.display = "none";
