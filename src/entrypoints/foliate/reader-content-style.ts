@@ -97,7 +97,7 @@ export function createFoliateContentCss(
     foliateReaderUseBookLayout: settings?.useBookLayout,
   });
   const isDark = theme === "dark";
-  const bg = isDark ? "#1f1f1e" : "#ffffff";
+  const bg = isDark ? "#1f1f1e" : "#f8f8f6";
   const text = isDark ? "#ebe8df" : "#1f1e1d";
   const selection = isDark
     ? "rgba(91, 141, 214, 0.42)"

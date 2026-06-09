@@ -5,18 +5,13 @@
 //
 // 设计原则：
 //   - 每行一个设置，左侧 label + 可选 description，右侧单一控件。
-//   - 复杂控件（slider / 译文样式色板 / 预览）用 FullRow，独占整行。
+//   - 复杂控件（slider / 译文样式色板）用 FullRow，独占整行。
 //   - boolean 用 Switch；多选用 Select；2~3 选文字段控件用 Segment；
 //     主题用 IconSegment。
 //   - About 页是只读 row，不做控件。
 
 import { For, Show, createEffect, createSignal, type JSX } from "solid-js";
 import { UI_LANG_LABELS, UI_LANGS } from "@/lib/languages";
-import {
-  resolveTranslationStyleColor,
-  resolveTranslationStyleFontFamily,
-  resolveTranslationStyleTextDecoration,
-} from "@/lib/translation-style";
 import {
   setSettings,
   useSettings,
@@ -718,22 +713,6 @@ function App() {
             value={settings().translationStyle.color}
           />
         </Row>
-        <FullRow>
-          <div
-            class="style-preview"
-            style={{
-              color: resolveTranslationStyleColor(settings().translationStyle),
-              "font-family": resolveTranslationStyleFontFamily(
-                settings().translationStyle.fontFamily,
-              ),
-              "text-decoration": resolveTranslationStyleTextDecoration(
-                settings().translationStyle,
-              ),
-            }}
-          >
-            {t("style.preview")}
-          </div>
-        </FullRow>
       </section>
     </>
   );

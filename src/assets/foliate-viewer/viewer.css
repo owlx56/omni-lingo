@@ -21,12 +21,13 @@
     --bg: #f8f8f6;
     --surface: #ffffff;
     --surface-alt: #ece9e1;
-    --reader-bg: #ffffff;
+    --reader-bg: var(--bg);
     --text: #1f1e1d;
     --text-muted: #6f6e6a;
     --border: #e2dfd5;
     --danger: #b42318;
-    --sidebar-bg: #fcfcfb;
+    --sidebar-bg: var(--bg);
+    --sidebar-divider: rgba(31, 30, 29, 0.12);
     color-scheme: light;
 }
 
@@ -34,12 +35,13 @@
     --bg: #1f1f1e;
     --surface: #232323;
     --surface-alt: #2c2c2b;
-    --reader-bg: #1f1f1e;
+    --reader-bg: var(--bg);
     --text: #ebe8df;
     --text-muted: #a3a09a;
     --border: #2f2f2e;
     --danger: #ffb4a8;
-    --sidebar-bg: rgba(26, 26, 25, 0.96);
+    --sidebar-bg: var(--bg);
+    --sidebar-divider: rgba(255, 255, 255, 0.1);
     color-scheme: dark;
 }
 
@@ -81,7 +83,7 @@ body {
     min-width: 0;
     min-height: 0;
     overflow: hidden;
-    background: var(--surface);
+    background: var(--bg);
 }
 
 .foliate-viewer-frame.is-dragging,
@@ -100,7 +102,6 @@ body {
     display: flex;
     flex-direction: column;
     background: var(--sidebar-bg);
-    backdrop-filter: blur(18px);
     overflow: hidden;
     z-index: 30;
 }
@@ -113,7 +114,8 @@ body {
 }
 
 .foliate-sidebar.is-pinned {
-    background: color-mix(in srgb, var(--sidebar-bg) 94%, var(--surface) 6%);
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--sidebar-divider);
 }
 
 .foliate-sidebar-head {
@@ -256,6 +258,7 @@ body {
 
 .foliate-toc-expander svg {
     display: block;
+    fill: currentColor;
     transform: rotate(0deg);
     transition: transform 120ms ease;
 }
@@ -1132,7 +1135,7 @@ foliate-view[data-view-mode="scroll"]::part(container)::-webkit-scrollbar {
     inset: 0;
     display: grid;
     place-content: center;
-    background: var(--surface);
+    background: var(--bg);
     color: var(--text-muted);
     z-index: 40;
     font-size: 15px;

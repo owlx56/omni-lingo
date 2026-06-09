@@ -26,6 +26,26 @@ describe("Foliate reader chrome layout styling", () => {
     );
   });
 
+  test("uses the shared shell background for the reader and sidebar", () => {
+    expect(css).toMatch(/--bg:\s*#f8f8f6;/);
+    expect(css).toMatch(/--bg:\s*#1f1f1e;/);
+    expect(css).toMatch(/--reader-bg:\s*var\(--bg\);/);
+    expect(css).toMatch(/--sidebar-bg:\s*var\(--bg\);/);
+  });
+
+  test("separates pinned sidebar from the reader with a single fine divider", () => {
+    expect(css).toContain("--sidebar-divider");
+    expect(css).toMatch(
+      /\.foliate-sidebar\.is-pinned\s*\{[\s\S]*border-right:\s*1px solid var\(--sidebar-divider\);/,
+    );
+  });
+
+  test("makes sidebar TOC expander triangles inherit theme text color", () => {
+    expect(css).toMatch(
+      /\.foliate-toc-expander svg\s*\{[\s\S]*fill:\s*currentColor;/,
+    );
+  });
+
   test("provides an in-reader appearance settings popover", () => {
     expect(css).toContain(".foliate-appearance-button");
     expect(css).toContain(".foliate-appearance-panel");

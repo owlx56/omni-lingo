@@ -51,6 +51,14 @@ describe("createFoliateContentCss", () => {
     expect(css).toContain("--theme-fg-color:#1f1e1d");
   });
 
+  test("uses the viewer shell background for light reader content", () => {
+    const css = createFoliateContentCss("light");
+
+    expect(css).toContain("--theme-bg-color:#f8f8f6");
+    expect(css).toContain("background:#f8f8f6!important");
+    expect(css).not.toContain("background:#ffffff!important");
+  });
+
   test("marks theme colors as overrides for Foliate paginator backgrounds", () => {
     const css = createFoliateContentCss("light");
 

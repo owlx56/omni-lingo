@@ -2,7 +2,7 @@
  *
  * 通用控件 / 主题 token / row primitives 在 src/lib/ui/controls.css。
  * 这里只放 options 独有的：page 容器 / header / sidebar / section 间距 /
- * 译文预览 / 响应式断点。
+ * 响应式断点。
  */
 
 html {
@@ -170,19 +170,6 @@ h1 {
 
 .hover-font-size-control {
     width: auto;
-}
-
-/* ── Translation preview（immersive 段独占）─────────────── */
-
-.style-preview {
-    width: 100%;
-    padding: 14px 16px;
-    border: 1px dashed var(--border-strong);
-    border-radius: 8px;
-    background: var(--surface-alt);
-    color: var(--text);
-    font-size: 15px;
-    line-height: 1.55;
 }
 
 /* ── File Plus ─────────────────────────────────────────────── */

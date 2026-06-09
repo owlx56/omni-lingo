@@ -4,7 +4,7 @@
 //   - Section 只有一个 bold 标题，下面是若干 row。
 //   - row 之间靠细分隔线区分，不靠 card 边框。
 //   - row 左侧 label + 可选 description（muted），右侧 control（紧贴右）。
-//   - FullRow 让 control 占满整行（slider、translation preview 等）。
+//   - FullRow 让 control 占满整行（slider 等）。
 //
 // 控件原语：Switch（boolean）、Select（多选 dropdown）、
 // Segment（2~3 选文字段控件）、IconSegment（带图标的段控件，主题用）。
