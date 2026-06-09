@@ -13,6 +13,9 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 | `src/entrypoints/foliate/App.tsx` | Foliate reader UI；接收 `onelingo-key`、`file`、`onelingo-sniff=1` 并驱动 `foliate-view` |
 | `src/entrypoints/foliate/bridge.ts` | Foliate 内容文档内 hover / selection 桥接；绑定 `foliate-view` 的 load / relocate 生命周期 |
 | `src/entrypoints/foliate/reader-content-style.ts` | Foliate 内容 CSS 注入、书内 CSS/HTML transform、Readest 默认字号和主题变量 |
+| `src/entrypoints/foliate/reader-toc.tsx` | TOC normalize、起始页码 hydration、展开路径和递归节点 |
+| `src/entrypoints/foliate/reader-appearance-panel.tsx` | viewer 顶栏 reader 外观弹窗 |
+| `src/entrypoints/foliate/reader-book-details.tsx` | 书籍详情 modal 内折叠 section UI |
 | `src/entrypoints/foliate/reader-*.ts` | Foliate sidebar / chrome / layout / page-turn / scrollbar / settings 等 reader-local helper |
 | `src/entrypoints/foliate/footnote-popup.ts` | Readest 式脚注 / 尾注弹窗 |
 | `src/lib/foliate-reader-settings.ts` | EPUB reader 外观设置的默认值、范围、锁定和存储转换 |
@@ -77,10 +80,11 @@ EPUB / MOBI / AZW3 / FB2 reader 使用 Readest fork `foliate-js`，依赖锁定�
 
 - sidebar 支持 overlay / pinned(docked) 两种状态。桌面 pinned 时侧栏成为布局左列，正文和 hover chrome 在右列；sidebar 宽度可拖拽并持久化，visible 不持久化。窄屏保持 overlay 抽屉，不提供横向拖拽。
 - sidebar 顶部保留 toggle 和 pin/unpin；下面显示书籍封面、标题、作者和详情按钮。无封面时不显示封面区域；详情 modal 只读展示 Metadata / Series / Description。
-- TOC 支持卷折叠和起始页码。overlay 模式下导航可自动收起；pinned 模式保持打开。
+- TOC 支持卷折叠和起始页码，normalize / 页码 hydration / 展开路径在 `reader-toc.tsx`。overlay 模式下导航可自动收起；pinned 模式保持打开。
 - 固定顶栏已改成 Readest 式正文 hover chrome：常态顶部显示当前章节名、底部空白；鼠标进入顶部区域时显示书名和 pages / scroll 模式切换、reader 外观按钮；鼠标进入底部区域时显示上一章节 / 下一章节按钮。
 - pages 模式左右空白区有 hover 翻页按钮；滚轮翻页只在 pages 模式启用，`scroll` 模式交给 Foliate 原生连续滚动。
 - scroll 模式隐藏 Foliate 原生滚动条，并使用 reader-local overlay scrollbar。滚动后只显示滑块，滑块可见时 hover 右侧展开完整滚动条和上下按钮；pages 模式不启用 overlay scrollbar。
+- 顶栏 reader 外观弹窗 UI 在 `reader-appearance-panel.tsx`，书籍详情 modal 的折叠 section UI 在 `reader-book-details.tsx`；不要把新的纯展示 JSX 堆回 App。
 - 脚注 / 尾注点击由 `foliate-js/footnotes.js` 的 `FootnoteHandler` 和本地启发式接管，优先在当前位置弹出只读 popup，识别失败才回退到原链接跳转。
 
 Foliate reader 外观设置只包含：

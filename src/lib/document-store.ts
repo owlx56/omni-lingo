@@ -1,3 +1,5 @@
+import { requestResult, transactionDone } from "@/lib/idb";
+
 const DB_NAME = "onelingo-docs";
 const STORE_NAME = "documents";
 const DB_VERSION = 1;
@@ -30,25 +32,22 @@ export async function storeDocument(
 ): Promise<string> {
   const key = crypto.randomUUID();
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    tx.objectStore(STORE_NAME).put(
-      { data, format, name, timestamp: Date.now() } satisfies StoredDocument,
-      key,
-    );
-    tx.oncomplete = () => resolve(key);
-    tx.onerror = () => reject(tx.error);
-  });
+  const tx = db.transaction(STORE_NAME, "readwrite");
+  tx.objectStore(STORE_NAME).put(
+    { data, format, name, timestamp: Date.now() } satisfies StoredDocument,
+    key,
+  );
+  await transactionDone(tx);
+  return key;
 }
 
 export async function loadDocument(
   key: string,
 ): Promise<StoredDocument | null> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const request = tx.objectStore(STORE_NAME).get(key);
-    request.onsuccess = () => resolve(request.result ?? null);
-    request.onerror = () => reject(request.error);
-  });
+  const tx = db.transaction(STORE_NAME, "readonly");
+  const result = await requestResult<StoredDocument | undefined>(
+    tx.objectStore(STORE_NAME).get(key),
+  );
+  return result ?? null;
 }

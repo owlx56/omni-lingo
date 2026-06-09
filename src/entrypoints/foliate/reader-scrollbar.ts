@@ -1,3 +1,6 @@
+import { isElement } from "@/lib/guards";
+import { clamp } from "@/lib/number";
+
 export type OverlayScrollbarMode = "pages" | "scroll";
 export type OverlayScrollbarVisualState = "hidden" | "visible" | "expanded";
 
@@ -397,12 +400,4 @@ function noopDrag(): OverlayScrollbarDrag {
     move() {},
     stop() {},
   };
-}
-
-function isElement(value: unknown): value is Element {
-  return typeof Element !== "undefined" && value instanceof Element;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

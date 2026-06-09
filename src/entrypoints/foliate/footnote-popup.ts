@@ -1,3 +1,5 @@
+import { READER_UI_ATTR } from "@/lib/dom-attrs";
+import { clamp } from "@/lib/number";
 import type { EffectiveTheme } from "@/lib/theme";
 import { createFoliateContentCss } from "./reader-content-style";
 import type { FoliateReaderStyleSettings } from "./reader-settings";
@@ -269,7 +271,7 @@ export function isFoliateReaderUiTarget(target: EventTarget | null): boolean {
     ? Boolean(
         target.closest(
           [
-            "[data-onelingo-reader-ui]",
+            `[${READER_UI_ATTR}]`,
             ".foliate-reader-topbar",
             ".foliate-reader-bottombar",
             ".foliate-reader-bottom-hover-zone",
@@ -360,8 +362,4 @@ function toParentViewportRect(rect: DOMRect, ownerDocument?: Document): DOMRect 
     rect.width,
     rect.height,
   );
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

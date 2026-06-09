@@ -10,22 +10,13 @@
 //     主题用 IconSegment。
 //   - About 页是只读 row，不做控件。
 
-import { For, Show, createEffect, createSignal, type JSX } from "solid-js";
-import { UI_LANG_LABELS, UI_LANGS } from "@/lib/languages";
+import { Show, createEffect, createSignal, type JSX } from "solid-js";
 import {
   setSettings,
   useSettings,
   HOVER_FONT_SIZE_MAX,
   HOVER_FONT_SIZE_MIN,
-  type FullPageEngineId,
-  type FullPageMode,
-  type HoverGranularity,
-  type TargetLang,
-  type ThemePreference,
   type TranslationColor,
-  type TranslationFontFamily,
-  type TranslationUnderlineStyle,
-  type UiLang,
 } from "@/lib/storage/settings";
 import {
   FOLIATE_READER_FONT_SIZE_MAX,
@@ -42,19 +33,9 @@ import {
   type FoliateReaderStyleSettings,
 } from "@/lib/foliate-reader-settings";
 import { broadcastFoliateReaderAppearance } from "@/lib/foliate-reader-live-settings";
-import { useT, type MessageKey, type TFn } from "@/lib/i18n";
-import {
-  IconFile,
-  IconHover,
-  IconImmersive,
-  IconInfo,
-  IconLogo,
-  IconMoon,
-  IconSelection,
-  IconSettings,
-  IconSun,
-  IconSystem,
-} from "@/lib/ui/icons";
+import { useT } from "@/lib/i18n";
+import { clamp } from "@/lib/number";
+import { IconLogo } from "@/lib/ui/icons";
 import {
   FullRow,
   IconSegment,
@@ -62,9 +43,6 @@ import {
   Segment,
   Select,
   Switch,
-  type IconSegmentOption,
-  type SegmentOption,
-  type SelectOption,
 } from "@/lib/ui/controls";
 import { browser } from "wxt/browser";
 import {
@@ -79,275 +57,31 @@ import {
   optionsUrlForTab,
   type TabId,
 } from "@/lib/options-tabs";
+import { ColorRowControl, NumberStepper, Sidebar } from "./options-components";
+import {
+  FOLIATE_READER_FONT_SIZE_STEP,
+  FOLIATE_READER_LINE_HEIGHT_STEP,
+  FULL_PAGE_ENGINES,
+  HOVER_ENGINES,
+  HOVER_FONT_SIZE_STEP,
+  TABS,
+  VERSION,
+  appearanceOptions,
+  fontSelectOptions,
+  granularitySelectOptions,
+  modeSegmentOptions,
+  targetLangSelectOptions,
+  uiLangSelectOptions,
+  underlineSelectOptions,
+} from "./options-model";
 
-
-type OptionIcon = (props: { size?: number }) => JSX.Element;
-
-const VERSION = "0.0.0";
-const HOVER_FONT_SIZE_STEP = 0.5;
-const FOLIATE_READER_FONT_SIZE_STEP = 1;
-const FOLIATE_READER_LINE_HEIGHT_STEP = 0.1;
-
-const TABS: { id: TabId; labelKey: MessageKey; icon: OptionIcon }[] = [
-  { id: "account", labelKey: "sidebar.account", icon: IconSettings },
-  { id: "hover", labelKey: "sidebar.hover", icon: IconHover },
-  { id: "selection", labelKey: "sidebar.selection", icon: IconSelection },
-  { id: "immersive", labelKey: "sidebar.immersive", icon: IconImmersive },
-  { id: "fileplus", labelKey: "sidebar.fileplus", icon: IconFile },
-  { id: "about", labelKey: "sidebar.about", icon: IconInfo },
-];
-
-const HOVER_ENGINES: { value: string; label: string }[] = [
-  { value: "google", label: "Google" },
-  { value: "google2", label: "Google 2" },
-  { value: "microsoft", label: "Microsoft" },
-];
-
-const FULL_PAGE_ENGINES: { value: FullPageEngineId; label: string }[] = [
-  { value: "google2", label: "Google 2" },
-  { value: "microsoft", label: "Microsoft" },
-];
-
-const GRANULARITIES: { value: HoverGranularity; labelKey: MessageKey }[] = [
-  { value: "word", labelKey: "granularity.word" },
-  { value: "sentence", labelKey: "granularity.sentence" },
-  { value: "paragraph", labelKey: "granularity.paragraph" },
-];
-
-const MODES: { value: FullPageMode; labelKey: MessageKey }[] = [
-  { value: "replace", labelKey: "mode.replace" },
-  { value: "bilingual", labelKey: "mode.bilingual" },
-];
-
-const FONT_FAMILIES: { value: TranslationFontFamily; labelKey: MessageKey }[] = [
-  { value: "inherit", labelKey: "font.inherit" },
-  { value: "serif", labelKey: "font.serif" },
-  { value: "sans", labelKey: "font.sans" },
-  { value: "mono", labelKey: "font.mono" },
-];
-
-const UNDERLINE_STYLES: {
-  value: TranslationUnderlineStyle;
-  labelKey: MessageKey;
-}[] = [
-  { value: "none", labelKey: "underline.none" },
-  { value: "solid", labelKey: "underline.solid" },
-  { value: "dotted", labelKey: "underline.dotted" },
-  { value: "wavy", labelKey: "underline.wavy" },
-];
-
-const COLOR_PRESETS: { value: TranslationColor; labelKey: MessageKey; swatch: string }[] =
-  [
-    { value: "inherit", labelKey: "color.inherit", swatch: "transparent" },
-    { value: "yellow", labelKey: "color.yellow", swatch: "rgb(251, 188, 4)" },
-    { value: "green", labelKey: "color.green", swatch: "rgb(19, 129, 37)" },
-    { value: "teal", labelKey: "color.teal", swatch: "rgb(25, 174, 160)" },
-    { value: "blue", labelKey: "color.blue", swatch: "rgb(26, 115, 232)" },
-    { value: "indigo", labelKey: "color.indigo", swatch: "rgb(91, 96, 232)" },
-    { value: "orange", labelKey: "color.orange", swatch: "rgb(245, 124, 0)" },
-    { value: "purple", labelKey: "color.purple", swatch: "rgb(142, 68, 173)" },
-    { value: "pink", labelKey: "color.pink", swatch: "rgb(236, 64, 122)" },
-    { value: "red", labelKey: "color.red", swatch: "rgb(234, 51, 59)" },
-    { value: "gray", labelKey: "color.gray", swatch: "rgb(147, 147, 147)" },
-  ];
-
-function Sidebar(props: {
-  activeTab: TabId;
-  onSelect: (tab: TabId) => void;
-  t: TFn;
-}) {
-  return (
-    <nav aria-label="Settings sections" class="sidebar">
-      <For each={TABS}>
-        {(tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              class="sidebar-item"
-              classList={{ active: props.activeTab === tab.id }}
-              onClick={() => props.onSelect(tab.id)}
-              type="button"
-            >
-              <Icon size={16} />
-              <span>{props.t(tab.labelKey)}</span>
-            </button>
-          );
-        }}
-      </For>
-    </nav>
-  );
-}
-
-function uiLangSelectOptions(): SelectOption<UiLang>[] {
-  return UI_LANGS.map((value) => ({
-    value,
-    label: UI_LANG_LABELS[value],
-  }));
-}
-
-function targetLangSelectOptions(): SelectOption<TargetLang>[] {
-  return UI_LANGS.map((value) => ({
-    value,
-    label: UI_LANG_LABELS[value],
-  }));
-}
-
-function granularitySelectOptions(t: TFn): SelectOption<HoverGranularity>[] {
-  return GRANULARITIES.map((item) => ({
-    value: item.value,
-    label: t(item.labelKey),
-  }));
-}
-
-function modeSegmentOptions(t: TFn): SegmentOption<FullPageMode>[] {
-  return MODES.map((item) => ({ value: item.value, label: t(item.labelKey) }));
-}
-
-function fontSelectOptions(t: TFn): SelectOption<TranslationFontFamily>[] {
-  return FONT_FAMILIES.map((item) => ({
-    value: item.value,
-    label: t(item.labelKey),
-  }));
-}
-
-function underlineSelectOptions(
-  t: TFn,
-): SelectOption<TranslationUnderlineStyle>[] {
-  return UNDERLINE_STYLES.map((item) => ({
-    value: item.value,
-    label: t(item.labelKey),
-  }));
-}
-
-function appearanceOptions(t: TFn): IconSegmentOption<ThemePreference>[] {
-  return [
-    { value: "system", label: t("appearance.system"), icon: IconSystem },
-    { value: "light", label: t("appearance.light"), icon: IconSun },
-    { value: "dark", label: t("appearance.dark"), icon: IconMoon },
-  ];
-}
-
-function ColorRowControl(props: {
-  value: TranslationColor;
-  customColor: string;
-  t: TFn;
-  onSelect: (next: TranslationColor) => void;
-  onCustom: (color: string) => void;
-}) {
-  return (
-    <div class="color-control">
-      <For each={COLOR_PRESETS}>
-        {(preset) => (
-          <button
-            aria-label={props.t(preset.labelKey)}
-            class="color-swatch-button"
-            classList={{ active: props.value === preset.value }}
-            onClick={() => props.onSelect(preset.value)}
-            style={{ "--swatch": preset.swatch }}
-            title={props.t(preset.labelKey)}
-            type="button"
-          >
-            <span aria-hidden="true" class="color-swatch-dot" />
-          </button>
-        )}
-      </For>
-      <label
-        class="color-swatch-button color-swatch-button-custom"
-        classList={{ active: props.value === "custom" }}
-        title={props.t("color.custom")}
-      >
-        <span aria-hidden="true" class="color-swatch-dot" />
-        <input
-          aria-label={props.t("color.custom.aria")}
-          class="color-swatch-input"
-          onInput={(event) => {
-            props.onCustom(event.currentTarget.value);
-          }}
-          type="color"
-          value={props.customColor}
-        />
-      </label>
-    </div>
-  );
-}
-
-function NumberStepper(props: {
-  ariaLabel: string;
-  disabled?: boolean;
-  max: number;
-  min: number;
-  onCommit: () => void;
-  onInput: (value: string) => void;
-  onStep: (delta: number) => void;
-  step: number;
-  unit?: string;
-  value: string;
-}) {
-  return (
-    <div
-      class="number-stepper"
-      classList={{ "is-disabled": props.disabled }}
-    >
-      <button
-        aria-label={`${props.ariaLabel} -${props.step}`}
-        class="number-stepper-button"
-        disabled={props.disabled}
-        onClick={() => props.onStep(-props.step)}
-        type="button"
-      >
-        -
-      </button>
-      <input
-        aria-label={props.ariaLabel}
-        class="number-stepper-input"
-        disabled={props.disabled}
-        inputMode="decimal"
-        max={props.max}
-        min={props.min}
-        onBlur={props.onCommit}
-        onInput={(event) => props.onInput(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (props.disabled) return;
-          if (event.key === "Enter") {
-            event.currentTarget.blur();
-            return;
-          }
-          if (event.key === "ArrowUp") {
-            event.preventDefault();
-            props.onStep(props.step);
-            return;
-          }
-          if (event.key === "ArrowDown") {
-            event.preventDefault();
-            props.onStep(-props.step);
-          }
-        }}
-        step="any"
-        type="text"
-        value={props.value}
-      />
-      <Show when={props.unit}>
-        <span aria-hidden="true" class="number-stepper-unit">{props.unit}</span>
-      </Show>
-      <button
-        aria-label={`${props.ariaLabel} +${props.step}`}
-        class="number-stepper-button"
-        disabled={props.disabled}
-        onClick={() => props.onStep(props.step)}
-        type="button"
-      >
-        +
-      </button>
-    </div>
-  );
-}
 
 function formatPx(value: number): string {
   return Number.isInteger(value) ? String(value) : String(value);
 }
 
 function clampFontSizeValue(value: number): number {
-  return Math.min(HOVER_FONT_SIZE_MAX, Math.max(HOVER_FONT_SIZE_MIN, value));
+  return clamp(value, HOVER_FONT_SIZE_MIN, HOVER_FONT_SIZE_MAX);
 }
 
 function cleanFontSizeValue(value: number): number {

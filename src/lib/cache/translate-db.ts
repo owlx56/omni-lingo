@@ -1,4 +1,6 @@
 import type { TranslateResponse } from "@/engines/types";
+import { isObjectRecord } from "@/lib/guards";
+import { requestResult, transactionDone } from "@/lib/idb";
 
 const DB_NAME = "onelingo-cache";
 const DB_VERSION = 1;
@@ -121,31 +123,9 @@ async function pruneOldRecords(): Promise<void> {
   await transactionDone(tx);
 }
 
-function requestResult<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => {
-      resolve(request.result);
-    };
-    request.onerror = () => {
-      reject(request.error ?? new Error("IndexedDB request failed"));
-    };
-  });
-}
-
-function transactionDone(tx: IDBTransaction): Promise<void> {
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => {
-      resolve();
-    };
-    tx.onabort = tx.onerror = () => {
-      reject(tx.error ?? new Error("IndexedDB transaction failed"));
-    };
-  });
-}
-
 function isRecord(value: unknown): value is TranslateCacheRecord {
-  if (!isObject(value)) return false;
-  const record = value as Record<string, unknown>;
+  if (!isObjectRecord(value)) return false;
+  const record = value;
   return (
     typeof record.key === "string" &&
     typeof record.updatedAt === "number" &&
@@ -154,16 +134,12 @@ function isRecord(value: unknown): value is TranslateCacheRecord {
 }
 
 function isTranslateResponse(value: unknown): value is TranslateResponse {
-  if (!isObject(value)) return false;
-  const response = value as Record<string, unknown>;
+  if (!isObjectRecord(value)) return false;
+  const response = value;
   return (
     typeof response.text === "string" &&
     typeof response.engine === "string" &&
     (response.detectedSource === undefined ||
       typeof response.detectedSource === "string")
   );
-}
-
-function isObject(value: unknown): value is object {
-  return typeof value === "object" && value !== null;
 }

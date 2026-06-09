@@ -20,6 +20,7 @@
 | 引擎层 `src/engines/` | 某个引擎独有乱码、HTML mode 不生效、批量返回错位   | request format、batch parse、text/html 参数                           |
 | 规则层 `rules.ts`     | 某站点区域多翻/漏翻、rich HTML 开关不合适          | selector、rootsSelector、ignoreSelector、richHtmlSelector             |
 | 样式层                | 译文挤压、横向过长、列表/表格排版坏掉              | rule styles、wrapper tag、host display                                |
+| Loading 层 `immersive-loading.ts` | 骨架屏行数/宽度/颜色不自然，loading CSS 变量丢失 | line specs、palette、`aria-busy` CSS 变量保留                         |
 
 ## 判断是否是通用问题
 

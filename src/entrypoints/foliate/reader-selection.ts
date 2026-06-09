@@ -1,12 +1,9 @@
+import { hasClosest } from "@/lib/guards";
 import type { FoliateContent, FoliateViewElement } from "./types";
 
 type SelectionLike = {
   rangeCount?: number;
   removeAllRanges?: () => void;
-};
-
-type ClosestTarget = {
-  closest: (selectors: string) => unknown;
 };
 
 const READER_SELECTION_CONTROL_SELECTOR = [
@@ -98,10 +95,4 @@ function isSelectionLike(value: unknown): value is SelectionLike {
     typeof value === "object" &&
     typeof (value as SelectionLike).removeAllRanges === "function"
   );
-}
-
-function hasClosest(target: EventTarget | null): target is EventTarget & ClosestTarget {
-  if (!target || typeof target !== "object") return false;
-  const candidate = target as unknown as { closest?: unknown };
-  return typeof candidate.closest === "function";
 }

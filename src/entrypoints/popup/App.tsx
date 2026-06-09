@@ -3,13 +3,12 @@
 
 import {
   Show,
-  type Accessor,
   createSignal,
   onCleanup,
   onMount,
   type JSX,
 } from "solid-js";
-import { UI_LANG_LABELS, UI_LANGS, type UiLang } from "@/lib/languages";
+import type { UiLang } from "@/lib/languages";
 import {
   ACCEPTED_DOCUMENT_FILES,
   storeLocalDocumentAndGetViewerUrl,
@@ -47,7 +46,6 @@ import {
   IconMoreHorizontal,
   IconReplaceMode,
   IconSettings,
-  IconSparkles,
   IconUploadFile,
   IconUser,
 } from "@/lib/ui/icons";
@@ -61,14 +59,25 @@ import {
 import {
   pageSourceFromStatus,
   pageSourceOptions,
-  pageSourceToCommandSource,
   pageSourceToPrefSource,
   type PageSourceLang,
 } from "./popup-language-options";
+import {
+  AiStyleIcon,
+  HeaderAction,
+  PopupAiConfigCard,
+  ProviderMark,
+  SwitchRow,
+  renderAiConfigSelectValue,
+} from "./popup-components";
+import {
+  commandSourceField,
+  pageTargetOptions,
+  type AiStyleId,
+  type PageTargetLang,
+} from "./popup-options";
 
-type PageTargetLang = UiLang;
 type ActionState = "idle" | "starting" | "restoring" | "retranslating";
-type AiStyleId = "default";
 
 const DEFAULT_PAGE_FEATURE_STATUS: PageFeatureStatus = {
   fullPageClickToShowOriginal: true,
@@ -83,20 +92,6 @@ export interface PopupAppProps {
   capability?: PopupCapability;
   onClose?: () => void;
   surface?: "native";
-}
-
-function pageTargetOptions(): SelectOption<PageTargetLang>[] {
-  return UI_LANGS.map((value) => ({
-    value,
-    label: UI_LANG_LABELS[value],
-  }));
-}
-
-function commandSourceField(source: PageSourceLang): {
-  source?: UiLang;
-} {
-  const commandSource = pageSourceToCommandSource(source);
-  return commandSource ? { source: commandSource } : {};
 }
 
 async function detectActiveTabCapability(): Promise<PopupCapability> {
@@ -116,124 +111,6 @@ function isMissingContentScriptError(error: unknown): boolean {
   return (
     error.message.includes("Could not establish connection") ||
     error.message.includes("Receiving end does not exist")
-  );
-}
-
-function ProviderMark(props: { engine: FullPageEngineId }): JSX.Element {
-  return (
-    <span class="provider-icon-shell" aria-hidden="true">
-      <Show
-        fallback={
-          <span class="provider-google-mark" aria-hidden="true">
-            G
-          </span>
-        }
-        when={props.engine === "microsoft"}
-      >
-        <span class="provider-microsoft-mark" aria-hidden="true">
-          <span class="provider-microsoft-red" />
-          <span class="provider-microsoft-green" />
-          <span class="provider-microsoft-blue" />
-          <span class="provider-microsoft-yellow" />
-        </span>
-      </Show>
-    </span>
-  );
-}
-
-function renderAiConfigSelectValue<T extends string>(
-  label: string,
-): (option: Accessor<SelectOption<T>>) => JSX.Element {
-  return (option) => (
-    <span class="popup-ai-select-line">
-      <span class="popup-ai-select-label">{label}:</span>
-      <span class="popup-ai-select-value">
-        {option().icon?.()}
-        <span class="popup-ai-select-text">{option().label}</span>
-      </span>
-    </span>
-  );
-}
-
-function PopupSwitch(props: {
-  checked: boolean;
-  disabled?: boolean;
-  label: string;
-  onChange?: (next: boolean) => void;
-}) {
-  return (
-    <button
-      aria-checked={props.checked}
-      aria-label={props.label}
-      class="popup-switch"
-      classList={{ on: props.checked }}
-      disabled={props.disabled}
-      onClick={() => props.onChange?.(!props.checked)}
-      role="switch"
-      type="button"
-    >
-      <span aria-hidden="true" class="popup-switch-thumb" />
-    </button>
-  );
-}
-
-function PopupAiConfigCard(props: {
-  serviceLabel: string;
-  serviceControl: JSX.Element;
-  aiStyleLabel: string;
-  aiStyleControl: JSX.Element;
-  smartContextLabel: string;
-}) {
-  return (
-    <section
-      aria-label={`${props.serviceLabel}, ${props.aiStyleLabel}, ${props.smartContextLabel}`}
-      class="popup-ai-config-card"
-    >
-      <div class="popup-ai-config-select-group">
-        {props.serviceControl}
-        {props.aiStyleControl}
-      </div>
-      <div class="popup-ai-config-row popup-ai-config-context-row">
-        <span class="popup-ai-config-label">{props.smartContextLabel}</span>
-        <PopupSwitch checked={false} disabled label={props.smartContextLabel} />
-      </div>
-    </section>
-  );
-}
-
-function SwitchRow(props: {
-  label: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange?: (next: boolean) => void;
-}) {
-  return (
-    <div class="popup-switch-row">
-      <span class="popup-switch-label">{props.label}</span>
-      <PopupSwitch
-        checked={props.checked}
-        disabled={props.disabled}
-        label={props.label}
-        onChange={props.onChange}
-      />
-    </div>
-  );
-}
-
-function HeaderAction(props: {
-  label: string;
-  icon: (iconProps: { size?: number }) => JSX.Element;
-}) {
-  const Icon = props.icon;
-  return (
-    <button
-      aria-label={props.label}
-      class="popup-header-action"
-      title={props.label}
-      type="button"
-    >
-      <Icon size={16} />
-    </button>
   );
 }
 
@@ -289,7 +166,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
     {
       value: "default",
       label: t("popup.aiStyle.default"),
-      icon: () => <IconSparkles size={13} />,
+      icon: AiStyleIcon,
     },
   ];
   const sourceOptions = (): SelectOption<PageSourceLang>[] =>

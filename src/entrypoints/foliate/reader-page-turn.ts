@@ -1,3 +1,5 @@
+import { clamp } from "@/lib/number";
+
 export type PageTurnSide = "left" | "right";
 
 type PageTurnHoverInput = {
@@ -27,8 +29,4 @@ export function getPageTurnHoverSide(
   if (x <= edgeWidth) return "left";
   if (x >= input.containerWidth - edgeWidth) return "right";
   return null;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

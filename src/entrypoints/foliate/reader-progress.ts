@@ -1,3 +1,4 @@
+import { clamp, finiteNumberOrNull } from "@/lib/number";
 import type { FoliateRelocateDetail } from "./types";
 
 export const READER_PROGRESS_RANGE_MAX = 1000;
@@ -45,28 +46,20 @@ export function formatReaderProgressPercent(
 }
 
 function normalizeFraction(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+  return finiteNumberOrNull(value);
 }
 
 function normalizeLocation(
   location: FoliateRelocateDetail["location"],
 ): { current: number; total: number } | null {
   if (!location) return null;
-  const total =
-    typeof location.total === "number" && Number.isFinite(location.total)
-      ? Math.floor(location.total)
-      : 0;
+  const totalValue = finiteNumberOrNull(location.total);
+  const total = totalValue !== null ? Math.floor(totalValue) : 0;
   if (total <= 0) return null;
-  const rawCurrent =
-    typeof location.current === "number" && Number.isFinite(location.current)
-      ? Math.floor(location.current)
-      : 0;
+  const currentValue = finiteNumberOrNull(location.current);
+  const rawCurrent = currentValue !== null ? Math.floor(currentValue) : 0;
   return {
     current: clamp(rawCurrent, 0, total - 1),
     total,
   };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }

@@ -53,6 +53,11 @@ background / content / options / popup 的消息全部走 `src/lib/messaging/`�
 
 options 和 popup 使用 Solid，但通用控件必须优先复用 `src/lib/ui/controls.tsx` 和 `src/lib/ui/controls.css`。不要在 entrypoint 内各自复制 Select、Switch、Segment、Row 等样式。
 
+options / popup 的入口文件只保留状态、消息调用和保存逻辑。页面专属的组件组合放在同目录小模块：
+
+- options：`options-components.tsx` 放 sidebar / swatch / stepper，`options-model.ts` 放 tab 和 select/segment 静态配置；
+- popup：`popup-components.tsx` 放 provider mark / switch row / AI config card，`popup-options.ts` 和 `popup-language-options.ts` 放语言选项和 command source 转换。
+
 options、popup、viewer 共用的图标必须放在 `src/lib/ui/icons.tsx`。新增按钮图标、侧栏图标、主题图标、reader 图标时，先扩展这里，再从 entrypoint 引用；不要在 options / popup / Foliate JSX 里临时塞一份 inline SVG。当前图标风格以 Lucide / Claude 式细线、圆角、`currentColor` 为基准。
 
 下拉菜单遵守当前 Claude/Gemini 风格约定：
@@ -89,6 +94,7 @@ options / popup / EPUB viewer / PDF viewer 的界面文案都走 `src/lib/i18n/c
 - Foliate reader 的阅读外观设置只包含字号、行距、首行缩进、Use Book Layout。默认字号按 Readest 16px；Use Book Layout 保留书籍段落版式，只锁行距和首行缩进，不锁字号；不提供 reader 字体选择。
 - Foliate 内容样式集中在 `src/entrypoints/foliate/reader-content-style.ts`。这里负责 `renderer.setStyles()`、已加载 iframe CSS 同步、书内 CSS/HTML transform、去掉本地字体 URL、把硬编码字号转成可随 reader 字号缩放的单位，以及给 paginator 提供主题背景变量。主题 / 字号 / 行距 / 首行缩进修改应在已打开 reader tab 内即时生效。
 - Foliate reader 的 sidebar、hover chrome、页边翻页、滚轮翻页、overlay scrollbar、footnote popup 都有本地 helper 和测试；改对应行为时优先补 / 更新 `src/entrypoints/foliate/*test.js`，不要把新逻辑堆回 `App.tsx`。
+- Foliate App 只负责编排 reader 状态和 `foliate-view` 生命周期。TOC normalize / hydration 在 `reader-toc.tsx`，reader 外观弹窗在 `reader-appearance-panel.tsx`，书籍详情 section 在 `reader-book-details.tsx`；新增同类 UI/纯逻辑时继续放到 `reader-*` 模块。
 - `/viewer.html` 只作为兼容路由和 HTML shell 探测入口；不要把 EPUB UI 或 PDF 自定义 viewer 重新塞回这里。
 - reader 内 selection 行为必须复用 `src/features/selection/`。未来改 selection 功能时，普通网页、PDF reader、EPUB reader 应尽量同时生效。
 - reader UI 控件必须标记或继承 `data-onelingo-reader-ui` 边界，hover / selection 不应命中工具栏、侧栏、菜单、对话框。
@@ -125,6 +131,19 @@ background 是 MV3 service worker，随时可能被杀。持久状态必须可�
 - 入口和纯逻辑用 `*.ts`；有 JSX 才用 `*.tsx`。
 - 一个文件一个主职责。
 - 注释解释“不明显的原因”，不要复述代码。
+
+## 冗余和生成产物
+
+删除代码前必须同时满足这些条件：
+
+- 无引用，且不是 WXT / browser extension 入口约定；
+- 不承担旧 URL、旧 storage、旧消息协议或跨浏览器兼容职责；
+- 没有测试、构建脚本或静态 public asset 复制流程依赖；
+- 不是 i18n / PDF viewer / Foliate runtime 的生成产物。
+
+不确定的兼容分支不要删，改为补一行保留原因或同步到文档。确认重复的基础能力优先抽到现有共享模块：`src/lib/number.ts`、`src/lib/guards.ts`、`src/lib/idb.ts`、`src/lib/dom-attrs.ts`、`src/lib/ui/controls.tsx`、`src/lib/ui/icons.tsx`。只有存在两个以上真实消费者，或重复逻辑已经影响一致性，才新增共享 helper；不要为了“以后可能用”预留导出。
+
+这些文件/目录不要手改：`node_modules/`、`.output/`、`src/lib/i18n/locales/*.ts`、`src/lib/i18n/locales/index.ts`、`src/lib/i18n/messages.ts`、`src/assets/pdf-viewer/locales.generated.mjs`、PDF.js / Foliate 构建复制后的 public assets。需要改变生成产物时，改源文件或脚本再运行对应生成命令。
 
 ## 依赖
 

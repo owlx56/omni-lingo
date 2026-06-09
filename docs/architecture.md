@@ -39,6 +39,10 @@ src/lib/
   cache/         -> 翻译缓存基础设施
   i18n/          -> options / popup / EPUB / PDF viewer 多语言文案源与生成入口
   ui/            -> options / popup 共享控件原语
+  number.ts      -> clamp / finite number helpers
+  guards.ts      -> object / Element / closest target type guards
+  idb.ts         -> IndexedDB request / transaction Promise wrappers
+  dom-attrs.ts   -> 跨 hover / selection / reader 的 OneLingo UI 边界 attr
   foliate-reader-settings.ts -> EPUB reader 字号、行距、首行缩进、Use Book Layout 规范化和锁定规则
   document-store.ts -> viewer 页面 IndexedDB 文档暂存
   languages.ts   -> UI 语言 / 目标语言常量和类型
@@ -112,6 +116,13 @@ options 和 popup 的通用控件放在 `src/lib/ui/controls.tsx`，样式放在
 
 共享图标放在 `src/lib/ui/icons.tsx`，options 侧栏、popup、主题 Sun/Moon/System、Foliate 顶栏 / 侧栏按钮都从这里引用。新增图标时优先保持 Lucide / Claude 式 `currentColor` 线性风格；不要在单个 entrypoint 内复制 SVG。
 
+entrypoint-local UI 只保留当前页面专属组合，不复制基础控件：
+
+- `src/entrypoints/options/options-components.tsx`：options sidebar、颜色 swatch 行、number stepper；
+- `src/entrypoints/options/options-model.ts`：options tab、engine、select、segment 等静态配置；
+- `src/entrypoints/popup/popup-components.tsx`：popup header action、switch row、provider mark、AI config card；
+- `src/entrypoints/popup/popup-options.ts` / `popup-language-options.ts`：popup target/source 语言和 command source 转换。
+
 ## PDF / EPUB Reader
 
 阅读器详细边界见 [document-viewer.md](document-viewer.md)。当前实现分为三个公开入口：
@@ -147,6 +158,9 @@ Foliate reader 当前由一个 Solid shell 和多个 reader-local helper 组成�
 | `src/entrypoints/foliate/reader-settings.ts` | 从 `src/lib/foliate-reader-settings.ts` 复用 reader 外观设置规范 |
 | `src/entrypoints/foliate/reader-chrome.ts` | Readest 式顶部 / 底部 hover chrome 状态 |
 | `src/entrypoints/foliate/reader-layout.ts` | pages / scroll 模式下 renderer 纵向留白和 chrome 空间 |
+| `src/entrypoints/foliate/reader-toc.tsx` | TOC normalize、起始页码 hydration、展开路径和递归节点 |
+| `src/entrypoints/foliate/reader-appearance-panel.tsx` | viewer 顶栏 reader 外观弹窗 |
+| `src/entrypoints/foliate/reader-book-details.tsx` | 书籍详情 modal 内的折叠 metadata/series/description section |
 | `src/entrypoints/foliate/reader-page-turn.ts` | pages 模式左右页边 hover 翻页区域 |
 | `src/entrypoints/foliate/wheel-turns.ts` | pages 模式滚轮翻页步进和导航队列 |
 | `src/entrypoints/foliate/reader-scrollbar.ts` | scroll 模式自绘 overlay scrollbar 状态机 |
@@ -175,6 +189,7 @@ Foliate runtime asset 由 `wxt.config.ts` 从 `node_modules/foliate-js` 复制�
 | `rules.ts`     | 默认 / 站点规则、规则匹配、规则解析                                                   |
 | `selectors.ts` | 安全 selector helper                                                                  |
 | `dom-attrs.ts` | 共享 `data-onelingo-*` wrapper 属性名                                                 |
+| `immersive-loading.ts` | loading skeleton 行数/宽度、CSS 变量保留和 style 注入                          |
 
 ### Immersive 流程
 
@@ -195,6 +210,7 @@ popup/background command
 - `scan.ts` 通过 `ScanContext` 接收运行态。
 - `collectNodeGroups`、`shouldBreakGroup`、`scheduleProcessNode` 留在 `index.ts`，因为它们属于翻译执行，不属于 DOM 发现。
 - `markup.ts` 尽量保持纯转换 / 回填边界。
+- loading skeleton 的 CSS 注入和纯宽度计算放在 `immersive-loading.ts`；不要把这类非会话状态辅助重新塞回 `index.ts`。
 - 共享 wrapper 属性名放在 `dom-attrs.ts`，不要放在 scan 或 orchestration 文件里。
 
 调试全文翻译 bug 时，先按 [immersive-debugging.md](immersive-debugging.md) 分层定位。优先修通用 DOM / 流水线问题，再考虑站点 rule，最后才写域名特例。

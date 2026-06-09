@@ -1,3 +1,5 @@
+import { ONELINGO_HOST_ATTR } from "@/lib/dom-attrs";
+
 // 单例 closed Shadow DOM 容器。
 //
 // 所有注入宿主页面的 UI（划词 logo、卡片、悬浮球、设置侧栏）都挂在
@@ -9,15 +11,13 @@
 // closed 模式：宿主页面 JS 拿不到 shadowRoot。调试时用 DevTools
 // 的 "user-agent shadow trees" 选项或直接选 host 元素查看 #shadow-root (closed)。
 
-const HOST_ATTR = "data-onelingo-host";
-
 let host: HTMLDivElement | null = null;
 let root: ShadowRoot | null = null;
 
 export function getShadowRoot(): ShadowRoot {
   if (root) return root;
   host = document.createElement("div");
-  host.setAttribute(HOST_ATTR, "");
+  host.setAttribute(ONELINGO_HOST_ATTR, "");
   // 自身 0x0、position:fixed，不参与布局也不挡事件；
   // z-index 拉满确保 shadow 内 position:fixed 的子元素能压在宿主之上
   host.style.cssText = "position:fixed;top:0;left:0;z-index:2147483647";

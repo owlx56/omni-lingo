@@ -1,3 +1,4 @@
+import { ONELINGO_HOST_ATTR, TOOLTIP_ATTR } from "@/lib/dom-attrs";
 import { BUILTIN_IGNORE_SELECTOR, HARD_SKIP_TAGS } from "./markup";
 import type { ResolvedFullPageRule } from "./rules";
 import {
@@ -256,7 +257,7 @@ export function isOurUiNode(el: Element): boolean {
     el.hasAttribute(WRAPPER_ATTR) ||
     el.hasAttribute(INNER_ATTR) ||
     !!el.closest(
-      `[data-onelingo-tooltip],[data-onelingo-host],[${WRAPPER_ATTR}]`,
+      `[${TOOLTIP_ATTR}],[${ONELINGO_HOST_ATTR}],[${WRAPPER_ATTR}]`,
     )
   );
 }

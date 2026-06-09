@@ -9,6 +9,7 @@
 //
 // 翻译提前发出的好处：hover 确认时大概率命中缓存，卡片瞬间出，无需 spinner。
 
+import { READER_UI_ATTR } from "@/lib/dom-attrs";
 import { sendMessage } from "@/lib/messaging";
 import {
   getSettings,
@@ -20,7 +21,6 @@ import { setSelText, setSelTarget, setSelResult } from "./card-store";
 
 const LOGO_ATTR = "data-onelingo-logo";
 const CARD_ATTR = "data-onelingo-selcard";
-const READER_UI_ATTR = "data-onelingo-reader-ui";
 const LOGO_SIZE = 30; // 与 Saladict SaladBowl 保持一致
 const LOGO_OFFSET_X = 6;
 const LOGO_OFFSET_Y = -(LOGO_SIZE + 4);

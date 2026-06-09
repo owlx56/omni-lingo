@@ -8,6 +8,7 @@ import {
   type JSX,
 } from "solid-js";
 import { FootnoteHandler } from "foliate-js/footnotes.js";
+import { READER_UI_ATTR } from "@/lib/dom-attrs";
 import { loadDocument } from "@/lib/document-store";
 import { fetchDocumentFromUrl } from "@/lib/document-resolver";
 import {
@@ -17,9 +18,10 @@ import {
   pdfViewerUrlForStoredKey,
   type ViewerFormat,
 } from "@/lib/document-viewer-urls";
-import { useT, type TFn } from "@/lib/i18n";
+import { useT } from "@/lib/i18n";
 import type { UiLang } from "@/lib/languages";
 import { onMessage, sendMessage } from "@/lib/messaging";
+import { clamp } from "@/lib/number";
 import { hideSelectionUi } from "@/features/selection";
 import {
   getStoredSettings,
@@ -121,10 +123,6 @@ import {
   type WheelTurnDirection,
 } from "./wheel-turns";
 import {
-  FOLIATE_READER_FONT_SIZE_MAX,
-  FOLIATE_READER_FONT_SIZE_MIN,
-  FOLIATE_READER_LINE_HEIGHT_MAX,
-  FOLIATE_READER_LINE_HEIGHT_MIN,
   getLockedFoliateReaderSettings,
   mergeFoliateReaderStyleSettings,
   normalizeFoliateReaderSettings,
@@ -137,6 +135,18 @@ import {
   resolveFoliateReaderAppearanceGlobalUpdate,
   writeFoliateReaderAppearanceSession,
 } from "./reader-appearance-session";
+import { ReaderAppearancePanel } from "./reader-appearance-panel";
+import {
+  TocNode,
+  computeExpandedTocKeys,
+  hydrateTocLocations,
+  normalizeToc,
+} from "./reader-toc";
+import {
+  DetailsSection,
+  type MetadataSection,
+  type SeriesItem,
+} from "./reader-book-details";
 
 type ViewState = "loading" | "ready" | "error";
 type ViewMode = "pages" | "scroll";
@@ -157,74 +167,12 @@ type SidebarBookState = {
   title: string;
 };
 
-type MetadataSection = {
-  key: string;
-  label: string;
-  value: string;
-};
-
-type SeriesItem = {
-  key: string;
-  label: string;
-  position: string;
-};
-
-type DetailsSectionKind = "fields" | "series" | "description";
-type ReaderAppearanceLockedSettings = ReturnType<
-  typeof getLockedFoliateReaderSettings
->;
-
 type FootnotePopupState = {
   position: FootnotePopupPosition;
   size: FootnotePopupSize;
 };
 
-type DetailsSectionProps = {
-  emptyLabel: string;
-  items: MetadataSection[] | SeriesItem[] | string[];
-  kind: DetailsSectionKind;
-  label: string;
-};
-
-type ReaderAppearancePanelProps = {
-  fontSize: number;
-  lineHeight: number;
-  locked: ReaderAppearanceLockedSettings;
-  onFontSizeChange: (value: number) => void;
-  onFontSizeStep: (delta: number) => void;
-  onLineHeightChange: (value: number) => void;
-  onLineHeightStep: (delta: number) => void;
-  onTextIndentChange: (value: boolean) => void;
-  onUseBookLayoutChange: (value: boolean) => void;
-  t: TFn;
-  textIndent: boolean;
-  useBookLayout: boolean;
-};
-
-type ReaderNumberStepperProps = {
-  ariaLabel: string;
-  disabled?: boolean;
-  max: number;
-  min: number;
-  onChange: (value: number) => void;
-  onStep: (delta: number) => void;
-  step: number;
-  unit: string;
-  value: number;
-};
-
-type TocLocation = NonNullable<FoliateTocItem["location"]>;
-type TocLocationContext = {
-  book: FoliateBookLike;
-  sectionIndexById: Map<unknown, number>;
-  sectionIndexByStringId: Map<string, number>;
-  sectionLocations: TocLocation[];
-};
-
 const MOBILE_BREAKPOINT = 720;
-const FOLIATE_SIZE_PER_LOC = 1500;
-const FOLIATE_READER_FONT_SIZE_STEP = 1;
-const FOLIATE_READER_LINE_HEIGHT_STEP = 0.1;
 
 function App(): JSX.Element {
   const t = useT();
@@ -794,7 +742,7 @@ function App(): JSX.Element {
     removeFootnoteView();
     footnoteView = popupView;
     footnoteContentScrollable = false;
-    popupView.setAttribute("data-onelingo-reader-ui", "");
+      popupView.setAttribute(READER_UI_ATTR, "");
     popupView.style.display = "block";
     popupView.style.width = "100%";
     popupView.style.height = "100%";
@@ -955,7 +903,7 @@ function App(): JSX.Element {
     });
   };
 
-  const readerAppearanceLocked = (): ReaderAppearanceLockedSettings =>
+  const readerAppearanceLocked = () =>
     getLockedFoliateReaderSettings(readerStyleSettings().useBookLayout);
 
   const applyStoredReaderAppearance = (
@@ -2001,507 +1949,6 @@ function App(): JSX.Element {
   );
 }
 
-function TocNode(props: {
-  item: FoliateTocItem;
-  index: number;
-  isActive: (href: string) => boolean;
-  isExpanded: (key: string) => boolean;
-  onSelect: (href: string) => Promise<void>;
-  onToggleExpanded: (key: string) => void;
-  parentKey?: string;
-}): JSX.Element {
-  const hasChildren = () => props.item.subitems.length > 0;
-  const pageLabel = tocPageLabel(props.item);
-  const nodeKey = tocNodeKey(props.item, props.index, props.parentKey);
-  const expanded = () => props.isExpanded(nodeKey);
-  return (
-    <div
-      classList={{
-        "foliate-toc-item": true,
-        active: props.isActive(props.item.href),
-        "is-branch": hasChildren(),
-      }}
-      data-key={nodeKey}
-    >
-      <div class="foliate-toc-row">
-        <Show when={hasChildren()} fallback={<span class="foliate-toc-expander-spacer" />}>
-          <button
-            aria-expanded={expanded() ? "true" : "false"}
-            aria-label={expanded() ? "Collapse section" : "Expand section"}
-            class="foliate-toc-expander"
-            classList={{ "is-expanded": expanded() }}
-            onClick={() => props.onToggleExpanded(nodeKey)}
-            type="button"
-          >
-            <svg viewBox="0 0 8 10" width="8" height="10" aria-hidden="true">
-              <polygon points="0 0, 8 5, 0 10" />
-            </svg>
-          </button>
-        </Show>
-        <button
-          class="foliate-toc-link"
-          onClick={() => void props.onSelect(props.item.href)}
-          type="button"
-        >
-          <span class="foliate-toc-label">{props.item.label}</span>
-          <Show when={pageLabel}>
-            <span class="foliate-toc-page">{pageLabel}</span>
-          </Show>
-        </button>
-      </div>
-      <Show when={hasChildren() && expanded()}>
-        <div class="foliate-toc-children">
-          <For each={props.item.subitems}>
-            {(child, index) => (
-              <TocNode
-                item={child}
-                index={index()}
-                isActive={props.isActive}
-                isExpanded={props.isExpanded}
-                onSelect={props.onSelect}
-                onToggleExpanded={props.onToggleExpanded}
-                parentKey={nodeKey}
-              />
-            )}
-          </For>
-        </div>
-      </Show>
-    </div>
-  );
-}
-
-function normalizeToc(items: unknown[]): FoliateTocItem[] {
-  return items
-    .map((item) => normalizeTocItem(item))
-    .filter((item): item is FoliateTocItem => Boolean(item));
-}
-
-function normalizeTocItem(value: unknown): FoliateTocItem | null {
-  if (!value || typeof value !== "object") return null;
-  const item = value as {
-    id?: unknown;
-    href?: unknown;
-    label?: unknown;
-    index?: unknown;
-    location?: unknown;
-    subitems?: unknown;
-  };
-  const id =
-    typeof item.id === "string" || typeof item.id === "number" ? item.id : undefined;
-  const href = typeof item.href === "string" ? item.href : "";
-  const label = typeof item.label === "string" ? item.label : href;
-  const index = typeof item.index === "number" ? item.index : undefined;
-  const location =
-    item.location && typeof item.location === "object"
-      ? {
-          current:
-            typeof (item.location as { current?: unknown }).current === "number"
-              ? ((item.location as { current?: unknown }).current as number)
-              : undefined,
-          next:
-            typeof (item.location as { next?: unknown }).next === "number"
-              ? ((item.location as { next?: unknown }).next as number)
-              : undefined,
-          total:
-            typeof (item.location as { total?: unknown }).total === "number"
-              ? ((item.location as { total?: unknown }).total as number)
-              : undefined,
-        }
-      : undefined;
-  const subitems = Array.isArray(item.subitems) ? normalizeToc(item.subitems) : [];
-  if (!href && !label) return null;
-  return { id, href, label, index, location, subitems };
-}
-
-async function hydrateTocLocations(
-  book: FoliateBookLike | undefined,
-  items: FoliateTocItem[],
-): Promise<FoliateTocItem[]> {
-  if (!book || items.length === 0) return items;
-
-  const context = createTocLocationContext(book);
-  if (!context) return inheritTocLocations(items);
-
-  await hydrateTocItemLocations(items, context);
-  return inheritTocLocations(items);
-}
-
-function createTocLocationContext(book: FoliateBookLike): TocLocationContext | null {
-  if (!Array.isArray(book.sections) || book.sections.length === 0) return null;
-
-  const sizes = book.sections.map((section) =>
-    section.linear !== "no" && typeof section.size === "number" && section.size > 0
-      ? section.size
-      : 0,
-  );
-  const totalSize = sizes.reduce((sum, size) => sum + size, 0);
-  const total = Math.max(1, Math.ceil(totalSize / FOLIATE_SIZE_PER_LOC));
-  let cumulative = 0;
-  const sectionLocations = sizes.map((size) => {
-    const location = {
-      current: Math.floor(cumulative / FOLIATE_SIZE_PER_LOC),
-      next: Math.floor((cumulative + size) / FOLIATE_SIZE_PER_LOC),
-      total,
-    };
-    cumulative += size;
-    return location;
-  });
-
-  const sectionIndexById = new Map<unknown, number>();
-  const sectionIndexByStringId = new Map<string, number>();
-  book.sections.forEach((section, index) => {
-    sectionIndexById.set(index, index);
-    sectionIndexByStringId.set(String(index), index);
-    if (section.id !== undefined) {
-      sectionIndexById.set(section.id, index);
-      sectionIndexByStringId.set(String(section.id), index);
-    }
-  });
-
-  return { book, sectionIndexById, sectionIndexByStringId, sectionLocations };
-}
-
-async function hydrateTocItemLocations(
-  items: FoliateTocItem[],
-  context: TocLocationContext,
-): Promise<void> {
-  for (const item of items) {
-    if (!hasTocLocation(item)) {
-      item.location = await resolveTocLocation(item, context);
-    }
-    if (item.subitems.length > 0) {
-      await hydrateTocItemLocations(item.subitems, context);
-    }
-  }
-}
-
-async function resolveTocLocation(
-  item: FoliateTocItem,
-  context: TocLocationContext,
-): Promise<TocLocation | undefined> {
-  if (item.href) {
-    const splitIndex = await resolveTocSectionIndexFromSplit(item.href, context);
-    const splitLocation = locationForSectionIndex(splitIndex, context);
-    if (splitLocation) return splitLocation;
-
-    const hrefIndex = await resolveTocSectionIndexFromHref(item.href, context);
-    const hrefLocation = locationForSectionIndex(hrefIndex, context);
-    if (hrefLocation) return hrefLocation;
-  }
-
-  if (typeof item.index === "number") return locationForSectionIndex(item.index, context);
-  return undefined;
-}
-
-async function resolveTocSectionIndexFromSplit(
-  href: string,
-  context: TocLocationContext,
-): Promise<number | undefined> {
-  if (!context.book.splitTOCHref) return undefined;
-  try {
-    const parts = await Promise.resolve(context.book.splitTOCHref(href));
-    const id = Array.isArray(parts) ? parts[0] : undefined;
-    return sectionIndexFromId(id, context);
-  } catch {
-    return undefined;
-  }
-}
-
-async function resolveTocSectionIndexFromHref(
-  href: string,
-  context: TocLocationContext,
-): Promise<number | undefined> {
-  if (!context.book.resolveHref) return undefined;
-  try {
-    const resolved = await Promise.resolve(context.book.resolveHref(href));
-    return typeof resolved?.index === "number" ? resolved.index : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function sectionIndexFromId(
-  id: unknown,
-  context: TocLocationContext,
-): number | undefined {
-  if (id === undefined || id === null) return undefined;
-  const exact = context.sectionIndexById.get(id);
-  if (exact !== undefined) return exact;
-  return context.sectionIndexByStringId.get(String(id));
-}
-
-function locationForSectionIndex(
-  index: number | undefined,
-  context: TocLocationContext,
-): TocLocation | undefined {
-  if (typeof index !== "number" || !Number.isInteger(index) || index < 0) {
-    return undefined;
-  }
-  return context.sectionLocations[index];
-}
-
-function inheritTocLocations(items: FoliateTocItem[]): FoliateTocItem[] {
-  for (const item of items) {
-    if (item.subitems.length > 0) {
-      inheritTocLocations(item.subitems);
-      if (!hasTocLocation(item)) {
-        item.location = firstChildLocation(item.subitems);
-      }
-    }
-  }
-  return items;
-}
-
-function firstChildLocation(items: FoliateTocItem[]): TocLocation | undefined {
-  for (const item of items) {
-    if (hasTocLocation(item)) return item.location;
-    const nested = firstChildLocation(item.subitems);
-    if (nested) return nested;
-  }
-  return undefined;
-}
-
-function hasTocLocation(item: FoliateTocItem): boolean {
-  return typeof item.location?.current === "number";
-}
-
-function tocPageLabel(item: FoliateTocItem): string {
-  if (typeof item.location?.current === "number") return String(item.location.current + 1);
-  if (typeof item.index === "number") return String(item.index + 1);
-  return "";
-}
-
-function tocNodeKey(item: FoliateTocItem, index: number, parentKey?: string): string {
-  const base = String(item.id ?? item.href ?? item.label ?? index);
-  return parentKey ? `${parentKey}/${base}` : base;
-}
-
-function computeExpandedTocKeys(items: FoliateTocItem[], activeHrefValue: string): Set<string> {
-  const path = activeHrefValue ? findTocPath(items, activeHrefValue) : [];
-  if (path.length > 0) return new Set(path);
-  const first = items[0];
-  if (items.length === 1 && first?.subitems?.length) {
-    return new Set([tocNodeKey(first, 0)]);
-  }
-  return new Set();
-}
-
-function findTocPath(
-  items: FoliateTocItem[],
-  href: string,
-  parentKey?: string,
-): string[] {
-  for (let index = 0; index < items.length; index += 1) {
-    const item = items[index];
-    if (!item) continue;
-    const key = tocNodeKey(item, index, parentKey);
-    if (item.href === href) return [key];
-    const childPath = findTocPath(item.subitems, href, key);
-    if (childPath.length > 0) return [key, ...childPath];
-  }
-  return [];
-}
-
-function DetailsSection({
-  kind,
-  label,
-  emptyLabel,
-  items,
-}: DetailsSectionProps): JSX.Element {
-  const [open, setOpen] = createSignal(true);
-
-  return (
-    <section class={`foliate-details-section is-${kind}`}>
-      <button
-        class="foliate-details-section-head"
-        onClick={() => setOpen((value) => !value)}
-        type="button"
-      >
-        <span>{label}</span>
-        <IconChevron size={14} />
-      </button>
-      <Show when={open()}>
-        <div class="foliate-details-section-body">
-          <Show
-            when={items.length > 0}
-            fallback={<p class="foliate-details-empty-text">{emptyLabel}</p>}
-          >
-            {kind === "description" ? (
-              <For each={items as string[]}>
-                {(item) => <p class="foliate-details-description">{item}</p>}
-              </For>
-            ) : kind === "series" ? (
-              <div class="foliate-details-series-list">
-                <For each={items as SeriesItem[]}>
-                  {(item) => (
-                    <div class="foliate-details-series-item">
-                      <strong>{item.label}</strong>
-                      <span>{item.position}</span>
-                    </div>
-                  )}
-                </For>
-              </div>
-            ) : (
-              <dl class="foliate-details-field-list">
-                <For each={items as MetadataSection[]}>
-                  {(item) => (
-                    <>
-                      <dt>{item.label}</dt>
-                      <dd>{item.value}</dd>
-                    </>
-                  )}
-                </For>
-              </dl>
-            )}
-          </Show>
-        </div>
-      </Show>
-    </section>
-  );
-}
-
-function ReaderAppearancePanel(props: ReaderAppearancePanelProps): JSX.Element {
-  return (
-    <section
-      aria-label={props.t("viewer.appearance.title")}
-      class="foliate-appearance-panel"
-      data-onelingo-reader-ui=""
-      onClick={(event) => event.stopPropagation()}
-      onPointerDown={(event) => event.stopPropagation()}
-      onWheel={(event) => event.stopPropagation()}
-      role="dialog"
-    >
-      <div class="foliate-appearance-panel-head">
-        <span>{props.t("viewer.appearance.title")}</span>
-      </div>
-      <div class="foliate-appearance-row">
-        <span>{props.t("viewer.appearance.fontSize")}</span>
-        <ReaderNumberStepper
-          ariaLabel={props.t("viewer.appearance.fontSize.aria")}
-          max={FOLIATE_READER_FONT_SIZE_MAX}
-          min={FOLIATE_READER_FONT_SIZE_MIN}
-          onChange={props.onFontSizeChange}
-          onStep={props.onFontSizeStep}
-          step={FOLIATE_READER_FONT_SIZE_STEP}
-          unit="px"
-          value={props.fontSize}
-        />
-      </div>
-      <div class="foliate-appearance-row">
-        <span>{props.t("viewer.appearance.useBookLayout")}</span>
-        <ReaderSwitch
-          checked={props.useBookLayout}
-          label={props.t("viewer.appearance.useBookLayout")}
-          onChange={props.onUseBookLayoutChange}
-        />
-      </div>
-      <div class="foliate-appearance-row">
-        <span>{props.t("viewer.appearance.textIndent")}</span>
-        <ReaderSwitch
-          checked={props.textIndent}
-          disabled={props.locked.textIndent}
-          label={props.t("viewer.appearance.textIndent")}
-          onChange={props.onTextIndentChange}
-        />
-      </div>
-      <div class="foliate-appearance-row">
-        <span>{props.t("viewer.appearance.lineHeight")}</span>
-        <ReaderNumberStepper
-          ariaLabel={props.t("viewer.appearance.lineHeight.aria")}
-          disabled={props.locked.lineHeight}
-          max={FOLIATE_READER_LINE_HEIGHT_MAX}
-          min={FOLIATE_READER_LINE_HEIGHT_MIN}
-          onChange={props.onLineHeightChange}
-          onStep={props.onLineHeightStep}
-          step={FOLIATE_READER_LINE_HEIGHT_STEP}
-          unit="x"
-          value={props.lineHeight}
-        />
-      </div>
-    </section>
-  );
-}
-
-function ReaderNumberStepper(props: ReaderNumberStepperProps): JSX.Element {
-  const commit = (value: string): void => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return;
-    props.onChange(parsed);
-  };
-
-  return (
-    <div
-      class="foliate-appearance-stepper"
-      classList={{ "is-disabled": Boolean(props.disabled) }}
-    >
-      <button
-        aria-label={`${props.ariaLabel} -${props.step}`}
-        disabled={props.disabled}
-        onClick={() => props.onStep(-props.step)}
-        type="button"
-      >
-        -
-      </button>
-      <input
-        aria-label={props.ariaLabel}
-        disabled={props.disabled}
-        inputMode="decimal"
-        max={props.max}
-        min={props.min}
-        onBlur={(event) => commit(event.currentTarget.value)}
-        onChange={(event) => commit(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === "ArrowUp") {
-            event.preventDefault();
-            props.onStep(props.step);
-          } else if (event.key === "ArrowDown") {
-            event.preventDefault();
-            props.onStep(-props.step);
-          }
-        }}
-        step="any"
-        type="text"
-        value={formatReaderSettingNumber(props.value)}
-      />
-      <span aria-hidden="true">{props.unit}</span>
-      <button
-        aria-label={`${props.ariaLabel} +${props.step}`}
-        disabled={props.disabled}
-        onClick={() => props.onStep(props.step)}
-        type="button"
-      >
-        +
-      </button>
-    </div>
-  );
-}
-
-function ReaderSwitch(props: {
-  checked: boolean;
-  disabled?: boolean;
-  label: string;
-  onChange: (value: boolean) => void;
-}): JSX.Element {
-  return (
-    <button
-      aria-checked={props.checked ? "true" : "false"}
-      aria-label={props.label}
-      class="foliate-appearance-switch"
-      classList={{ "is-on": props.checked }}
-      disabled={props.disabled}
-      onClick={() => props.onChange(!props.checked)}
-      role="switch"
-      type="button"
-    >
-      <span />
-    </button>
-  );
-}
-
-function formatReaderSettingNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
-}
-
 function buildMetadataSections(
   metadata: FoliateBookMetadata | null,
   t: (key: Parameters<ReturnType<typeof useT>>[0]) => string,
@@ -2758,10 +2205,6 @@ function normalizeSidebarWidth(value: unknown, fallback: number): string {
 
 function parseWidthFraction(value: string): number {
   return parseFoliateSidebarWidthFraction(value);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 function syncReaderLayout(

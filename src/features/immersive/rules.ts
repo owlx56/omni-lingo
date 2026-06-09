@@ -1,3 +1,4 @@
+import { isObjectRecord as isObject } from "@/lib/guards";
 import type { PageTranslateCommand } from "@/lib/messaging";
 import type { FullPageEngineId } from "@/lib/storage/settings";
 
@@ -852,8 +853,4 @@ function normalizeSourceLang(value: string): string | undefined {
   const lang = normalizeLangValue(value);
   if (!lang || lang === "auto") return undefined;
   return lang;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

@@ -7,6 +7,11 @@
 //
 // 缓存共用：key = engine|src|tgt|text，全文翻译按相同粒度拆句即可命中。
 
+import {
+  ONELINGO_HOST_ATTR,
+  READER_UI_ATTR,
+  TOOLTIP_ATTR,
+} from "@/lib/dom-attrs";
 import { sendMessage } from "@/lib/messaging";
 import type { TranslateResponse } from "@/engines/types";
 import { shouldSkipSameLanguageText } from "@/lib/lang-detect";
@@ -18,8 +23,6 @@ import {
 } from "@/lib/storage/settings";
 
 const TRANSLATE_DELAY_MS = 10;
-const TOOLTIP_ATTR = "data-onelingo-tooltip";
-const READER_UI_ATTR = "data-onelingo-reader-ui";
 const HIGHLIGHT_NAME = "onelingo-hover";
 const HIGHLIGHT_STYLE_ATTR = "data-onelingo-hl";
 
@@ -550,7 +553,7 @@ function isOurUi(t: EventTarget | null, tooltipAttr: string): boolean {
   const element = asElement(t);
   if (!element) return false;
   return !!element.closest?.(
-    `[${tooltipAttr}],[data-onelingo-host],[${READER_UI_ATTR}]`,
+    `[${tooltipAttr}],[${ONELINGO_HOST_ATTR}],[${READER_UI_ATTR}]`,
   );
 }
 

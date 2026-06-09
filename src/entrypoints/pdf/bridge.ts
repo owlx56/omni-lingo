@@ -1,3 +1,4 @@
+import { READER_UI_ATTR } from "@/lib/dom-attrs";
 import { onMessage, sendMessage, type PageFeatureStatus } from "@/lib/messaging";
 import { loadDocument } from "@/lib/document-store";
 import {
@@ -17,7 +18,6 @@ import {
   type EffectiveTheme,
 } from "@/lib/theme";
 
-const READER_UI_ATTR = "data-onelingo-reader-ui";
 const STORED_PDF_KEY_PARAM = "onelingo-key";
 const SNIFFED_PDF_PARAM = "onelingo-sniff";
 const VIEWER_APP_MAX_ATTEMPTS = 100;
