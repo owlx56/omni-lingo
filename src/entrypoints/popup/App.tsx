@@ -1,5 +1,5 @@
 // Native toolbar popup. The layout mirrors Read Frog's popup structure while
-// keeping OneLingo's existing page-translation/session semantics.
+// keeping Omni Lingo's existing page-translation/session semantics.
 
 import {
   Show,
@@ -513,7 +513,7 @@ function App(props: PopupAppProps = {}): JSX.Element {
   return (
     <main
       class="popup"
-      data-onelingo-reader-ui=""
+      data-omni-lingo-reader-ui=""
       data-popup-capability={capability()}
       data-popup-surface={props.surface ?? "native"}
       onClick={(event) => {

@@ -1,6 +1,6 @@
-# OneLingo（一译）
+# Omni Lingo
 
-OneLingo 是一个浏览器翻译拓展，目标是提供悬停翻译、划词翻译和全文沉浸式翻译体验。当前代码基于 WXT + TypeScript + Solid，面向 Chrome MV3 开发，保留跨 Firefox / Safari 的架构空间。
+Omni Lingo 是一个浏览器翻译拓展，目标是提供悬停翻译、划词翻译和全文沉浸式翻译体验。当前代码基于 WXT + TypeScript + Solid，面向 Chrome MV3 开发，保留跨 Firefox / Safari 的架构空间。
 
 ## 当前状态
 
@@ -130,7 +130,7 @@ i18n 文案源集中在 `src/lib/i18n/catalog.ts`；`src/lib/i18n/locales/*.ts`�
 | `markup.ts`    | 序列化、占位符、rich HTML 恢复、译文 markup 插入                                      |
 | `rules.ts`     | 默认 / 站点规则、规则匹配、规则解析                                                   |
 | `selectors.ts` | 安全 selector helper                                                                  |
-| `dom-attrs.ts` | 共享 `data-onelingo-*` wrapper 属性名                                                 |
+| `dom-attrs.ts` | 共享 `data-omni-lingo-*` wrapper 属性名                                                 |
 
 改这个模块前建议先读 [docs/architecture.md#全文翻译-immersive](docs/architecture.md#全文翻译-immersive)。
 修全文翻译 bug 时先按 [docs/immersive-debugging.md](docs/immersive-debugging.md) 分层定位。
@@ -148,8 +148,8 @@ i18n 文案源集中在 `src/lib/i18n/catalog.ts`；`src/lib/i18n/locales/*.ts`�
 
 ## 调试提示
 
-- content script 加载后，页面 DevTools console 会看到 `[OneLingo] content loaded: ...`。
-- background 启动后，拓展 Service worker console 会看到 `[OneLingo] background ready`。
+- content script 加载后，页面 DevTools console 会看到 `[Omni Lingo] content loaded: ...`。
+- background 启动后，拓展 Service worker console 会看到 `[Omni Lingo] background ready`。
 - popup 的全文翻译命令通过 background 转发到当前活动 tab。
 - 全文翻译站点差异优先在 `src/features/immersive/rules.ts` 里用 selector / rule flag 表达。
 

@@ -9,7 +9,7 @@
 - TypeScript：功能和基础设施代码。
 - Solid：只用于交互 UI。
 - Vanilla TypeScript：用于热路径和宿主页面 DOM 操作。
-- PDF.js release dist：PDF 渲染和官方 viewer 基础能力，由 `@onelingo/pdfjs-dist` 私有 Git 依赖提供；该自建仓库同步 Mozilla GitHub release 的 `pdfjs-*-dist.zip` 展开内容，OneLingo 通过 Bun/Git 依赖锁定到具体 tag，构建时复制到扩展 public assets。当前依赖是 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，安装后包根目录是 package shell，官方 release dist 在 `dist/`。
+- PDF.js release dist：PDF 渲染和官方 viewer 基础能力，由 `@omni-lingo/pdfjs-dist` 私有 Git 依赖提供。该自建仓库同步 Mozilla GitHub release 的 `pdfjs-*-dist.zip` 展开内容，Omni Lingo 通过 Bun/Git 依赖锁定到具体 tag，构建时复制到扩展 public assets。当前依赖是 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，安装后包根目录是 package shell，官方 release dist 在 `dist/`。
 - foliate-js：EPUB / MOBI / AZW3 / FB2 渲染，当前使用 Readest fork `github:readest/foliate-js#1fc763b8e6afe10971043a6818dcb9e2d8c54f4a`，以获得连续 scrolled renderer 和 Readest paginator 行为。
 
 ## 顶层流向
@@ -42,7 +42,7 @@ src/lib/
   number.ts      -> clamp / finite number helpers
   guards.ts      -> object / Element / closest target type guards
   idb.ts         -> IndexedDB request / transaction Promise wrappers
-  dom-attrs.ts   -> 跨 hover / selection / reader 的 OneLingo UI 边界 attr
+  dom-attrs.ts   -> 跨 hover / selection / reader 的 Omni Lingo UI 边界 attr
   foliate-reader-settings.ts -> EPUB reader 字号、行距、首行缩进、Use Book Layout 规范化和锁定规则
   document-store.ts -> viewer 页面 IndexedDB 文档暂存
   languages.ts   -> UI 语言 / 目标语言常量和类型
@@ -127,22 +127,22 @@ entrypoint-local UI 只保留当前页面专属组合，不复制基础控件：
 
 阅读器详细边界见 [document-viewer.md](document-viewer.md)。当前实现分为三个公开入口：
 
-- `/viewer.html`：Solid 兼容路由壳，处理旧本地 key、远程 URL、旧 sniffer 链接和 HTML shell 探测；最终转到 PDF 或 EPUB viewer。
-- `/pdf/web/viewer.html`：构建时公开的顶层 PDF.js reader。HTML / JS / CSS / runtime 都来自已安装的 `@onelingo/pdfjs-dist` Git 依赖，也就是同一个 GitHub release dist。
-- `/foliate/web/viewer.html`：构建时公开的 OneLingo Foliate reader shell。HTML / CSS 来自 `src/assets/foliate-viewer/`，运行时由 `/foliate-viewer.js` 挂载 `src/entrypoints/foliate/`。
+- `/viewer.html`：Solid 路由壳，处理本地 key、远程 URL 和 HTML shell 探测；最终转到 PDF 或 EPUB viewer。
+- `/pdf/web/viewer.html`：构建时公开的顶层 PDF.js reader。HTML / JS / CSS / runtime 都来自已安装的 `@omni-lingo/pdfjs-dist` Git 依赖，也就是同一个 GitHub release dist。
+- `/foliate/web/viewer.html`：构建时公开的 Omni Lingo Foliate reader shell。HTML / CSS 来自 `src/assets/foliate-viewer/`，运行时由 `/foliate-viewer.js` 挂载 `src/entrypoints/foliate/`。
 
 PDF 打开路径：
 
 ```text
 local key or direct URL
-  -> /pdf/web/viewer.html?file=... or ?onelingo-key=...
+  -> /pdf/web/viewer.html?file=... or ?omni-lingo-key=...
   -> src/entrypoints/pdf/bridge.ts 在顶层 PDF.js viewer 内初始化 hover / selection
 ```
 
 EPUB 打开路径：
 
 ```text
-/foliate/web/viewer.html?onelingo-key=... or ?file=...
+/foliate/web/viewer.html?omni-lingo-key=... or ?file=...
   -> ArrayBuffer / IndexedDB
   -> foliate-view open(file)
   -> src/entrypoints/foliate/bridge.ts 绑定内容文档
@@ -175,7 +175,7 @@ Foliate runtime asset 由 `wxt.config.ts` 从 `node_modules/foliate-js` 复制�
 - `documentLinkSniffKeepOriginal` 会打开 reader 新 tab，并给原 tab 临时安装 allow rule 放行原 PDF 页面。
 - `documentLinkSniffStandalone` 才使用 popup window；普通保留原页面必须是新 tab。
 
-构建资产由 `wxt.config.ts` 的 `build:publicAssets` 复制。不要编辑 `.output/`，不要手改 `@onelingo/pdfjs-dist` 依赖包内容；缺失或需要升级 PDF.js assets 时，先更新自建 `@onelingo/pdfjs-dist` Git 仓库，再在 OneLingo 里更新依赖 tag 并运行 `bun install`。
+构建资产由 `wxt.config.ts` 的 `build:publicAssets` 复制。不要编辑 `.output/`，不要手改 `@omni-lingo/pdfjs-dist` 依赖包内容；缺失或需要升级 PDF.js assets 时，先更新自建 `@omni-lingo/pdfjs-dist` Git 仓库，再在 Omni Lingo 里更新依赖 tag 并运行 `bun install`。
 
 ## 全文翻译 Immersive
 
@@ -188,7 +188,7 @@ Foliate runtime asset 由 `wxt.config.ts` 从 `node_modules/foliate-js` 复制�
 | `markup.ts`    | 序列化、占位符、rich HTML 恢复、译文 markup 插入                                      |
 | `rules.ts`     | 默认 / 站点规则、规则匹配、规则解析                                                   |
 | `selectors.ts` | 安全 selector helper                                                                  |
-| `dom-attrs.ts` | 共享 `data-onelingo-*` wrapper 属性名                                                 |
+| `dom-attrs.ts` | 共享 `data-omni-lingo-*` wrapper 属性名                                                 |
 | `immersive-loading.ts` | loading skeleton 行数/宽度、CSS 变量保留和 style 注入                          |
 
 ### Immersive 流程

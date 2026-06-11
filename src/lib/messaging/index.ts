@@ -166,7 +166,7 @@ export interface ProtocolMap {
 }
 
 type Envelope<K extends keyof ProtocolMap = keyof ProtocolMap> = {
-  __onelingo: true;
+  __omniLingo: true;
   type: K;
   input: ProtocolMap[K]["input"];
 };
@@ -176,11 +176,11 @@ type Handler<K extends keyof ProtocolMap> = (
   sender: Browser.runtime.MessageSender,
 ) => ProtocolMap[K]["output"] | Promise<ProtocolMap[K]["output"]>;
 
-function isEnvelope(raw: unknown): raw is Envelope {
+export function isProtocolEnvelope(raw: unknown): raw is Envelope {
   return (
     typeof raw === "object" &&
     raw !== null &&
-    (raw as { __onelingo?: unknown }).__onelingo === true
+    (raw as { __omniLingo?: unknown }).__omniLingo === true
   );
 }
 
@@ -236,16 +236,16 @@ export function onMessage<K extends keyof ProtocolMap>(
     raw: unknown,
     sender: Browser.runtime.MessageSender,
   ): Promise<unknown> | undefined => {
-    if (!isEnvelope(raw) || raw.type !== type) return undefined;
+    if (!isProtocolEnvelope(raw) || raw.type !== type) return undefined;
     return Promise.resolve(handler(raw.input as ProtocolMap[K]["input"], sender));
   };
   browser.runtime.onMessage.addListener(listener);
   return () => browser.runtime.onMessage.removeListener(listener);
 }
 
-function makeEnvelope<K extends keyof ProtocolMap>(
+export function makeEnvelope<K extends keyof ProtocolMap>(
   type: K,
   input: ProtocolMap[K]["input"],
 ): Envelope<K> {
-  return { __onelingo: true, type, input };
+  return { __omniLingo: true, type, input };
 }

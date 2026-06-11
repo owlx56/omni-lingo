@@ -70,7 +70,7 @@ export function initFoliateBridge(
   });
 
   initSelection({ captureDocumentSelection: false });
-  document.documentElement.setAttribute("data-onelingo-foliate-viewer", "");
+  document.documentElement.setAttribute("data-omni-lingo-foliate-viewer", "");
 
   const prefs: FoliateBridgePrefs = {
     readerSettings: normalizeFoliateReaderSettings(null),
@@ -98,7 +98,7 @@ export function initFoliateBridge(
       });
     })
     .catch((err: unknown) => {
-      console.warn("[OneLingo] failed to read foliate settings:", err);
+      console.warn("[Omni Lingo] failed to read foliate settings:", err);
     });
 
   const stopThemeWatch = watchEffectiveTheme((theme) => {
@@ -130,7 +130,7 @@ export function initFoliateBridge(
       });
     });
   } catch (err) {
-    console.warn("[OneLingo] failed to watch foliate settings:", err);
+    console.warn("[Omni Lingo] failed to watch foliate settings:", err);
   }
   const stopMessages = registerMessageHandlers(hover);
   const stopHooks = registerViewHooks(

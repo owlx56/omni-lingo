@@ -32,7 +32,7 @@ type FoliateReaderAppearanceBroadcastChannel = {
 };
 
 const FOLIATE_READER_APPEARANCE_CHANNEL =
-  "onelingo:foliate-reader-appearance";
+  "omni-lingo:foliate-reader-appearance";
 
 export function createFoliateReaderAppearanceMessageInput(
   settings: FoliateReaderStyleSettings,

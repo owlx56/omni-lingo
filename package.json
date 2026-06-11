@@ -1,5 +1,5 @@
 {
-  "name": "onelingo",
+  "name": "omni-lingo",
   "description": "manifest.json description",
   "private": true,
   "version": "0.0.0",
@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@wxt-dev/module-solid": "^1.1.4",
-    "@onelingo/pdfjs-dist": "git@github.com:owlx56/pdfjs-dist.git#v5.7.284",
+    "@omni-lingo/pdfjs-dist": "git@github.com:owlx56/pdfjs-dist.git#23389b8255d77b94674fd8c64e702acff2722fa6",
     "typescript": "^5.9.3",
     "wxt": "^0.20.23"
   }

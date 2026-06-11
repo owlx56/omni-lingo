@@ -22,11 +22,11 @@ import {
   type ViewerFormat,
 } from "@/lib/document-viewer-urls";
 
-const OPEN_LINK_IN_VIEWER_MENU = "onelingo-open-link-in-viewer";
-const OPEN_PAGE_IN_VIEWER_MENU = "onelingo-open-page-in-viewer";
-const OPEN_IN_VIEWER_TITLE = "Open in OneLingo Reader";
+const OPEN_LINK_IN_VIEWER_MENU = "omni-lingo-open-link-in-viewer";
+const OPEN_PAGE_IN_VIEWER_MENU = "omni-lingo-open-page-in-viewer";
+const OPEN_IN_VIEWER_TITLE = "Open in Omni Lingo Reader";
 const DOCUMENT_URL_RE = /\.(?:pdf|epub|mobi|azw3|kf8|fb2|fb2\.zip|fbz)(?:$|[?#])/i;
-const SNIFFED_DOCUMENT_STORAGE_PREFIX = "onelingo:sniffed-document:";
+const SNIFFED_DOCUMENT_STORAGE_PREFIX = "omni-lingo:sniffed-document:";
 const DOCUMENT_SNIFF_RULE_IDS = [42001, 42002, 42003, 42004, 42005, 42006];
 const DOCUMENT_SNIFF_BYPASS_RULE_ID_START = 42100;
 const DOCUMENT_SNIFF_BYPASS_RULE_ID_COUNT = 32;
@@ -60,13 +60,13 @@ interface PendingDocumentOpen {
 }
 
 export default defineBackground(() => {
-  console.log("[OneLingo] background ready");
+  console.log("[Omni Lingo] background ready");
   const documentSniffer = initDocumentLinkSniffer();
   void clearDocumentBypassRules().catch((err: unknown) => {
-    console.warn("[OneLingo] failed to clear document sniff bypass rules:", err);
+    console.warn("[Omni Lingo] failed to clear document sniff bypass rules:", err);
   });
   void initDocumentViewerMenus().catch((err: unknown) => {
-    console.warn("[OneLingo] failed to initialize reader context menus:", err);
+    console.warn("[Omni Lingo] failed to initialize reader context menus:", err);
   });
 
   onMessage("ping", (input) => ({ echo: input.text, at: Date.now() }));
@@ -250,12 +250,12 @@ function initDocumentLinkSniffer(): DocumentSniffState {
   };
 
   void getSettings().then(apply).catch((err: unknown) => {
-    console.warn("[OneLingo] failed to read document sniffer settings:", err);
+    console.warn("[Omni Lingo] failed to read document sniffer settings:", err);
   });
   try {
     watchSettings(apply);
   } catch (err: unknown) {
-    console.warn("[OneLingo] failed to watch document sniffer settings:", err);
+    console.warn("[Omni Lingo] failed to watch document sniffer settings:", err);
   }
 
   browser.tabs?.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -270,7 +270,7 @@ function initDocumentLinkSniffer(): DocumentSniffState {
       return;
     }
     void openSniffedDocument(tabId, url, state).catch((err: unknown) => {
-      console.warn("[OneLingo] failed to sniff document navigation:", err);
+      console.warn("[Omni Lingo] failed to sniff document navigation:", err);
     });
   });
 
@@ -320,7 +320,7 @@ function queueDocumentSniffRulesUpdate(state: DocumentSniffState): void {
     .then(() => syncDocumentSniffRules(state))
     .catch((err: unknown) => {
       state.dnrEnabled = false;
-      console.warn("[OneLingo] failed to update document sniff rules:", err);
+      console.warn("[Omni Lingo] failed to update document sniff rules:", err);
     });
 }
 
@@ -430,7 +430,7 @@ function rememberSniffedDocumentOpen(
   void browser.storage.session
     .set({ [sniffedDocumentStorageKey(tabId)]: entry })
     .catch((err: unknown) => {
-      console.warn("[OneLingo] failed to store sniffed document URL:", err);
+      console.warn("[Omni Lingo] failed to store sniffed document URL:", err);
     });
   if (state.pendingOpens.size > 100) {
     const cutoff = Date.now() - 30_000;
@@ -508,7 +508,8 @@ async function consumeSniffedDocumentOpen(
   const memoryEntry = state.pendingOpens.get(tabId);
   state.pendingOpens.delete(tabId);
   const pending =
-    memoryEntry ?? (await readStoredSniffedDocumentOpen(key).catch(() => null));
+    memoryEntry ??
+    (await readStoredSniffedDocumentOpen(key).catch(() => null));
   void browser.storage.session.remove(key).catch(() => {});
   if (!pending || Date.now() - pending.createdAt > 30_000) return null;
   return pending;

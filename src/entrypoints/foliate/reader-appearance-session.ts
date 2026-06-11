@@ -5,7 +5,7 @@ import {
 } from "./reader-settings";
 
 export const FOLIATE_READER_APPEARANCE_SESSION_KEY =
-  "onelingo:foliate-reader-appearance";
+  "omni-lingo:foliate-reader-appearance";
 
 export interface FoliateReaderAppearanceSessionStorage {
   getItem(key: string): string | null;

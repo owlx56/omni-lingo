@@ -1,4 +1,4 @@
-// OneLingo UI 多语言字典。
+// Omni Lingo UI 多语言字典。
 //
 // 文案源集中在 catalog.ts；messages.ts 只导出类型和格式化 helper。
 

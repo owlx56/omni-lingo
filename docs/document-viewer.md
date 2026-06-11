@@ -1,16 +1,16 @@
 # Document Viewer
 
-OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接嗅探，以及 reader 内 hover / selection 翻译。这里记录当前边界，避免以后把 PDF.js、EPUB 和普通网页翻译路径改散。
+Omni Lingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接嗅探，以及 reader 内 hover / selection 翻译。这里记录当前边界，避免以后把 PDF.js、EPUB 和普通网页翻译路径改散。
 
 ## 文件入口
 
 | 文件 | 职责 |
 | --- | --- |
-| `src/entrypoints/viewer/App.tsx` | `/viewer.html` 兼容路由壳；只负责本地 `onelingo-key`、远程 URL、旧 sniff 链接的格式解析和转跳 |
+| `src/entrypoints/viewer/App.tsx` | `/viewer.html` 路由壳；只负责本地 `omni-lingo-key`、远程 URL、sniff 链接的格式解析和转跳 |
 | `src/entrypoints/pdf-viewer.ts` | 输出 `/pdf-viewer.js` 的薄入口；实际代码在 `src/entrypoints/pdf/bridge.ts` |
 | `src/entrypoints/pdf/bridge.ts` | PDF.js reader 内 hover、selection 状态桥接、主题同步和 reader UI 标记 |
 | `src/entrypoints/foliate-viewer.ts` | 输出 `/foliate-viewer.js` 的薄入口；挂载 Foliate Solid viewer |
-| `src/entrypoints/foliate/App.tsx` | Foliate reader UI；接收 `onelingo-key`、`file`、`onelingo-sniff=1` 并驱动 `foliate-view` |
+| `src/entrypoints/foliate/App.tsx` | Foliate reader UI；接收 `omni-lingo-key`、`file`、`omni-lingo-sniff=1` 并驱动 `foliate-view` |
 | `src/entrypoints/foliate/bridge.ts` | Foliate 内容文档内 hover / selection 桥接；绑定 `foliate-view` 的 load / relocate 生命周期 |
 | `src/entrypoints/foliate/reader-content-style.ts` | Foliate 内容 CSS 注入、书内 CSS/HTML transform、Readest 默认字号和主题变量 |
 | `src/entrypoints/foliate/reader-toc.tsx` | TOC normalize、起始页码 hydration、展开路径和递归节点 |
@@ -19,9 +19,9 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 | `src/entrypoints/foliate/reader-*.ts` | Foliate sidebar / chrome / layout / page-turn / scrollbar / settings 等 reader-local helper |
 | `src/entrypoints/foliate/footnote-popup.ts` | Readest 式脚注 / 尾注弹窗 |
 | `src/lib/foliate-reader-settings.ts` | EPUB reader 外观设置的默认值、范围、锁定和存储转换 |
-| `@onelingo/pdfjs-dist` | 私有 Git 依赖仓库 `owlx56/pdfjs-dist`；根目录是 package shell，官方 `pdfjs-*-dist.zip` 展开内容放在 `dist/` |
-| `package.json` / `bun.lock` | OneLingo 只在这里锁定 `@onelingo/pdfjs-dist` 的具体 Git tag；当前为 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284` |
-| `src/assets/foliate-viewer/` | OneLingo EPUB 静态 shell，构建时复制到 `/foliate/web/` |
+| `@omni-lingo/pdfjs-dist` | 私有 Git 依赖仓库 `owlx56/pdfjs-dist`；根目录是 package shell，官方 `pdfjs-*-dist.zip` 展开内容放在 `dist/` |
+| `package.json` / `bun.lock` | Omni Lingo 只在这里锁定 `@omni-lingo/pdfjs-dist` 的具体 Git tag；当前为 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284` |
+| `src/assets/foliate-viewer/` | Omni Lingo EPUB 静态 shell，构建时复制到 `/foliate/web/` |
 | `src/assets/pdf-viewer/locales.generated.mjs` | 由 `scripts/generate-i18n.ts` 生成的 PDF reader 静态语言包 |
 | `src/features/document-sniffer.ts` | content script 层的页面内 PDF / EPUB 链接点击拦截 |
 | `src/entrypoints/background.ts` | 地址栏 / 主框架文件导航嗅探、右键菜单、保留原页面、独立窗口逻辑 |
@@ -31,48 +31,50 @@ OneLingo 的文档阅读器覆盖 PDF / EPUB、本地文件 / URL、文件链接
 
 ## 打开流程
 
-PDF 最终必须进入顶层 `/pdf/web/viewer.html`，EPUB 最终进入 `/foliate/web/viewer.html`。`/viewer.html` 只保留为兼容路由和 HTML shell 探测入口，不再承载 EPUB UI：
+PDF 最终必须进入顶层 `/pdf/web/viewer.html`，EPUB 最终进入 `/foliate/web/viewer.html`。`/viewer.html` 只保留为路由和 HTML shell 探测入口，不再承载 EPUB UI：
 
 ```text
 options / context menu / sniffer
   -> PDF URL: /pdf/web/viewer.html?file=...
   -> local PDF: storeDocument() IndexedDB
-  -> /pdf/web/viewer.html?onelingo-key=...
-  -> PDF DNR sniff: /pdf/web/viewer.html?onelingo-sniff=1
+  -> /pdf/web/viewer.html?omni-lingo-key=...
+  -> PDF DNR sniff: /pdf/web/viewer.html?omni-lingo-sniff=1
   -> EPUB / MOBI / AZW3 / FB2 URL: /foliate/web/viewer.html?file=...
   -> local EPUB: storeDocument() IndexedDB
-  -> /foliate/web/viewer.html?onelingo-key=...
-  -> Foliate DNR sniff: /foliate/web/viewer.html?onelingo-sniff=1
+  -> /foliate/web/viewer.html?omni-lingo-key=...
+  -> Foliate DNR sniff: /foliate/web/viewer.html?omni-lingo-sniff=1
   -> unknown URL / HTML shell: /viewer.html?url=...&format=auto
   -> discovered PDF: /pdf/web/viewer.html?file=...
   -> discovered EPUB: /foliate/web/viewer.html?file=...
 ```
 
-本地 PDF 从 options 进入时先 `storeDocument()`，然后由顶层 PDF.js viewer 内的 `pdf/bridge.ts` 用 `onelingo-key` 读取 IndexedDB 并调用 `PDFViewerApplication.open({ data })`。远程 PDF URL 直接作为官方 viewer 的 `file` 参数打开，和 Saladict 一样。远程 EPUB / MOBI / AZW3 / FB2 URL 进入 `/foliate/web/viewer.html?file=...` 后由 Foliate viewer 拉取并渲染；本地同样用 `onelingo-key` 打开。远程 URL 如果不能从扩展入口判断格式，会先进入 `/viewer.html` 做 HTML shell 发现；发现 PDF 后立即重定向到顶层官方 viewer，发现 Foliate 书籍后重定向到 Foliate viewer 的 `file` 入口。`fetchResolvableResource()` 会尝试从 iframe / embed / object / anchor / script 中发现嵌套的 PDF / Foliate 链接，最多递归 `MAX_URL_RESOLVE_DEPTH`。
+本地 PDF 从 options 进入时先 `storeDocument()`，然后由顶层 PDF.js viewer 内的 `pdf/bridge.ts` 用 `omni-lingo-key` 读取 IndexedDB 并调用 `PDFViewerApplication.open({ data })`。远程 PDF URL 直接作为官方 viewer 的 `file` 参数打开，和 Saladict 一样。远程 EPUB / MOBI / AZW3 / FB2 URL 进入 `/foliate/web/viewer.html?file=...` 后由 Foliate viewer 拉取并渲染；本地同样用 `omni-lingo-key` 打开。远程 URL 如果不能从扩展入口判断格式，会先进入 `/viewer.html` 做 HTML shell 发现；发现 PDF 后立即重定向到顶层官方 viewer，发现 Foliate 书籍后重定向到 Foliate viewer 的 `file` 入口。`fetchResolvableResource()` 会尝试从 iframe / embed / object / anchor / script 中发现嵌套的 PDF / Foliate 链接，最多递归 `MAX_URL_RESOLVE_DEPTH`。
+
+Omni Lingo 只生成并读取 `omni-lingo-key` / `omni-lingo-sniff` 和 `omni-lingo-docs`。
 
 ## PDF.js 资产
 
-PDF reader 使用 `@onelingo/pdfjs-dist` 私有 Git 依赖提供 GitHub release `pdfjs-*-dist.zip` 的展开内容，并加载官方 PDF.js `viewer.html` / `viewer.js|mjs` / `viewer.css` shell。当前依赖锁定在 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，PDF.js 版本为 `5.7.284`；不要再用自定义 `PDFViewer` 外壳替代官方 viewer，也不要把官方 viewer 放进 OneLingo iframe，否则 Chrome / Less / Saladict 一致的双击选词边界会重新偏移。
+PDF reader 使用 `@omni-lingo/pdfjs-dist` 私有 Git 依赖提供 GitHub release `pdfjs-*-dist.zip` 的展开内容，并加载官方 PDF.js `viewer.html` / `viewer.js|mjs` / `viewer.css` shell。当前依赖锁定在 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，PDF.js 版本为 `5.7.284`；不要再用自定义 `PDFViewer` 外壳替代官方 viewer，也不要把官方 viewer 放进 Omni Lingo iframe，否则 Chrome / Less / Saladict 一致的双击选词边界会重新偏移。
 
-OneLingo 不再下载或解压 PDF.js release zip。私有 `owlx56/pdfjs-dist` 仓库负责用脚本/CI 同步 Mozilla release zip；OneLingo 只在 `package.json` / `bun.lock` 中锁定该 Git 依赖的具体 tag。升级 PDF.js 时，先更新自建仓库，再更新 OneLingo 依赖引用并运行 `bun install`。
+Omni Lingo 不再下载或解压 PDF.js release zip。私有 `owlx56/pdfjs-dist` 仓库负责用脚本/CI 同步 Mozilla release zip；Omni Lingo 只在 `package.json` / `bun.lock` 中锁定该 Git 依赖的具体 tag。升级 PDF.js 时，先更新自建仓库，再更新 Omni Lingo 依赖引用并运行 `bun install`。
 
 `wxt.config.ts` 的 `build:publicAssets` 会复制：
 
-- `@onelingo/pdfjs-dist/dist/build/` 下的 PDF.js runtime、worker、sandbox
-- `@onelingo/pdfjs-dist/dist/web/viewer.html`
-- `@onelingo/pdfjs-dist/dist/web/viewer.js|mjs`
-- `@onelingo/pdfjs-dist/dist/web/viewer.css`
-- `@onelingo/pdfjs-dist/dist/web/locale/`
-- `@onelingo/pdfjs-dist/dist/web/cmaps/`、`standard_fonts/`、`wasm/`、`iccs/`、`images/`
+- `@omni-lingo/pdfjs-dist/dist/build/` 下的 PDF.js runtime、worker、sandbox
+- `@omni-lingo/pdfjs-dist/dist/web/viewer.html`
+- `@omni-lingo/pdfjs-dist/dist/web/viewer.js|mjs`
+- `@omni-lingo/pdfjs-dist/dist/web/viewer.css`
+- `@omni-lingo/pdfjs-dist/dist/web/locale/`
+- `@omni-lingo/pdfjs-dist/dist/web/cmaps/`、`standard_fonts/`、`wasm/`、`iccs/`、`images/`
 - `src/assets/fonts/inter/`
 
-旧版 PDF.js 使用 `@onelingo/pdfjs-dist/dist/web/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。新版 PDF.js 使用 Fluent `viewer.ftl` / `locale.json` 时直接复制官方 locale 目录。
+旧版 PDF.js 使用 `@omni-lingo/pdfjs-dist/dist/web/locale/**/viewer.properties` 时，`wxt.config.ts` 会以 `en-US/viewer.properties` 为基线，对缺失 key 做构建期补齐：先尝试使用官方别名 key（例如 `bookmark1.*` 复用 `bookmark.*`，`save.*` 复用 `download.*`），再回退到英文值。新版 PDF.js 使用 Fluent `viewer.ftl` / `locale.json` 时直接复制官方 locale 目录。
 
-`prepare:publicPaths` 会把 `pdf/web/viewer.html`、`foliate/web/viewer.html` 和 `foliate/web/foliate-js/view.js` 加入 public path。`wxt.config.ts` 会通过 Node 模块解析定位已安装的 `@onelingo/pdfjs-dist`，只接受包壳里的 `dist/build/pdf.mjs` / `dist/build/pdf.js` 布局，并用 `dist/PDFJS_RELEASE.json` 和 `pdfjs-release.lock.json` 做一致性校验。`wxt.config.ts` 会在复制时注入 `/pdf-viewer.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
+`prepare:publicPaths` 会把 `pdf/web/viewer.html`、`foliate/web/viewer.html` 和 `foliate/web/foliate-js/view.js` 加入 public path。`wxt.config.ts` 会通过 Node 模块解析定位已安装的 `@omni-lingo/pdfjs-dist`，只接受包壳里的 `dist/build/pdf.mjs` / `dist/build/pdf.js` 布局，并用 `dist/PDFJS_RELEASE.json` 和 `pdfjs-release.lock.json` 做一致性校验。`wxt.config.ts` 会在复制时注入 `/pdf-viewer.js`、清空默认 PDF、跳过 `validateFileURL(file)`，并保留 `willReadFrequently` canvas readback 补丁。
 
 ## Foliate / EPUB reader
 
-EPUB / MOBI / AZW3 / FB2 reader 使用 Readest fork `foliate-js`，依赖锁定在 `github:readest/foliate-js#1fc763b8e6afe10971043a6818dcb9e2d8c54f4a`。不要把 `foliate-js` 改回上游，也不要在 OneLingo 外层手写章节拼接；跨章节滚动依赖 fork 的连续 `flow="scrolled"` renderer。
+EPUB / MOBI / AZW3 / FB2 reader 使用 Readest fork `foliate-js`，依赖锁定在 `github:readest/foliate-js#1fc763b8e6afe10971043a6818dcb9e2d8c54f4a`。不要把 `foliate-js` 改回上游，也不要在 Omni Lingo 外层手写章节拼接；跨章节滚动依赖 fork 的连续 `flow="scrolled"` renderer。
 
 `wxt.config.ts` 会复制 `node_modules/foliate-js` 运行时文件到 `/foliate/web/foliate-js/`，并通过 `scripts/foliate-runtime-patches.ts` 做构建期 patch，包括 iframe sandbox 兼容、Readest fork paginator 兼容和 pages 双页章节首页对齐等。改 Foliate runtime 行为时，改 patch 管线和 `scripts/foliate-runtime-patches.test.js`，不要改 `node_modules/foliate-js` 或 `.output/`。
 
@@ -104,7 +106,7 @@ Foliate reader 外观设置只包含：
 - 限制 pages 模式封面 / 全页图片高度，避免和 reader chrome 重叠；
 - 已打开内容 iframe 通过 `applyFoliateContentCss()` 同步样式，新加载章节通过 `bridge.ts` load / relocate 继续绑定。
 
-Reader UI 控件、sidebar、详情 modal、脚注 popup、overlay scrollbar 等都必须标记或继承 `data-onelingo-reader-ui` 边界。hover、selection、滚轮翻页和正文点击取消选中都要避开这些 UI 区域。
+Reader UI 控件、sidebar、详情 modal、脚注 popup、overlay scrollbar 等都必须标记或继承 `data-omni-lingo-reader-ui` 边界。hover、selection、滚轮翻页和正文点击取消选中都要避开这些 UI 区域。
 
 ## Reader 翻译
 
@@ -114,7 +116,7 @@ Reader UI 控件、sidebar、详情 modal、脚注 popup、overlay scrollbar 等
 - PDF reader 通过 `src/entrypoints/pdf/bridge.ts` 调用 `initHover()` 和 `initSelection()`，并实现 `readPageFeatureStatus` / `updatePageFeaturePrefs`。
 - PDF hover 与普通网页共用 `src/features/hover/`。在顶层官方 PDF.js viewer 下，这套通用 hover 已验证可与 Less Translate 保持同等精度；不要为了 PDF 单独恢复 token split、overlay underline 或改写 textLayer DOM。PDF.js 的双击选词和浏览器原生选区依赖原始 textLayer 结构，所以仍然不要包 `all: unset` wrapper / token span。
 - Foliate reader 因内容在 `foliate-view` 载入的 iframe 文档中，需要 `src/entrypoints/foliate/bridge.ts` 在文档生命周期里转接 hover / selection。当前 hover 已复用 `src/features/hover/` 的共享 controller；bridge 只保留 `load` / `relocate` 绑定和文档级样式同步。
-- reader UI 元素要标记 `data-onelingo-reader-ui`，hover / selection 命中测试必须避开工具栏、侧栏、弹层和菜单。
+- reader UI 元素要标记 `data-omni-lingo-reader-ui`，hover / selection 命中测试必须避开工具栏、侧栏、弹层和菜单。
 
 修改 selection 行为时，先改 `src/features/selection/` 的共享路径，再检查普通网页、PDF reader、EPUB reader 三处是否同样生效。
 
@@ -142,7 +144,7 @@ options、popup、EPUB reader、PDF reader 的文案源都在 `src/lib/i18n/cata
 - EPUB / Solid reader UI 通过 `useT()` 读取 `viewer.*` key。
 - PDF 静态 reader 使用 `pdfViewer.*` key。
 - `scripts/generate-i18n.ts` 生成 `src/lib/i18n/locales/*.ts` 和 `src/assets/pdf-viewer/locales.generated.mjs`。
-- PDF 官方 viewer 通过 URL hash 的 `locale` 初始化语言；`src/lib/document-viewer-urls.ts` 负责把 OneLingo `uiLang` 映射到 PDF.js locale。已打开 PDF tab 会继续同步 `lang` / `dir`，但官方 viewer 文案不会热切换，刷新后生效。
+- PDF 官方 viewer 通过 URL hash 的 `locale` 初始化语言；`src/lib/document-viewer-urls.ts` 负责把 Omni Lingo `uiLang` 映射到 PDF.js locale。已打开 PDF tab 会继续同步 `lang` / `dir`，但官方 viewer 文案不会热切换，刷新后生效。
 
 新增 reader 文案时只改 `catalog.ts`，然后运行：
 
@@ -161,7 +163,7 @@ options、popup、EPUB reader、PDF reader 使用打包的 Inter 字体。字体
 
 - `/viewer.html` 路由壳通过 `useSettings()` / `initTheme()` 更新。
 - 顶层 PDF viewer 内部由 `/pdf-viewer.js` 调用 `initTheme()` 并监听主题变化。
-- EPUB viewer 自身由 `/foliate-viewer.js` 初始化主题；EPUB 内容文档通过 `src/entrypoints/foliate/bridge.ts` 监听主题 / 设置变化，并用 `reader-content-style.ts` 注入 `onelingo-foliate-theme`。
+- EPUB viewer 自身由 `/foliate-viewer.js` 初始化主题；EPUB 内容文档通过 `src/entrypoints/foliate/bridge.ts` 监听主题 / 设置变化，并用 `reader-content-style.ts` 注入 `omni-lingo-foliate-theme`。
 
 修主题 bug 时要检查已打开的 PDF / EPUB tab，无需刷新 tab 就应该响应主语言和主题切换。Foliate pages 模式还有 paginator `#background` 段；如果正文和 UI 已变色但左右 gutter 没变，优先检查 `foliate-view.renderer.shadowRoot.querySelector("#background")` 的子节点背景，以及内容 CSS 是否仍包含 `--override-color:true`。
 

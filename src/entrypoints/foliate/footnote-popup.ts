@@ -1,4 +1,4 @@
-import { READER_UI_ATTR } from "@/lib/dom-attrs";
+import { OMNI_LINGO_UI_BOUNDARY_SELECTOR } from "@/lib/dom-attrs";
 import { clamp } from "@/lib/number";
 import type { EffectiveTheme } from "@/lib/theme";
 import { createFoliateContentCss } from "./reader-content-style";
@@ -271,7 +271,7 @@ export function isFoliateReaderUiTarget(target: EventTarget | null): boolean {
     ? Boolean(
         target.closest(
           [
-            `[${READER_UI_ATTR}]`,
+            OMNI_LINGO_UI_BOUNDARY_SELECTOR,
             ".foliate-reader-topbar",
             ".foliate-reader-bottombar",
             ".foliate-reader-bottom-hover-zone",

@@ -1,4 +1,4 @@
-// OneLingo i18n 入口。
+// Omni Lingo i18n entry.
 //
 // 用法：
 //   const t = useT();

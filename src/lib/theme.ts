@@ -30,7 +30,7 @@ export function initTheme(): void {
       applyEffective(resolveEffective(currentPreference));
     })
     .catch((err: unknown) => {
-      console.warn("[OneLingo] failed to read theme settings:", err);
+      console.warn("[Omni Lingo] failed to read theme settings:", err);
     });
   try {
     watchSettings((s) => {
@@ -38,7 +38,7 @@ export function initTheme(): void {
       applyEffective(resolveEffective(currentPreference));
     });
   } catch (err) {
-    console.warn("[OneLingo] failed to watch theme settings:", err);
+    console.warn("[Omni Lingo] failed to watch theme settings:", err);
   }
 }
 

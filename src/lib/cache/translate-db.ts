@@ -2,7 +2,7 @@ import type { TranslateResponse } from "@/engines/types";
 import { isObjectRecord } from "@/lib/guards";
 import { requestResult, transactionDone } from "@/lib/idb";
 
-const DB_NAME = "onelingo-cache";
+export const TRANSLATE_CACHE_DB_NAME = "omni-lingo-cache";
 const DB_VERSION = 1;
 const STORE = "translate";
 const UPDATED_AT = "updatedAt";
@@ -45,9 +45,7 @@ export async function writeTranslateCache(
   value: TranslateResponse,
 ): Promise<void> {
   const db = await openDb();
-  const tx = db.transaction(STORE, "readwrite");
-  tx.objectStore(STORE).put({ key, value, updatedAt: Date.now() });
-  await transactionDone(tx);
+  await writeTranslateRecord(db, { key, value, updatedAt: Date.now() });
 
   writesSincePrune += 1;
   if (writesSincePrune >= PRUNE_EVERY_WRITES) {
@@ -61,20 +59,14 @@ function openDb(): Promise<IDBDatabase> {
     return Promise.reject(new Error("IndexedDB is unavailable"));
   }
 
-  dbPromise ??= new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+  dbPromise ??= openDbUncached();
 
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      const tx = request.transaction;
-      const store = db.objectStoreNames.contains(STORE)
-        ? tx?.objectStore(STORE)
-        : db.createObjectStore(STORE, { keyPath: "key" });
+  return dbPromise;
+}
 
-      if (store && !store.indexNames.contains(UPDATED_AT)) {
-        store.createIndex(UPDATED_AT, UPDATED_AT);
-      }
-    };
+function openDbUncached(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(TRANSLATE_CACHE_DB_NAME, DB_VERSION);
 
     request.onsuccess = () => {
       const db = request.result;
@@ -93,9 +85,28 @@ function openDb(): Promise<IDBDatabase> {
       dbPromise = undefined;
       reject(new Error("IndexedDB open was blocked"));
     };
-  });
 
-  return dbPromise;
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      const tx = request.transaction;
+      const store = db.objectStoreNames.contains(STORE)
+        ? tx?.objectStore(STORE)
+        : db.createObjectStore(STORE, { keyPath: "key" });
+
+      if (store && !store.indexNames.contains(UPDATED_AT)) {
+        store.createIndex(UPDATED_AT, UPDATED_AT);
+      }
+    };
+  });
+}
+
+async function writeTranslateRecord(
+  db: IDBDatabase,
+  record: TranslateCacheRecord,
+): Promise<void> {
+  const tx = db.transaction(STORE, "readwrite");
+  tx.objectStore(STORE).put(record);
+  await transactionDone(tx);
 }
 
 async function pruneOldRecords(): Promise<void> {

@@ -10,8 +10,10 @@ import { fetchDocumentFromUrl } from "@/lib/document-resolver";
 import {
   foliateViewerUrlForFile,
   foliateViewerUrlForStoredKey,
+  hasDocumentSniffFlag,
   pdfViewerUrlForFile,
   pdfViewerUrlForStoredKey,
+  readStoredDocumentKey,
   type ViewerFormat,
 } from "@/lib/document-viewer-urls";
 import { useT } from "@/lib/i18n";
@@ -39,7 +41,7 @@ function App(): JSX.Element {
 
   const init = async (): Promise<void> => {
     const params = new URLSearchParams(location.search);
-    const key = params.get("onelingo-key");
+    const key = readStoredDocumentKey(params);
     const url = params.get("url");
 
     if (key) {
@@ -51,7 +53,7 @@ function App(): JSX.Element {
       await resolveAndRedirectUrl(url, format);
       return;
     }
-    if (params.get("sniff") === "1") {
+    if (hasDocumentSniffFlag(params)) {
       const pending = await sendMessage("consumeSniffedDocument", {});
       if (pending?.action === "open" && pending.url) {
         await resolveAndRedirectUrl(pending.url, "auto");

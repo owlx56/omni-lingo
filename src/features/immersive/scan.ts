@@ -1,4 +1,4 @@
-import { ONELINGO_HOST_ATTR, TOOLTIP_ATTR } from "@/lib/dom-attrs";
+import { OMNI_LINGO_UI_BOUNDARY_SELECTOR } from "@/lib/dom-attrs";
 import { BUILTIN_IGNORE_SELECTOR, HARD_SKIP_TAGS } from "./markup";
 import type { ResolvedFullPageRule } from "./rules";
 import {
@@ -6,7 +6,12 @@ import {
   matchesSelectorSafe,
   querySelectorAllSafe,
 } from "./selectors";
-import { INNER_ATTR, WRAPPER_ATTR } from "./dom-attrs";
+import {
+  INNER_ATTR,
+  INNER_SELECTOR,
+  WRAPPER_ATTR,
+  WRAPPER_SELECTOR,
+} from "./dom-attrs";
 
 export interface ScanContext {
   intersectionObserver: IntersectionObserver;
@@ -113,7 +118,7 @@ const SKIP_ANCESTOR_SELECTOR = [
   ".notranslate",
   ".sr-only",
   ".visually-hidden",
-  `[${WRAPPER_ATTR}]`,
+  WRAPPER_SELECTOR,
 ].join(",");
 
 const displayCache = new WeakMap<Element, boolean>();
@@ -249,16 +254,14 @@ function buildIgnoreSelector(rule: ResolvedFullPageRule | null): string {
 }
 
 export function isOurWrapper(node: Node): boolean {
-  return node instanceof Element && node.hasAttribute(WRAPPER_ATTR);
+  return node instanceof Element && !!node.closest(WRAPPER_SELECTOR);
 }
 
 export function isOurUiNode(el: Element): boolean {
   return (
     el.hasAttribute(WRAPPER_ATTR) ||
     el.hasAttribute(INNER_ATTR) ||
-    !!el.closest(
-      `[${TOOLTIP_ATTR}],[${ONELINGO_HOST_ATTR}],[${WRAPPER_ATTR}]`,
-    )
+    !!el.closest(`${OMNI_LINGO_UI_BOUNDARY_SELECTOR},${WRAPPER_SELECTOR},${INNER_SELECTOR}`)
   );
 }
 

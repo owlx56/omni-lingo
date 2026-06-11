@@ -11,7 +11,7 @@ import {
   popupShowsPageControls,
 } from "./popup-capability.ts";
 
-const OWN_BASE = "chrome-extension://onelingo-id/";
+const OWN_BASE = "chrome-extension://omni-lingo-id/";
 
 describe("popup capability classification", () => {
   test("uses the full web popup on ordinary web and file pages", () => {
@@ -26,28 +26,28 @@ describe("popup capability classification", () => {
     );
   });
 
-  test("classifies supported OneLingo extension pages by popup content", () => {
+  test("classifies supported Omni Lingo extension pages by popup content", () => {
     expect(
       classifyPopupCapability(
-        "chrome-extension://onelingo-id/options.html",
+        "chrome-extension://omni-lingo-id/options.html",
         OWN_BASE,
       ),
     ).toBe("options");
     expect(
       classifyPopupCapability(
-        "chrome-extension://onelingo-id/pdf/web/viewer.html?file=test.pdf",
+        "chrome-extension://omni-lingo-id/pdf/web/viewer.html?file=test.pdf",
         OWN_BASE,
       ),
     ).toBe("reader");
     expect(
       classifyPopupCapability(
-        "chrome-extension://onelingo-id/foliate/web/viewer.html?file=test.epub",
+        "chrome-extension://omni-lingo-id/foliate/web/viewer.html?file=test.epub",
         OWN_BASE,
       ),
     ).toBe("reader");
     expect(
       classifyPopupCapability(
-        "chrome-extension://onelingo-id/viewer.html?url=https%3A%2F%2Fa.test%2Fa.pdf",
+        "chrome-extension://omni-lingo-id/viewer.html?url=https%3A%2F%2Fa.test%2Fa.pdf",
         OWN_BASE,
       ),
     ).toBe("reader");

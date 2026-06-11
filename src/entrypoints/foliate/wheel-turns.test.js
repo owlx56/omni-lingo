@@ -41,7 +41,7 @@ describe("createWheelTurnDetector", () => {
     expect(detector.feed(sample({ deltaY: 40, timeStamp: 64 }))).toBeNull();
   });
 
-  test("starts a new wheel gesture after OneLingo's shorter idle gap", () => {
+  test("starts a new wheel gesture after Omni Lingo's shorter idle gap", () => {
     const detector = createWheelTurnDetector({ threshold: 30 });
 
     expect(detector.feed(sample({ deltaY: 40, timeStamp: 0 }))).toBe("right");

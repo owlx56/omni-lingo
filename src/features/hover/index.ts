@@ -8,8 +8,7 @@
 // 缓存共用：key = engine|src|tgt|text，全文翻译按相同粒度拆句即可命中。
 
 import {
-  ONELINGO_HOST_ATTR,
-  READER_UI_ATTR,
+  OMNI_LINGO_UI_BOUNDARY_SELECTOR,
   TOOLTIP_ATTR,
 } from "@/lib/dom-attrs";
 import { sendMessage } from "@/lib/messaging";
@@ -26,8 +25,8 @@ import { pdfTextLayerHit } from "./pdf-text-layer";
 import { computeTooltipPosition } from "./tooltip-position";
 
 const TRANSLATE_DELAY_MS = 10;
-const HIGHLIGHT_NAME = "onelingo-hover";
-const HIGHLIGHT_STYLE_ATTR = "data-onelingo-hl";
+const HIGHLIGHT_NAME = "omni-lingo-hover";
+const HIGHLIGHT_STYLE_ATTR = "data-omni-lingo-hl";
 
 type CaretDoc = Document & {
   caretPositionFromPoint?(
@@ -220,7 +219,7 @@ function initHoverSettings(state: State): void {
       applyHoverSettings(state, s);
     })
     .catch((err: unknown) => {
-      console.warn("[OneLingo] failed to read hover settings:", err);
+      console.warn("[Omni Lingo] failed to read hover settings:", err);
       applyEnabled(state);
     });
   try {
@@ -228,7 +227,7 @@ function initHoverSettings(state: State): void {
       applyHoverSettings(state, s);
     });
   } catch (err) {
-    console.warn("[OneLingo] failed to watch hover settings:", err);
+    console.warn("[Omni Lingo] failed to watch hover settings:", err);
   }
 }
 
@@ -362,7 +361,7 @@ async function finishTranslate(
       show(s, res.text, anchor);
     })
     .catch((e: unknown) => {
-      console.warn("[OneLingo] hover translate failed:", e);
+      console.warn("[Omni Lingo] hover translate failed:", e);
       if (seq === s.seq) dismiss(s);
     });
 }
@@ -614,9 +613,7 @@ function isEditable(t: EventTarget | null): boolean {
 function isOurUi(t: EventTarget | null, tooltipAttr: string): boolean {
   const element = asElement(t);
   if (!element) return false;
-  return !!element.closest?.(
-    `[${tooltipAttr}],[${ONELINGO_HOST_ATTR}],[${READER_UI_ATTR}]`,
-  );
+  return !!element.closest?.(`[${tooltipAttr}],${OMNI_LINGO_UI_BOUNDARY_SELECTOR}`);
 }
 
 function asElement(target: EventTarget | null): ElementLike | null {

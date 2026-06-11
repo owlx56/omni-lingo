@@ -1,6 +1,6 @@
 # Agent Guidelines
 
-这份文档保存 OneLingo 的长期工程规则。根目录 `AGENTS.md` 只保留短入口和硬约束。
+这份文档保存 Omni Lingo 的长期工程规则。根目录 `AGENTS.md` 只保留短入口和硬约束。
 
 ## 核心决策
 
@@ -40,7 +40,7 @@ Minimal 翻译是 vanilla DOM，只展示译文。Rich 翻译是 Solid UI，包�
 使用 CSS Custom Highlight API：
 
 ```ts
-CSS.highlights.set("onelingo-hover", new Highlight(range));
+CSS.highlights.set("omni-lingo-hover", new Highlight(range));
 ```
 
 不要用 `<mark>` 或 wrapper `<span>` 做悬停下划线。包宿主 DOM 会破坏选区、事件委托和宿主框架的 DOM diff。Firefox 可降级到 overlay。
@@ -86,10 +86,10 @@ options / popup / EPUB viewer / PDF viewer 的界面文案都走 `src/lib/i18n/c
 
 文档阅读器边界见 `docs/document-viewer.md`。简要规则：
 
-- PDF reader 使用 `@onelingo/pdfjs-dist` 私有 Git 依赖提供官方 GitHub release `pdfjs-*-dist.zip` 的展开内容；当前锁定 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，依赖根目录是包壳，官方 release dist 在 `dist/build/`、`dist/web/`、`dist/LICENSE`。不要手改已安装依赖或 `.output/`。
+- PDF reader 使用 `@omni-lingo/pdfjs-dist` 私有 Git 依赖提供官方 GitHub release `pdfjs-*-dist.zip` 的展开内容；当前锁定 `git@github.com:owlx56/pdfjs-dist.git#v5.7.284`，依赖根目录是包壳，官方 release dist 在 `dist/build/`、`dist/web/`、`dist/LICENSE`。不要手改已安装依赖或 `.output/`。
 - PDF 内置 viewer 必须保持官方 PDF.js `viewer.html` / `viewer.js` / `viewer.css` 的布局和 textLayer 环境，避免自定义 `PDFViewer` 外壳导致双击选词边界和 hover 精度偏移。
 - PDF hover 默认直接复用 `src/features/hover/` 的通用逻辑。遇到 PDF hover 精度问题，先检查是否仍在顶层官方 viewer 里运行，再检查 reader UI 边界和 textLayer 命中；不要先验地恢复 PDF-specific hover 分支。
-- EPUB 主路径现已切到 Readest fork `foliate-js`，reader shell 公开为 `/foliate/web/viewer.html`，实现放在 `src/entrypoints/foliate/App.tsx`，内容桥接在 `src/entrypoints/foliate/bridge.ts`；hover 编排优先复用 `src/features/hover/`，bridge 只保留文档生命周期绑定和坐标转换。连续滚动依赖 fork 的 scrolled renderer，不在 OneLingo 外层手写章节拼接。
+- EPUB 主路径现已切到 Readest fork `foliate-js`，reader shell 公开为 `/foliate/web/viewer.html`，实现放在 `src/entrypoints/foliate/App.tsx`，内容桥接在 `src/entrypoints/foliate/bridge.ts`；hover 编排优先复用 `src/features/hover/`，bridge 只保留文档生命周期绑定和坐标转换。连续滚动依赖 fork 的 scrolled renderer，不在 Omni Lingo 外层手写章节拼接。
 - Foliate runtime 从 `node_modules/foliate-js` 复制到扩展 public assets，并由 `scripts/foliate-runtime-patches.ts` 做构建期 patch。改 paginator / iframe sandbox / runtime asset 行为时改 patch 管线和测试，不要手改 `node_modules/` 或 `.output/`。
 - Foliate reader 的阅读外观设置只包含字号、行距、首行缩进、Use Book Layout。默认字号按 Readest 16px；Use Book Layout 保留书籍段落版式，只锁行距和首行缩进，不锁字号；不提供 reader 字体选择。
 - Foliate 内容样式集中在 `src/entrypoints/foliate/reader-content-style.ts`。这里负责 `renderer.setStyles()`、已加载 iframe CSS 同步、书内 CSS/HTML transform、去掉本地字体 URL、把硬编码字号转成可随 reader 字号缩放的单位，以及给 paginator 提供主题背景变量。主题 / 字号 / 行距 / 首行缩进修改应在已打开 reader tab 内即时生效。
@@ -97,7 +97,7 @@ options / popup / EPUB viewer / PDF viewer 的界面文案都走 `src/lib/i18n/c
 - Foliate App 只负责编排 reader 状态和 `foliate-view` 生命周期。TOC normalize / hydration 在 `reader-toc.tsx`，reader 外观弹窗在 `reader-appearance-panel.tsx`，书籍详情 section 在 `reader-book-details.tsx`；新增同类 UI/纯逻辑时继续放到 `reader-*` 模块。
 - `/viewer.html` 只作为兼容路由和 HTML shell 探测入口；不要把 EPUB UI 或 PDF 自定义 viewer 重新塞回这里。
 - reader 内 selection 行为必须复用 `src/features/selection/`。未来改 selection 功能时，普通网页、PDF reader、EPUB reader 应尽量同时生效。
-- reader UI 控件必须标记或继承 `data-onelingo-reader-ui` 边界，hover / selection 不应命中工具栏、侧栏、菜单、对话框。
+- reader UI 控件必须标记或继承 `data-omni-lingo-reader-ui` 边界，hover / selection 不应命中工具栏、侧栏、菜单、对话框。
 - 打开文件链接嗅探同时涉及 content script 点击拦截和 background DNR / webRequest 主框架嗅探。修其中一个前先确认另一个是否也需要同步。
 
 ### 存储
@@ -109,7 +109,7 @@ options / popup / EPUB viewer / PDF viewer 的界面文案都走 `src/lib/i18n/c
 | 跨设备配置                   | `storage.sync`                 |
 | 本机配置                     | `storage.local`                |
 | 翻译缓存                     | 内存 LRU + IndexedDB           |
-| reader 临时文档              | viewer 页面 IndexedDB `onelingo-docs` |
+| reader 临时文档              | viewer 页面 IndexedDB `omni-lingo-docs` |
 | 生词本、术语、长期文件结果   | 通过 background 访问 IndexedDB |
 
 background 是 MV3 service worker，随时可能被杀。持久状态必须可恢复。

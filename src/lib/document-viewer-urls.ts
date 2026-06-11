@@ -7,7 +7,8 @@ export type ViewerFormat = DocumentFormat | "auto";
 const PDF_VIEWER_PATH = "pdf/web/viewer.html";
 const FOLIATE_VIEWER_PATH = "foliate/web/viewer.html";
 const READER_SHELL_PATH = "viewer.html";
-const STORED_DOCUMENT_KEY_PARAM = "onelingo-key";
+export const STORED_DOCUMENT_KEY_PARAM = "omni-lingo-key";
+export const DOCUMENT_SNIFF_PARAM = "omni-lingo-sniff";
 const PDF_URL_RE = /\.pdf(?:$|[?#].*)?/i;
 const FOLIATE_URL_RE = /\.(?:epub|mobi|azw3|kf8|fb2|fb2\.zip|fbz)(?:$|[?#].*)?/i;
 
@@ -30,7 +31,7 @@ export function pdfViewerUrlForStoredKey(
 
 export function pdfViewerUrlForSniff(uiLang?: UiLang): string {
   const url = pdfViewerBaseUrl();
-  url.searchParams.set("onelingo-sniff", "1");
+  url.searchParams.set(DOCUMENT_SNIFF_PARAM, "1");
   applyPdfLocale(url, uiLang);
   return url.href;
 }
@@ -49,7 +50,7 @@ export function foliateViewerUrlForStoredKey(key: string): string {
 
 export function foliateViewerUrlForSniff(): string {
   const url = foliateViewerBaseUrl();
-  url.searchParams.set("onelingo-sniff", "1");
+  url.searchParams.set(DOCUMENT_SNIFF_PARAM, "1");
   return url.href;
 }
 
@@ -122,6 +123,14 @@ function pdfViewerBaseUrl(): URL {
 
 function foliateViewerBaseUrl(): URL {
   return new URL(FOLIATE_VIEWER_PATH, browser.runtime.getURL("/"));
+}
+
+export function readStoredDocumentKey(params: URLSearchParams): string | null {
+  return params.get(STORED_DOCUMENT_KEY_PARAM);
+}
+
+export function hasDocumentSniffFlag(params: URLSearchParams): boolean {
+  return params.get(DOCUMENT_SNIFF_PARAM) === "1";
 }
 
 function readerShellBaseUrl(): URL {

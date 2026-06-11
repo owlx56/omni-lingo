@@ -10,7 +10,7 @@ export const READEST_DEFAULT_FONT_SIZE = 16;
 export const READEST_MINIMUM_FONT_SIZE = 8;
 export const READEST_DEFAULT_LINE_HEIGHT = 1.4;
 export const READEST_DEFAULT_TEXT_INDENT = 0;
-export const FOLIATE_CONTENT_STYLE_ID = "onelingo-foliate-theme";
+export const FOLIATE_CONTENT_STYLE_ID = "omni-lingo-foliate-theme";
 const READEST_DEFAULT_FONT_WEIGHT = 400;
 
 type FoliateContentStyleTarget = {
@@ -377,7 +377,7 @@ export function bindFoliateContentTransforms(
       )
       .catch((err: unknown) => {
         console.warn(
-          `[OneLingo] failed to transform foliate content ${detail.name ?? ""}:`,
+          `[Omni Lingo] failed to transform foliate content ${detail.name ?? ""}:`,
           err,
         );
         return "";

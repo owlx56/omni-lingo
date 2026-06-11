@@ -49,7 +49,7 @@ export function ReaderAppearancePanel(
     <section
       aria-label={props.t("viewer.appearance.title")}
       class="foliate-appearance-panel"
-      data-onelingo-reader-ui=""
+      data-omni-lingo-reader-ui=""
       onClick={(event) => event.stopPropagation()}
       onPointerDown={(event) => event.stopPropagation()}
       onWheel={(event) => event.stopPropagation()}

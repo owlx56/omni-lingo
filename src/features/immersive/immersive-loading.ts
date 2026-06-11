@@ -1,8 +1,8 @@
 import { INNER_ATTR, WRAPPER_ATTR } from "./dom-attrs";
 
-const LOADING_STYLE_ID = "onelingo-immersive-loading-style";
-const LOADING_BASE_VAR = "--onelingo-loading-base";
-const LOADING_FLOW_VAR = "--onelingo-loading-flow";
+const LOADING_STYLE_ID = "omni-lingo-immersive-loading-style";
+const LOADING_BASE_VAR = "--omni-lingo-loading-base";
+const LOADING_FLOW_VAR = "--omni-lingo-loading-flow";
 
 export type LoadingCssVars = { base: string; flow: string };
 
@@ -16,7 +16,7 @@ export function appendLoadingLines(
   const specs = createLoadingLineSpecs(original, inline, lineCount, seed);
   for (const spec of specs) {
     const line = document.createElement("span");
-    line.className = "onelingo-immersive-loading-line";
+    line.className = "omni-lingo-immersive-loading-line";
     line.style.width = spec.width;
     line.style.animationDelay = `${spec.animationDelay}s`;
     line.style.animationDuration = `${spec.animationDuration}s`;
@@ -58,27 +58,27 @@ export function ensureLoadingStyles(): void {
 [${WRAPPER_ATTR}]::after {
   content: none !important;
 }
-[${WRAPPER_ATTR}] [${INNER_ATTR}][aria-busy="true"] .onelingo-immersive-loading-line {
+[${WRAPPER_ATTR}] [${INNER_ATTR}][aria-busy="true"] .omni-lingo-immersive-loading-line {
   display: block;
   height: 0.92em;
   min-height: 0.72rem;
   margin: 0.38em 0;
-  background-color: var(--onelingo-loading-base);
+  background-color: var(--omni-lingo-loading-base);
   background-image: linear-gradient(
     90deg,
-    var(--onelingo-loading-base) 0%,
-    var(--onelingo-loading-base) 34%,
-    var(--onelingo-loading-flow) 49%,
-    var(--onelingo-loading-base) 64%,
-    var(--onelingo-loading-base) 100%
+    var(--omni-lingo-loading-base) 0%,
+    var(--omni-lingo-loading-base) 34%,
+    var(--omni-lingo-loading-flow) 49%,
+    var(--omni-lingo-loading-base) 64%,
+    var(--omni-lingo-loading-base) 100%
   );
   background-position: 120% 0;
   background-size: 260% 100%;
-  animation: onelingo-loading-flow 2s linear infinite;
+  animation: omni-lingo-loading-flow 2s linear infinite;
 }
-@keyframes onelingo-loading-flow { to { background-position: -120% 0; } }
+@keyframes omni-lingo-loading-flow { to { background-position: -120% 0; } }
 @media (prefers-reduced-motion: reduce) {
-  [${WRAPPER_ATTR}] [${INNER_ATTR}] .onelingo-immersive-loading-line {
+  [${WRAPPER_ATTR}] [${INNER_ATTR}] .omni-lingo-immersive-loading-line {
     animation: none;
     background-position: 50% 0;
   }

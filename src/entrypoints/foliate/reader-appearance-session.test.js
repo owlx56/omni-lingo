@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   createFoliateReaderAppearanceDocumentKey,
+  FOLIATE_READER_APPEARANCE_SESSION_KEY,
   readFoliateReaderAppearanceSession,
   resolveFoliateReaderAppearanceGlobalUpdate,
   resolveFoliateReaderAppearanceFromSession,
@@ -68,7 +69,7 @@ describe("reader appearance session overrides", () => {
     const storage = makeSessionStorage();
 
     storage.setItem(
-      "onelingo:foliate-reader-appearance",
+      FOLIATE_READER_APPEARANCE_SESSION_KEY,
       JSON.stringify({
         detached: true,
         documentKey: "stored:book-1",
@@ -93,6 +94,16 @@ describe("reader appearance session overrides", () => {
         useBookLayout: false,
       },
     });
+  });
+
+  test("writes detached overrides to the Omni Lingo session key", () => {
+    const storage = makeSessionStorage();
+
+    writeFoliateReaderAppearanceSession(storage, "stored:book-1", globalSettings);
+
+    expect(storage.getItem(FOLIATE_READER_APPEARANCE_SESSION_KEY)).toContain(
+      "stored:book-1",
+    );
   });
 
   test("creates stable document keys for stored, url, and local files", () => {

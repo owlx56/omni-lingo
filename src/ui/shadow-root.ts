@@ -1,4 +1,4 @@
-import { ONELINGO_HOST_ATTR } from "@/lib/dom-attrs";
+import { OMNI_LINGO_HOST_ATTR } from "@/lib/dom-attrs";
 
 // 单例 closed Shadow DOM 容器。
 //
@@ -17,7 +17,7 @@ let root: ShadowRoot | null = null;
 export function getShadowRoot(): ShadowRoot {
   if (root) return root;
   host = document.createElement("div");
-  host.setAttribute(ONELINGO_HOST_ATTR, "");
+  host.setAttribute(OMNI_LINGO_HOST_ATTR, "");
   // 自身 0x0、position:fixed，不参与布局也不挡事件；
   // z-index 拉满确保 shadow 内 position:fixed 的子元素能压在宿主之上
   host.style.cssText = "position:fixed;top:0;left:0;z-index:2147483647";

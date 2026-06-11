@@ -90,7 +90,7 @@ const DEFAULT_HIDE_DELAY_MS = 1000;
 const DEFAULT_MIN_THUMB_SIZE = 28;
 const DEFAULT_STEP_SIZE = 72;
 const WHEEL_LINE_SIZE = 16;
-const FOLIATE_SCROLLBAR_STYLE_ID = "onelingo-overlay-scrollbar-native-style";
+const FOLIATE_SCROLLBAR_STYLE_ID = "omni-lingo-overlay-scrollbar-native-style";
 
 export const HIDDEN_OVERLAY_SCROLLBAR: OverlayScrollbarSnapshot = {
   canScroll: false,

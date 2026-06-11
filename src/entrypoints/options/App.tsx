@@ -33,6 +33,7 @@ import {
   type FoliateReaderStyleSettings,
 } from "@/lib/foliate-reader-settings";
 import { broadcastFoliateReaderAppearance } from "@/lib/foliate-reader-live-settings";
+import { PRODUCT_NAME } from "@/lib/branding";
 import { useT } from "@/lib/i18n";
 import { clamp } from "@/lib/number";
 import { IconLogo } from "@/lib/ui/icons";
@@ -671,7 +672,7 @@ function App() {
   const renderAbout = (): JSX.Element => (
     <section class="section">
       <h2>{t("section.about")}</h2>
-      <Row label="OneLingo" description={t("about.tagline")}>
+      <Row label={PRODUCT_NAME} description={t("about.tagline")}>
         <span aria-hidden="true" class="avatar avatar-small">
           <IconLogo size={20} />
         </span>

@@ -10,7 +10,8 @@ import {
   patchFoliatePaginatorScript,
 } from "./scripts/foliate-runtime-patches";
 
-const PDFJS_PACKAGE_NAME = "@onelingo/pdfjs-dist";
+// Private package shell around the official Mozilla PDF.js release dist.
+const PDFJS_PACKAGE_NAME = "@omni-lingo/pdfjs-dist";
 
 type PublicAssetFile =
   | {
@@ -181,7 +182,7 @@ function patchPdfJsCanvasReadback(contents: string): string {
 function patchPdfViewerHtml(contents: string): string {
   let next = contents.replace(
     /<title>[\s\S]*?<\/title>/,
-    "<title>OneLingo PDF Viewer</title>",
+    "<title>Omni Lingo PDF Viewer</title>",
   );
   if (next.includes('src="/pdf-viewer.js"')) return next;
 
@@ -198,9 +199,9 @@ function patchPdfViewerHtml(contents: string): string {
 }
 
 function patchPdfViewerScript(contents: string, filename: string): string {
-  let next = contents.startsWith("/* OneLingo:")
+  let next = contents.startsWith("/* Omni Lingo:")
     ? contents
-    : `/* OneLingo: official PDF.js viewer, patched at build time. */\n${contents}`;
+    : `/* Omni Lingo: official PDF.js viewer, patched at build time. */\n${contents}`;
 
   const defaultUrl =
     /defaultOptions\.defaultUrl\s*=\s*\{[\s\S]*?value:\s*(['"])(?:[^'"]*?\.pdf|[^'"]+)\1,[\s\S]*?kind:\s*OptionKind\.VIEWER[\s\S]*?\};/;
@@ -211,14 +212,14 @@ function patchPdfViewerScript(contents: string, filename: string): string {
     match.replace(/value:\s*(['"])(?:[^'"]*?\.pdf|[^'"]+)\1/, 'value: ""'),
   );
 
-  if (!next.includes("OneLingo: extension viewer opens external file URLs")) {
+  if (!next.includes("Omni Lingo: extension viewer opens external file URLs")) {
     const validateCall = "validateFileURL(file);";
     if (!next.includes(validateCall)) {
       throw new Error(`Unable to locate validateFileURL(file) in ${filename}.`);
     }
     next = next.replace(
       validateCall,
-      "/* OneLingo: extension viewer opens external file URLs. */",
+      "/* Omni Lingo: extension viewer opens external file URLs. */",
     );
   }
 
@@ -455,7 +456,7 @@ async function assertPdfJsUpstreamMatchesLock(
   if (!mismatchedField) return;
 
   throw new Error(
-    `PDF.js dist package metadata mismatch (${mismatchedField}). Update @onelingo/pdfjs-dist.`,
+    `PDF.js dist package metadata mismatch (${mismatchedField}). Update @omni-lingo/pdfjs-dist.`,
   );
 }
 
@@ -472,7 +473,7 @@ async function readPdfJsReleaseMetadataFile(
       (error as NodeJS.ErrnoException).code === "ENOENT"
     ) {
       throw new Error(
-        `Missing PDF.js assets at ${path}. Check @onelingo/pdfjs-dist installation.`,
+        `Missing PDF.js assets at ${path}. Check @omni-lingo/pdfjs-dist installation.`,
       );
     }
     throw error;
@@ -486,7 +487,7 @@ async function readPdfJsReleaseMetadataFile(
   for (const field of requiredFields) {
     if (typeof parsed[field] !== "string" || !parsed[field]) {
       throw new Error(
-        `${path} is missing ${field}. Check @onelingo/pdfjs-dist installation.`,
+        `${path} is missing ${field}. Check @omni-lingo/pdfjs-dist installation.`,
       );
     }
   }
@@ -504,7 +505,7 @@ async function readPdfJsReleaseMetadataFile(
   for (const field of requiredReleaseFields) {
     if (typeof parsed[field] !== "string" || !parsed[field]) {
       throw new Error(
-        `${path} is missing ${field}. Check @onelingo/pdfjs-dist installation.`,
+        `${path} is missing ${field}. Check @omni-lingo/pdfjs-dist installation.`,
       );
     }
   }
@@ -764,7 +765,7 @@ export default defineConfig({
   srcDir: "src",
   modules: ["@wxt-dev/module-solid"],
   manifest: {
-    name: "OneLingo",
+    name: "Omni Lingo",
     description: "跨平台翻译拓展",
     permissions: [
       "storage",

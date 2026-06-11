@@ -1,5 +1,5 @@
 // 全文翻译核心逻辑 — 参照 kiss-translator 实现
-// 核心差异保留：使用 onelingo 的 LRU + IndexedDB 二级缓存（通过 translateBatch 消息）
+// 核心差异保留：使用 Omni Lingo 的 LRU + IndexedDB 二级缓存（通过 translateBatch 消息）
 
 import type { TranslateFormat } from "@/engines/types";
 import {
@@ -20,7 +20,12 @@ import {
   type Settings,
 } from "@/lib/storage/settings";
 import { buildTranslationStyleCss } from "@/lib/translation-style";
-import { INNER_ATTR, WRAPPER_ATTR } from "./dom-attrs";
+import {
+  INNER_ATTR,
+  INNER_SELECTOR,
+  WRAPPER_ATTR,
+  WRAPPER_SELECTOR,
+} from "./dom-attrs";
 import {
   appendTranslatedContent,
   pickSerializeFormat,
@@ -63,10 +68,10 @@ const NAVIGATION_CHECK_MS = 500;
 const NAVIGATION_RETRANSLATE_DELAY_MS = 800;
 const VIRTUAL_LAYOUT_REFRESH_DELAY_MS = 80;
 
-const MAIN_PAGE_LAYOUT_STYLE_ID = "onelingo-wikipedia-main-page-layout-style";
-const HIDDEN_ORIGINAL_ATTR = "data-onelingo-hidden-original";
-const SINGLE_MODE_TOGGLE_ATTR = "data-onelingo-single-mode-toggle";
-const ORIGINAL_PEEK_ATTR = "data-onelingo-original-peek";
+const MAIN_PAGE_LAYOUT_STYLE_ID = "omni-lingo-wikipedia-main-page-layout-style";
+const HIDDEN_ORIGINAL_ATTR = "data-omni-lingo-hidden-original";
+const SINGLE_MODE_TOGGLE_ATTR = "data-omni-lingo-single-mode-toggle";
+const ORIGINAL_PEEK_ATTR = "data-omni-lingo-original-peek";
 const INLINE_RUN_SEPARATOR_RE = /^[\s,.;:|/\\()[\]{}·•●‧・\-–—←→]+$/u;
 const INLINE_RUN_TRANSLATION_SEPARATOR = " · ";
 const INTERACTIVE_HOST_SELECTOR = [
@@ -927,9 +932,7 @@ async function translateNodeGroup(
 
     // Replace skeleton with actual translation
     runWithMutedMutations(host, () => {
-      const inner = wrapper.querySelector(
-        `[${INNER_ATTR}]`,
-      ) as HTMLElement | null;
+      const inner = wrapper.querySelector(INNER_SELECTOR) as HTMLElement | null;
       if (!inner) return;
       inner.removeAttribute("aria-busy");
       inner.textContent = "";
@@ -959,7 +962,7 @@ async function translateNodeGroup(
       });
       removeHostWrapper(host, wrapper);
     }
-    console.warn("[OneLingo] translateNodeGroup failed:", err);
+    console.warn("[Omni Lingo] translateNodeGroup failed:", err);
   }
 }
 
@@ -1082,7 +1085,11 @@ function removeHostWrapper(host: HTMLElement, wrapper: HTMLElement): void {
 }
 
 function getHostWrappers(host: HTMLElement): HTMLElement[] {
-  return Array.from(hostWrappers.get(host) ?? []);
+  const wrappers = new Set(hostWrappers.get(host) ?? []);
+  for (const wrapper of querySelectorAllSafe(host, WRAPPER_SELECTOR)) {
+    if (wrapper instanceof HTMLElement) wrappers.add(wrapper);
+  }
+  return Array.from(wrappers);
 }
 
 function getOriginalHideMode(host: HTMLElement): OriginalHideMode {
@@ -1267,7 +1274,7 @@ function canUseSingleModeToggle(
 }
 
 function isTranslatedWrapperReady(wrapper: HTMLElement): boolean {
-  const inner = wrapper.querySelector(`[${INNER_ATTR}]`);
+  const inner = wrapper.querySelector(INNER_SELECTOR);
   return (
     inner instanceof HTMLElement && inner.getAttribute("aria-busy") !== "true"
   );
@@ -1452,7 +1459,7 @@ function applyWrapperMode(
     layoutChanged = true;
   }
 
-  const inner = wrapper.querySelector(`[${INNER_ATTR}]`) as HTMLElement | null;
+  const inner = wrapper.querySelector(INNER_SELECTOR) as HTMLElement | null;
   if (inner) {
     applyTranslationInnerStyles(inner, transOnly, host, state.hideMode, rule);
   }
@@ -1481,9 +1488,7 @@ function reapplyTranslationInnerStyles(rule: ResolvedFullPageRule): void {
         const state = wrapperState.get(wrapper);
         if (!state) continue;
 
-        const inner = wrapper.querySelector(
-          `[${INNER_ATTR}]`,
-        ) as HTMLElement | null;
+        const inner = wrapper.querySelector(INNER_SELECTOR) as HTMLElement | null;
         if (inner) {
           applyTranslationInnerStyles(
             inner,
@@ -1766,7 +1771,7 @@ function handleSoftNavigation(): void {
     navigationTimer = undefined;
     if (!lastTranslateInput) return;
     void startPageTranslate(lastTranslateInput).catch((error) => {
-      console.warn("[OneLingo] navigation retranslate failed:", error);
+      console.warn("[Omni Lingo] navigation retranslate failed:", error);
     });
   }, NAVIGATION_RETRANSLATE_DELAY_MS);
 }

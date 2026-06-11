@@ -14,8 +14,10 @@ import { fetchDocumentFromUrl } from "@/lib/document-resolver";
 import {
   foliateViewerUrlForFile,
   foliateViewerUrlForStoredKey,
+  hasDocumentSniffFlag,
   pdfViewerUrlForFile,
   pdfViewerUrlForStoredKey,
+  readStoredDocumentKey,
   type ViewerFormat,
 } from "@/lib/document-viewer-urls";
 import { useT } from "@/lib/i18n";
@@ -350,9 +352,9 @@ function App(): JSX.Element {
 
   const init = async (): Promise<void> => {
     const params = new URLSearchParams(location.search);
-    const key = params.get("onelingo-key");
+    const key = readStoredDocumentKey(params);
     const file = params.get("file") ?? params.get("url");
-    const sniff = params.get("onelingo-sniff") === "1" || params.get("sniff") === "1";
+    const sniff = hasDocumentSniffFlag(params);
 
     if (key) {
       await openStoredDocument(key);
@@ -567,7 +569,7 @@ function App(): JSX.Element {
           : current,
       );
     } catch (err) {
-      console.warn("[OneLingo] failed to load foliate cover:", err);
+      console.warn("[Omni Lingo] failed to load foliate cover:", err);
     }
   };
 
@@ -582,7 +584,7 @@ function App(): JSX.Element {
     try {
       raw = await getStoredSettings();
     } catch (err) {
-      console.warn("[OneLingo] failed to read foliate sidebar prefs:", err);
+      console.warn("[Omni Lingo] failed to read foliate sidebar prefs:", err);
     }
     const desktop = isWideViewport();
     const storedPinned = raw?.foliateSidebarPinned;
@@ -665,7 +667,7 @@ function App(): JSX.Element {
     try {
       await Promise.resolve(result);
     } catch (err) {
-      console.warn("[OneLingo] failed to render foliate footnote popup:", err);
+      console.warn("[Omni Lingo] failed to render foliate footnote popup:", err);
       closeFootnotePopup();
       await view.goTo(detail.href);
     }
@@ -696,7 +698,7 @@ function App(): JSX.Element {
     try {
       await Promise.resolve(result);
     } catch (err) {
-      console.warn("[OneLingo] failed to follow foliate footnote link:", err);
+      console.warn("[Omni Lingo] failed to follow foliate footnote link:", err);
       closeFootnotePopup();
       await view.goTo(detail.href);
     }
@@ -717,7 +719,7 @@ function App(): JSX.Element {
     try {
       await Promise.resolve(handleFootnoteEvent(view.book, syntheticEvent));
     } catch (err) {
-      console.warn("[OneLingo] failed to go back in foliate footnote popup:", err);
+      console.warn("[Omni Lingo] failed to go back in foliate footnote popup:", err);
     }
   };
 
@@ -1347,7 +1349,7 @@ function App(): JSX.Element {
   };
 
   return (
-    <main class="viewer-root" data-onelingo-reader-ui="">
+    <main class="viewer-root" data-omni-lingo-reader-ui="">
       <div
         classList={{
           "foliate-viewer-frame": true,
@@ -1499,7 +1501,7 @@ function App(): JSX.Element {
                     scrollbarSnapshot().state === "visible" ||
                     scrollbarSnapshot().state === "expanded",
                 }}
-                data-onelingo-reader-ui=""
+                data-omni-lingo-reader-ui=""
                 onMouseEnter={() => overlayScrollbarController.expand()}
                 onMouseLeave={() => overlayScrollbarController.collapse()}
                 onWheel={(event) => {
@@ -1824,7 +1826,7 @@ function App(): JSX.Element {
                   <button
                     aria-hidden="true"
                     class="foliate-footnote-backdrop"
-                    data-onelingo-reader-ui=""
+                    data-omni-lingo-reader-ui=""
                     onClick={closeFootnotePopup}
                     tabIndex={-1}
                     type="button"
@@ -1837,7 +1839,7 @@ function App(): JSX.Element {
                       "is-scrollable": popup().size.scrollable,
                       "is-up": popup().position.dir === "up",
                     }}
-                    data-onelingo-reader-ui=""
+                    data-omni-lingo-reader-ui=""
                     role="dialog"
                     style={{
                       height: `${popup().size.height}px`,

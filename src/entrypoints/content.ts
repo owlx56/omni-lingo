@@ -23,12 +23,12 @@ import { initDocumentLinkSniffer } from "@/features/document-sniffer";
 export default defineContentScript({
   matches: ["<all_urls>"],
   async main() {
-    console.log("[OneLingo] content loaded:", location.href);
+    console.log("[Omni Lingo] content loaded:", location.href);
     try {
       const res = await sendMessage("ping", { text: "hello" });
-      console.log("[OneLingo] ping ok:", res);
+      console.log("[Omni Lingo] ping ok:", res);
     } catch (e) {
-      console.warn("[OneLingo] ping failed:", e);
+      console.warn("[Omni Lingo] ping failed:", e);
     }
     initFullPage();
     initHover();

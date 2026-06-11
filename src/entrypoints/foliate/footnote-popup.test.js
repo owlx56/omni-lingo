@@ -57,7 +57,10 @@ class FakeElement {
       if (selector.includes(".foliate-footnote-popup") && current._classes.has("foliate-footnote-popup")) {
         return current;
       }
-      if (selector.includes("[data-onelingo-reader-ui]") && current._readerUi) {
+      if (
+        selector.includes("[data-omni-lingo-reader-ui]") &&
+        current._readerUi
+      ) {
         return current;
       }
       current = current.parentElement;

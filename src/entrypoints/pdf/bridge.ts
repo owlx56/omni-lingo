@@ -2,6 +2,11 @@ import { READER_UI_ATTR } from "@/lib/dom-attrs";
 import { onMessage, sendMessage, type PageFeatureStatus } from "@/lib/messaging";
 import { loadDocument } from "@/lib/document-store";
 import {
+  DOCUMENT_SNIFF_PARAM,
+  hasDocumentSniffFlag,
+  readStoredDocumentKey,
+} from "@/lib/document-viewer-urls";
+import {
   getHoverEnabledStatus,
   initHover,
   updateHoverEnabledPref,
@@ -17,9 +22,11 @@ import {
   watchEffectiveTheme,
   type EffectiveTheme,
 } from "@/lib/theme";
+import {
+  setPdfJsVerbosityToErrors,
+  type PdfJsOptionsWindowLike,
+} from "./pdfjs-options";
 
-const STORED_PDF_KEY_PARAM = "onelingo-key";
-const SNIFFED_PDF_PARAM = "onelingo-sniff";
 const VIEWER_APP_MAX_ATTEMPTS = 100;
 
 interface PdfViewerApplication {
@@ -28,17 +35,20 @@ interface PdfViewerApplication {
   setTitle?(title: string): void;
 }
 
-type PdfViewerWindow = Window & typeof globalThis & {
-  PDFViewerApplication?: PdfViewerApplication;
-};
+type PdfViewerWindow = Window &
+  typeof globalThis &
+  PdfJsOptionsWindowLike & {
+    PDFViewerApplication?: PdfViewerApplication;
+  };
 
 export function initPdfBridge(): void {
-  document.documentElement.setAttribute("data-onelingo-pdf-viewer", "");
+  document.documentElement.setAttribute("data-omni-lingo-pdf-viewer", "");
+  setPdfJsVerbosityToErrors(window as PdfViewerWindow);
   initPdfViewerTheme();
   initPdfReaderUiBoundary();
   initPdfReaderFeatures();
   void bootstrapPdfDocumentOpen().catch((err: unknown) => {
-    console.warn("[OneLingo] failed to bootstrap PDF document:", err);
+    console.warn("[Omni Lingo] failed to bootstrap PDF document:", err);
   });
 }
 
@@ -46,12 +56,14 @@ export function initPdfBridge(): void {
 // top-level official PDF.js viewer application.
 async function bootstrapPdfDocumentOpen(): Promise<void> {
   const params = new URLSearchParams(location.search);
-  const key = params.get(STORED_PDF_KEY_PARAM);
-  const shouldConsumeSniffed = params.get(SNIFFED_PDF_PARAM) === "1";
+  const key = readStoredDocumentKey(params);
+  const shouldConsumeSniffed = hasDocumentSniffFlag(params);
   if (!key && !shouldConsumeSniffed) return;
 
   const app = await waitForPdfViewerApplication();
+  setPdfJsVerbosityToErrors(window as PdfViewerWindow);
   await app.initializedPromise;
+  setPdfJsVerbosityToErrors(window as PdfViewerWindow);
 
   if (key) {
     await openStoredPdf(app, key);
@@ -64,7 +76,7 @@ async function bootstrapPdfDocumentOpen(): Promise<void> {
 }
 
 // Theme + reader chrome marking keep the official viewer selectable while
-// shielding OneLingo's own reader UI from hover/selection handlers.
+// shielding Omni Lingo's own reader UI from hover/selection handlers.
 function initPdfViewerTheme(): void {
   initTheme();
   watchEffectiveTheme(syncPdfViewerTheme);
@@ -118,7 +130,7 @@ async function openSniffedPdf(app: PdfViewerApplication): Promise<void> {
 
 function currentPdfViewerUrlForFile(fileUrl: string): string {
   const url = new URL(location.href);
-  url.searchParams.delete(SNIFFED_PDF_PARAM);
+  url.searchParams.delete(DOCUMENT_SNIFF_PARAM);
   url.searchParams.set("file", fileUrl);
   return url.href;
 }
@@ -139,8 +151,8 @@ function sleep(ms: number): Promise<void> {
 
 function syncPdfViewerTheme(theme: EffectiveTheme): void {
   applyThemeToDocument(document, theme);
-  document.documentElement.classList.toggle("onelingo-theme-dark", theme === "dark");
-  document.documentElement.classList.toggle("onelingo-theme-light", theme === "light");
+  document.documentElement.classList.toggle("omni-lingo-theme-dark", theme === "dark");
+  document.documentElement.classList.toggle("omni-lingo-theme-light", theme === "light");
 }
 
 function markPdfChrome(): void {

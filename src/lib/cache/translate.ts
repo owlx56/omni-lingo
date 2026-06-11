@@ -121,7 +121,7 @@ export async function translateCachedBatch(
         results[i] = individual.text;
       }
     } catch (err) {
-      console.warn("[OneLingo] translateCachedBatch API failed:", err);
+      console.warn("[Omni Lingo] translateCachedBatch API failed:", err);
       // Fallback: empty strings for failed items
       for (const i of needApi) results[i] = "";
     }

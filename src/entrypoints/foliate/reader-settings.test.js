@@ -16,7 +16,7 @@ import {
 } from "./reader-settings.ts";
 
 describe("normalizeFoliateReaderSettings", () => {
-  test("keeps OneLingo defaults for missing values", () => {
+  test("keeps Omni Lingo defaults for missing values", () => {
     expect(normalizeFoliateReaderSettings({})).toEqual({
       fontSize: 17,
       lineHeight: 1.4,

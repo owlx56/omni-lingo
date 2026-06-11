@@ -150,7 +150,7 @@ const PLACEHOLDER_SAFE_TAG = "span";
 // Compact format: <i1>content</i1> matches kiss-translator's default placetagFormat.
 const PLACEHOLDER_OPEN_RE = /<i(\d+)>/gi;
 const PLACEHOLDER_CLOSE_RE = /<\/i\d+>/gi;
-const PRESERVE_HTML_ATTR = "data-onelingo-preserve";
+const PRESERVE_HTML_ATTR = "data-omni-lingo-preserve";
 
 interface WrappedPlaceholder {
   openTag: string;
@@ -408,9 +408,9 @@ function restoreFromTranslation(
 ): string {
   if (!translatedText || placeholders.size === 0) return translatedText;
 
-  const restoreAttr = "data-onelingo-restore";
-  const openTokenPrefix = "\uE000onelingo-open-";
-  const closeToken = "\uE000onelingo-close\uE000";
+  const restoreAttr = "data-omni-lingo-restore";
+  const openTokenPrefix = "\uE000omni-lingo-open-";
+  const closeToken = "\uE000omni-lingo-close\uE000";
   let textToParse =
     format === "text" ? decodeHtmlEntities(translatedText) : translatedText;
   let result = translatedText;

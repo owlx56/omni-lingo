@@ -31,7 +31,7 @@ export function initDocumentLinkSniffer(): void {
       state.uiLang = settings.uiLang;
     })
     .catch((err: unknown) => {
-      console.warn("[OneLingo] failed to read document sniffer settings:", err);
+      console.warn("[Omni Lingo] failed to read document sniffer settings:", err);
     });
 
   try {
@@ -42,7 +42,7 @@ export function initDocumentLinkSniffer(): void {
       state.uiLang = settings.uiLang;
     });
   } catch (err: unknown) {
-    console.warn("[OneLingo] failed to watch document sniffer settings:", err);
+    console.warn("[Omni Lingo] failed to watch document sniffer settings:", err);
   }
 
   document.addEventListener(

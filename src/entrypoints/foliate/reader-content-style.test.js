@@ -16,7 +16,7 @@ import {
 } from "./reader-content-style.ts";
 
 describe("createFoliateContentCss", () => {
-  test("uses OneLingo's default reader font size", () => {
+  test("uses Omni Lingo's default reader font size", () => {
     const css = createFoliateContentCss("light");
 
     expect(READEST_DEFAULT_FONT_SIZE).toBe(16);

@@ -9,7 +9,7 @@
 //
 // 翻译提前发出的好处：hover 确认时大概率命中缓存，卡片瞬间出，无需 spinner。
 
-import { READER_UI_ATTR } from "@/lib/dom-attrs";
+import { OMNI_LINGO_UI_BOUNDARY_SELECTOR } from "@/lib/dom-attrs";
 import { sendMessage } from "@/lib/messaging";
 import {
   getSettings,
@@ -19,8 +19,8 @@ import {
 import { getHost, getShadowRoot } from "@/ui/shadow-root";
 import { setSelText, setSelTarget, setSelResult } from "./card-store";
 
-const LOGO_ATTR = "data-onelingo-logo";
-const CARD_ATTR = "data-onelingo-selcard";
+const LOGO_ATTR = "data-omni-lingo-logo";
+const CARD_ATTR = "data-omni-lingo-selcard";
 const LOGO_SIZE = 30; // 与 Saladict SaladBowl 保持一致
 const LOGO_OFFSET_X = 6;
 const LOGO_OFFSET_Y = -(LOGO_SIZE + 4);
@@ -75,7 +75,7 @@ export function initSelection(options: InitSelectionOptions = {}): void {
         applySelectionSettings(s, cfg);
       })
       .catch((err: unknown) => {
-        console.warn("[OneLingo] failed to read selection settings:", err);
+        console.warn("[Omni Lingo] failed to read selection settings:", err);
         applyEnabled(s);
       });
     try {
@@ -83,7 +83,7 @@ export function initSelection(options: InitSelectionOptions = {}): void {
         applySelectionSettings(s, cfg);
       });
     } catch (err) {
-      console.warn("[OneLingo] failed to watch selection settings:", err);
+      console.warn("[Omni Lingo] failed to watch selection settings:", err);
     }
   }
 
@@ -232,7 +232,7 @@ function startSelection(
       setSelResult(res.text);
     })
     .catch((err) => {
-      console.warn("[OneLingo] selection translate failed:", err);
+      console.warn("[Omni Lingo] selection translate failed:", err);
     });
 
   showLogo(s, clientX, clientY);
@@ -249,7 +249,7 @@ function injectLogoStyle(): void {
   // prettier-ignore
   style.textContent = `
     /* ── 入场：果冻弹出（直接移植 Saladict saladbowl-jelly） ── */
-    @keyframes onelingo-jelly {
+    @keyframes omni-lingo-jelly {
          0% { transform: matrix3d(0.500,0,0,0,0,0.500,0,0,0,0,1,0,0,0,0,1); }
       3.40% { transform: matrix3d(0.658,0,0,0,0,0.703,0,0,0,0,1,0,0,0,0,1); }
       4.70% { transform: matrix3d(0.725,0,0,0,0,0.800,0,0,0,0,1,0,0,0,0,1); }
@@ -302,14 +302,14 @@ function injectLogoStyle(): void {
        90% { transform: rotate( 0deg); }
       100% { transform: rotate( 5deg); }
     }
-    [data-onelingo-logo]:hover .saladbowl-leaf {
+    [${LOGO_ATTR}]:hover .saladbowl-leaf {
       animation: saladbowl-leaf-shake 0.7s infinite linear;
     }
-    [data-onelingo-logo]:hover .saladbowl-orange {
+    [${LOGO_ATTR}]:hover .saladbowl-orange {
       transform-origin: 301.8px 187.4px;
       animation: saladbowl-orange-spin 0.7s infinite linear;
     }
-    [data-onelingo-logo]:hover .saladbowl-tomato {
+    [${LOGO_ATTR}]:hover .saladbowl-tomato {
       transform-origin: 297.8px 126.4px;
       animation: saladbowl-tomato-shake 0.7s infinite linear;
     }
@@ -384,7 +384,7 @@ function showLogo(s: State, mouseX: number, mouseY: number): void {
   // 每次显示都重放果冻入场动画（display:none→block 不会自动重置 inline animation）
   el.style.animation = "none";
   void el.offsetWidth; // 触发 reflow，让浏览器认为动画被中断
-  el.style.animation = "onelingo-jelly 1s linear";
+  el.style.animation = "omni-lingo-jelly 1s linear";
 }
 
 function onLogoEnter(s: State): void {
@@ -448,7 +448,7 @@ function showCard(s: State): void {
       })
       .catch((err: unknown) => {
         s.cardMounted = false;
-        console.warn("[OneLingo] failed to mount selection card:", err);
+        console.warn("[Omni Lingo] failed to mount selection card:", err);
       });
   }
 
@@ -523,5 +523,5 @@ function isInEditable(n: Node | null): boolean {
 }
 
 function isReaderUi(t: EventTarget | null): boolean {
-  return t instanceof Element && !!t.closest(`[${READER_UI_ATTR}]`);
+  return t instanceof Element && !!t.closest(OMNI_LINGO_UI_BOUNDARY_SELECTOR);
 }
