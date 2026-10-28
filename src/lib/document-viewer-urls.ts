@@ -9,8 +9,12 @@ const FOLIATE_VIEWER_PATH = "foliate/web/viewer.html";
 const READER_SHELL_PATH = "viewer.html";
 export const STORED_DOCUMENT_KEY_PARAM = "omni-lingo-key";
 export const DOCUMENT_SNIFF_PARAM = "omni-lingo-sniff";
-const PDF_URL_RE = /\.pdf(?:$|[?#].*)?/i;
-const FOLIATE_URL_RE = /\.(?:epub|mobi|azw3|kf8|fb2|fb2\.zip|fbz)(?:$|[?#].*)?/i;
+export const HTTP_PDF_DOCUMENT_URL_REGEX =
+  "^https?://[^/?#]+/[^?#]*\\.[Pp][Dd][Ff](?:$|[?#].*)";
+export const HTTP_FOLIATE_DOCUMENT_URL_REGEX =
+  "^https?://[^/?#]+/[^?#]*\\.(?:[Ee][Pp][Uu][Bb]|[Mm][Oo][Bb][Ii]|[Aa][Zz][Ww]3|[Kk][Ff]8|[Ff][Bb]2(?:\\.zip)?|[Ff][Bb][Zz])(?:$|[?#].*)";
+const PDF_URL_RE = /\.pdf$/i;
+const FOLIATE_URL_RE = /\.(?:epub|mobi|azw3|kf8|fb2(?:\.zip)?|fbz)$/i;
 
 export function pdfViewerUrlForFile(fileUrl: string, uiLang?: UiLang): string {
   const url = pdfViewerBaseUrl();
@@ -145,7 +149,7 @@ function applyPdfLocale(url: URL, uiLang: UiLang | undefined): void {
 function testDocumentUrl(url: string, regex: RegExp): boolean {
   try {
     const parsed = new URL(url);
-    return regex.test(parsed.pathname + parsed.search + parsed.hash);
+    return regex.test(parsed.pathname);
   } catch {
     return false;
   }

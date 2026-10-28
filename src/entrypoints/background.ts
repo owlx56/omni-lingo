@@ -13,6 +13,8 @@ import {
 import { browser, type Browser } from "wxt/browser";
 import type { UiLang } from "@/lib/languages";
 import {
+  HTTP_FOLIATE_DOCUMENT_URL_REGEX,
+  HTTP_PDF_DOCUMENT_URL_REGEX,
   documentViewerUrlForUrl,
   foliateViewerUrlForSniff,
   isFoliateViewerUrl,
@@ -30,9 +32,6 @@ const SNIFFED_DOCUMENT_STORAGE_PREFIX = "omni-lingo:sniffed-document:";
 const DOCUMENT_SNIFF_RULE_IDS = [42001, 42002, 42003, 42004, 42005, 42006];
 const DOCUMENT_SNIFF_BYPASS_RULE_ID_START = 42100;
 const DOCUMENT_SNIFF_BYPASS_RULE_ID_COUNT = 32;
-const HTTP_PDF_URL_REGEX = "^https?://.*\\.[Pp][Dd][Ff](?:$|[?#].*)?";
-const HTTP_FOLIATE_URL_REGEX =
-  "^https?://.*\\.(?:[Ee][Pp][Uu][Bb]|[Mm][Oo][Bb][Ii]|[Aa][Zz][Ww]3|[Kk][Ff]8|[Ff][Bb]2(?:\\.zip)?|[Ff][Bb][Zz])(?:$|[?#].*)?";
 const DOCUMENT_RESPONSE_TYPES = new Set([
   "application/pdf",
   "application/epub+zip",
@@ -351,7 +350,7 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
       priority: 1,
       action: { type: "redirect", redirect: pdfRedirect },
       condition: {
-        regexFilter: HTTP_PDF_URL_REGEX,
+        regexFilter: HTTP_PDF_DOCUMENT_URL_REGEX,
         resourceTypes,
       },
     },
@@ -370,7 +369,7 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
       priority: 1,
       action: { type: "redirect", redirect: foliateRedirect },
       condition: {
-        regexFilter: HTTP_FOLIATE_URL_REGEX,
+        regexFilter: HTTP_FOLIATE_DOCUMENT_URL_REGEX,
         resourceTypes,
       },
     },
@@ -395,7 +394,7 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
       priority: 1,
       action: { type: "redirect", redirect: pdfRedirect },
       condition: {
-        regexFilter: HTTP_PDF_URL_REGEX,
+        regexFilter: HTTP_PDF_DOCUMENT_URL_REGEX,
         resourceTypes,
         responseHeaders: [
           { header: "content-type", values: ["application/octet-stream*"] },
@@ -407,7 +406,7 @@ function createDocumentSniffRules(): Browser.declarativeNetRequest.Rule[] {
       priority: 1,
       action: { type: "redirect", redirect: foliateRedirect },
       condition: {
-        regexFilter: HTTP_FOLIATE_URL_REGEX,
+        regexFilter: HTTP_FOLIATE_DOCUMENT_URL_REGEX,
         resourceTypes,
         responseHeaders: [
           { header: "content-type", values: ["application/octet-stream*"] },
